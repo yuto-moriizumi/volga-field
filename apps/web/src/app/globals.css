@@ -1,0 +1,48 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --panel-light: #334155;
+  --text: #f1f5f9;
+  --text-dim: #94a3b8;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --danger: #ef4444;
+  --success: #10b981;
+  --magic: #8b5cf6;
+  --weapon: #dc2626;
+  --shield: #3b82f6;
+  --potion: #10b981;
+  --special: #f59e0b;
+  --border: #475569;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+    sans-serif;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input {
+  font-family: inherit;
+}
