@@ -10,3 +10,4 @@ build/
 coverage/
 .opencode/goals/
 .playwright-mcp/
+.worktrees
