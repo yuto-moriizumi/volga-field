@@ -87,7 +87,11 @@ export function Lobby() {
     if (mode === "shugyo" || mode === "shinken") {
       localStorage.setItem("volga-player-name", name.trim());
       localStorage.removeItem("volga-room-password");
-      send({ type: "create_room", playerName: name.trim() });
+      send({
+        type: "create_room",
+        playerName: name.trim(),
+        mode: mode === "shugyo" ? "training" : "versus",
+      });
     } else {
       setHostMode(mode);
       setHostPassword("");
