@@ -245,7 +245,6 @@ function placeholderState(
       hp: 20,
       maxHp: 20,
       hand: [],
-      equipped: { weapon: null, shield: null, barrier: false },
       ready: p.ready,
     })),
     deckSize: 0,
@@ -329,7 +328,6 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       hp: 20,
       maxHp: 20,
       hand: [],
-      equipped: { weapon: null, shield: null, barrier: false },
       ready: false,
     },
   });
