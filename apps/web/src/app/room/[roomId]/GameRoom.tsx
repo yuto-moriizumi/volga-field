@@ -92,10 +92,6 @@ export function GameRoom({
   const isDefending = gameState?.phase === "defense" && gameState.pendingAttack?.defenderId === playerId;
 
   useEffect(() => {
-    if (opponent && !selectedTargetId) setSelectedTargetId(opponent.id);
-  }, [opponent, selectedTargetId]);
-
-  useEffect(() => {
     if (!lastMessage || lastMessage.type !== "game_state") return;
     const latest = lastMessage.gameState.log.at(-1);
     if (latest?.kind === "attack" && latest.damage) {
@@ -108,6 +104,7 @@ export function GameRoom({
     const card = me.hand[idx];
     if (!card) return;
     setSelectedCardIdx(idx);
+    setSelectedTargetId(isAttackCard(card.id) ? opponent?.id ?? null : null);
   }
 
   function executeSelectedCard() {
@@ -691,6 +688,14 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
 
 function isDefenseCard(cardId: string): boolean {
   return findCard(cardId)?.effects.some((effect) => effect.kind === "equip_shield") ?? false;
+}
+
+function isAttackCard(cardId: string): boolean {
+  return (
+    findCard(cardId)?.effects.some(
+      (effect) => effect.kind === "damage" && effect.target === "opponent",
+    ) ?? false
+  );
 }
 
 function HpBar({
