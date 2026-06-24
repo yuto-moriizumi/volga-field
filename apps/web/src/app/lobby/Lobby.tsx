@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { DoomsdayTurn } from "@volga/shared";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 
 type ModeId = "shugyo" | "kakure" | "shinken";
+const DOOMSDAY_TURNS: DoomsdayTurn[] = [50, 75, 100];
 
 const MODES: {
   id: ModeId;
@@ -42,6 +44,7 @@ export function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const [hostMode, setHostMode] = useState<ModeId | null>(null);
   const [hostPassword, setHostPassword] = useState("");
+  const [doomsdayTurn, setDoomsdayTurn] = useState<DoomsdayTurn>(50);
   const [showJoin, setShowJoin] = useState(false);
   const [prophetCount, setProphetCount] = useState(0);
 
@@ -91,6 +94,7 @@ export function Lobby() {
         type: "create_room",
         playerName: name.trim(),
         mode: mode === "shugyo" ? "training" : "versus",
+        doomsdayTurn: mode === "shugyo" ? doomsdayTurn : undefined,
       });
     } else {
       setHostMode(mode);
@@ -110,7 +114,12 @@ export function Lobby() {
       "volga-room-password",
       JSON.stringify({ mode: hostMode, password: trimmedPassword }),
     );
-    send({ type: "create_room", roomId: trimmedPassword, playerName: name.trim() });
+    send({
+      type: "create_room",
+      roomId: trimmedPassword,
+      playerName: name.trim(),
+      doomsdayTurn,
+    });
   }
 
   function joinWithPassword() {
@@ -171,6 +180,22 @@ export function Lobby() {
           ))}
         </div>
 
+        <section className="gf-card gf-doomsday-picker">
+          <div className="gf-section-title">終末の時</div>
+          <div className="gf-segmented" role="group" aria-label="終末の時">
+            {DOOMSDAY_TURNS.map((turn) => (
+              <button
+                key={turn}
+                type="button"
+                className={turn === doomsdayTurn ? "active" : ""}
+                onClick={() => setDoomsdayTurn(turn)}
+              >
+                G.F.{turn}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {showJoin && (
           <section
             className="gf-card"
@@ -214,6 +239,18 @@ export function Lobby() {
             >
               仲間と同じ合言葉を入力してください
             </p>
+            <div className="gf-segmented" role="group" aria-label="終末の時">
+              {DOOMSDAY_TURNS.map((turn) => (
+                <button
+                  key={turn}
+                  type="button"
+                  className={turn === doomsdayTurn ? "active" : ""}
+                  onClick={() => setDoomsdayTurn(turn)}
+                >
+                  G.F.{turn}
+                </button>
+              ))}
+            </div>
             <input
               className="gf-input"
               value={hostPassword}

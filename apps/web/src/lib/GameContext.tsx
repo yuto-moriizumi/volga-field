@@ -29,6 +29,7 @@ export interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null);
 
 function getDefaultUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
   if (typeof window === "undefined") return "ws://localhost:4000";
   const host = window.location.hostname;
   return `ws://${host}:4000`;

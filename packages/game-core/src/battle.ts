@@ -1,6 +1,7 @@
 import type {
   BattleLogEntry,
   CardRef,
+  DoomsdayTurn,
   GameState,
   PlayerId,
   PlayerState,
@@ -13,10 +14,20 @@ import { damagePlayer, healPlayer } from "./player.js";
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
 export const MAX_PLAYERS = 2;
+const DOOMSDAY_EVENT_RATE = 0.25;
+
+const DOOMSDAY_EVENTS = [
+  { name: "小悪魔", weight: 7, damage: 10 },
+  { name: "中悪魔", weight: 5, damage: 20 },
+  { name: "大悪魔", weight: 3, damage: 30 },
+  { name: "イタズラマン", weight: 5, discard: 2 },
+  { name: "めぐみの妖精", weight: 5, heal: 10 },
+] as const;
 
 export function createGame(
   roomId: string,
   players: { id: PlayerId; name: string }[],
+  options: { doomsdayTurn?: DoomsdayTurn | null } = {},
 ): { state: GameState; deck: CardRef[] } {
   const seed = Date.now();
   let deck = buildDeck(seed);
@@ -39,6 +50,9 @@ export function createGame(
     players: initialStates,
     deckSize: deck.length,
     turn: 1,
+    actionTurn: 1,
+    doomsdayTurn: options.doomsdayTurn ?? null,
+    doomsdayActive: false,
     activePlayerIndex: 0,
     phase: "play",
     pendingAttack: null,
@@ -54,6 +68,61 @@ export function createGame(
     startedAt: Date.now(),
   };
   return { state, deck };
+}
+
+function pickDoomsdayEvent() {
+  const total = DOOMSDAY_EVENTS.reduce((sum, event) => sum + event.weight, 0);
+  let roll = Math.random() * total;
+  for (const event of DOOMSDAY_EVENTS) {
+    roll -= event.weight;
+    if (roll <= 0) return event;
+  }
+  return DOOMSDAY_EVENTS[0]!;
+}
+
+function applyDoomsdayEvent(
+  player: PlayerState,
+  turn: number,
+): { player: PlayerState; log: BattleLogEntry | null } {
+  if (Math.random() >= DOOMSDAY_EVENT_RATE) return { player, log: null };
+
+  const event = pickDoomsdayEvent();
+  if ("damage" in event) {
+    return {
+      player: damagePlayer(player, event.damage),
+      log: {
+        turn,
+        playerId: player.id,
+        message: `終末の時: ${event.name}が現れ、${player.name}が${event.damage}ダメージを受けた`,
+        kind: "system",
+        damage: event.damage,
+      },
+    };
+  }
+  if ("discard" in event) {
+    const nextHand = player.hand.slice(0, Math.max(0, player.hand.length - event.discard));
+    const discarded = player.hand.length - nextHand.length;
+    return {
+      player: { ...player, hand: nextHand },
+      log: {
+        turn,
+        playerId: player.id,
+        message: `終末の時: ${event.name}が現れ、${player.name}の神器を${discarded}枚捨てた`,
+        kind: "system",
+      },
+    };
+  }
+
+  const healed = healPlayer(player, event.heal);
+  return {
+    player: healed,
+    log: {
+      turn,
+      playerId: player.id,
+      message: `終末の時: ${event.name}が現れ、${player.name}のHPが${healed.hp - player.hp}回復した`,
+      kind: "system",
+    },
+  };
 }
 
 interface PairResult {
@@ -563,6 +632,13 @@ export function endTurn(
   let drawn: CardRef[] = [];
   const deficit = HAND_SIZE - self.hand.length;
   if (deficit > 0 && newDeck.length > 0) {
+    if (state.doomsdayActive) {
+      for (let i = 0; i < deficit; i++) {
+        const result = applyDoomsdayEvent(self, state.turn);
+        self = result.player;
+        if (result.log) logs.push(result.log);
+      }
+    }
     const result = drawCards(newDeck, deficit);
     drawn = result.drawn;
     newDeck = result.deck;
@@ -586,6 +662,19 @@ export function endTurn(
 
   const nextIdx = (state.activePlayerIndex + 1) % state.players.length;
   const newTurn = nextIdx === 0 ? state.turn + 1 : state.turn;
+  const newActionTurn = state.actionTurn + 1;
+  const doomsdayActive =
+    state.doomsdayActive ||
+    (state.doomsdayTurn !== null && newActionTurn >= state.doomsdayTurn);
+
+  if (!state.doomsdayActive && doomsdayActive) {
+    logs.push({
+      turn: newTurn,
+      playerId,
+      message: `終末の時 G.F.${state.doomsdayTurn} が訪れた`,
+      kind: "system",
+    });
+  }
 
   const finalPlayers = state.players.map((p) => {
     if (p.id === playerId) return self;
@@ -597,6 +686,8 @@ export function endTurn(
     players: finalPlayers,
     activePlayerIndex: nextIdx,
     turn: newTurn,
+    actionTurn: newActionTurn,
+    doomsdayActive,
     deckSize: newDeck.length,
     phase: "play",
     pendingAttack: null,

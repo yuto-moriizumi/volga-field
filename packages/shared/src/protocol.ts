@@ -1,5 +1,6 @@
 import type {
   CardRef,
+  DoomsdayTurn,
   GameState,
   PlayerId,
   PlayerState,
@@ -8,7 +9,13 @@ import type {
 } from "./types.js";
 
 export type ClientMessage =
-  | { type: "create_room"; playerName: string; roomId?: RoomId; mode?: "training" | "versus" }
+  | {
+      type: "create_room";
+      playerName: string;
+      roomId?: RoomId;
+      mode?: "training" | "versus";
+      doomsdayTurn?: DoomsdayTurn;
+    }
   | { type: "join_room"; roomId: RoomId; playerName: string }
   | { type: "leave_room" }
   | { type: "ready" }
