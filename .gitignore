@@ -8,3 +8,4 @@ build/
 .turbo
 coverage/
 .opencode/goals/
+.playwright-mcp/
