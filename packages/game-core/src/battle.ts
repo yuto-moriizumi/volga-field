@@ -545,20 +545,6 @@ export function endTurn(
     state.players.find((p) => p.id !== playerId) ?? state.players[0]!;
   const logs: BattleLogEntry[] = [];
 
-  if (self.equipped.weapon) {
-    const dmg = self.equipped.weapon.power;
-    const { target: updated, log } = resolveDamage(
-      opponent,
-      dmg,
-      self.equipped.weapon.id,
-      "武器攻撃",
-      playerId,
-      state.turn,
-    );
-    opponent = updated;
-    logs.push(...log);
-  }
-
   let newDeck = deck;
   let drawn: CardRef[] = [];
   const deficit = HAND_SIZE - self.hand.length;
