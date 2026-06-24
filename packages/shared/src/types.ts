@@ -34,6 +34,7 @@ export interface PlayerState {
 }
 
 export type TurnPhase = "draw" | "play" | "defense" | "resolved";
+export type DoomsdayTurn = 50 | 75 | 100;
 
 export interface PendingAttack {
   attackerId: PlayerId;
@@ -56,6 +57,9 @@ export interface GameState {
   players: PlayerState[];
   deckSize: number;
   turn: number;
+  actionTurn: number;
+  doomsdayTurn: DoomsdayTurn | null;
+  doomsdayActive: boolean;
   activePlayerIndex: number;
   phase: TurnPhase;
   pendingAttack: PendingAttack | null;

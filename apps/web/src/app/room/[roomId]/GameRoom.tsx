@@ -218,9 +218,9 @@ export function GameRoom({
   const oppReady = opponent?.ready ?? false;
 
   return (
-    <div className="gf-app">
+    <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
       <TopBar
-        title={`ターン ${gameState.turn}`}
+        title={`G.F.${gameState.actionTurn}`}
         rightAction={{ label: "退出", icon: "🚪", onClick: leaveRoom }}
       />
 
@@ -296,6 +296,11 @@ export function GameRoom({
       </main>
 
       <BottomBar playerName={(me?.name ?? name.trim()) || "ヴォルガ"}>
+        {gameState.doomsdayTurn && (
+          <span className="gf-tag">
+            終末 {gameState.doomsdayActive ? "発生中" : `G.F.${gameState.doomsdayTurn}`}
+          </span>
+        )}
         <span className="gf-tag">山札 {gameState.deckSize}</span>
       </BottomBar>
 

@@ -100,6 +100,18 @@ a {
   flex-direction: column;
 }
 
+.gf-app.gf-doomsday-active {
+  background:
+    repeating-radial-gradient(
+      circle at 50% 45%,
+      rgba(255, 84, 62, 0.2) 0,
+      rgba(255, 84, 62, 0.2) 2px,
+      transparent 2px,
+      transparent 18px
+    ),
+    linear-gradient(135deg, #280f14, #5b161b 48%, #12090c);
+}
+
 .gf-main {
   flex: 1;
   display: flex;
@@ -343,6 +355,37 @@ a {
 
 .gf-mode-card.tone-pink .head {
   background: linear-gradient(180deg, var(--accent-pink), var(--accent-pink-dark));
+}
+
+.gf-doomsday-picker {
+  width: min(420px, 92%);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gf-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+
+.gf-segmented button {
+  min-height: 40px;
+  border: 2px solid var(--bar-teal-dark);
+  border-radius: 6px;
+  background: var(--panel-cream);
+  color: var(--text-dark);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gf-segmented button.active {
+  background: linear-gradient(180deg, #6a1d23, #2b1014);
+  border-color: #14080a;
+  color: #fff2d6;
 }
 
 .gf-btn {

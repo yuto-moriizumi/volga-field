@@ -1,6 +1,7 @@
 import type { WebSocket } from "ws";
 import type {
   ClientMessage,
+  DoomsdayTurn,
   PlayerId,
   RoomId,
   ServerMessage,
@@ -85,6 +86,7 @@ function startGame(room: Room): void {
   const { state, deck } = createGame(
     room.id,
     room.players.map((p) => ({ id: p.id, name: p.name })),
+    { doomsdayTurn: room.doomsdayTurn },
   );
   room.gameState = state;
   room.deck = deck;
@@ -164,11 +166,16 @@ function normalizeRoomId(roomId?: RoomId): RoomId | null {
   return trimmed ? trimmed : null;
 }
 
+function normalizeDoomsdayTurn(value: DoomsdayTurn | undefined | null): DoomsdayTurn | null {
+  return value === 50 || value === 75 || value === 100 ? value : null;
+}
+
 function handleCreateRoom(
   client: Client,
   name: string,
   requestedRoomId?: RoomId,
   mode: RoomMode = "versus",
+  doomsdayTurn: DoomsdayTurn | null = null,
 ): void {
   if (client.roomId) {
     log(`create_room rejected (already in room ${client.roomId}) from ${client.id}`);
@@ -187,7 +194,7 @@ function handleCreateRoom(
     name: name || "プレイヤー",
     ready: false,
   };
-  const room = createRoom(id, roomPlayer, mode);
+  const room = createRoom(id, roomPlayer, mode, normalizeDoomsdayTurn(doomsdayTurn));
   if (mode === "training") {
     room.players.push({
       id: genId("ai"),
@@ -226,6 +233,9 @@ function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
     })),
     deckSize: 0,
     turn: 0,
+    actionTurn: 0,
+    doomsdayTurn: null,
+    doomsdayActive: false,
     activePlayerIndex: 0,
     phase: "draw",
     pendingAttack: null,
@@ -418,7 +428,13 @@ function handlePing(client: Client): void {
 function dispatch(client: Client, msg: ClientMessage): void {
   switch (msg.type) {
     case "create_room":
-      handleCreateRoom(client, msg.playerName, msg.roomId, msg.mode);
+      handleCreateRoom(
+        client,
+        msg.playerName,
+        msg.roomId,
+        msg.mode,
+        normalizeDoomsdayTurn(msg.doomsdayTurn),
+      );
       break;
     case "join_room":
       handleJoinRoom(client, msg.roomId, msg.playerName);

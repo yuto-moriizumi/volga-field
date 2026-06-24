@@ -1,4 +1,4 @@
-import type { CardRef, GameState, PlayerId, RoomId } from "@volga/shared";
+import type { CardRef, DoomsdayTurn, GameState, PlayerId, RoomId } from "@volga/shared";
 
 export interface RoomPlayer {
   id: PlayerId;
@@ -18,11 +18,17 @@ export interface Room {
   deck: CardRef[];
   started: boolean;
   mode: RoomMode;
+  doomsdayTurn: DoomsdayTurn | null;
 }
 
 export const MAX_PLAYERS = 2;
 
-export function createRoom(id: RoomId, host: RoomPlayer, mode: RoomMode = "versus"): Room {
+export function createRoom(
+  id: RoomId,
+  host: RoomPlayer,
+  mode: RoomMode = "versus",
+  doomsdayTurn: DoomsdayTurn | null = null,
+): Room {
   return {
     id,
     hostId: host.id,
@@ -31,6 +37,7 @@ export function createRoom(id: RoomId, host: RoomPlayer, mode: RoomMode = "versu
     deck: [],
     started: false,
     mode,
+    doomsdayTurn,
   };
 }
 
