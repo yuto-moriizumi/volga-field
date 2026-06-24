@@ -8,16 +8,12 @@
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,
-    "incremental": true,
+    "incremental": false,
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"]
     }
   },
   "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"],
-  "references": [
-    { "path": "../../packages/shared" },
-    { "path": "../../packages/game-core" }
-  ]
+  "exclude": ["node_modules"]
 }
