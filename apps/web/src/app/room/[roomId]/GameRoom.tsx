@@ -103,8 +103,11 @@ export function GameRoom({
     if (!me || !isMyTurn) return;
     const card = me.hand[idx];
     if (!card) return;
-    setSelectedCardIdx(idx);
-    setSelectedTargetId(isAttackCard(card.id) ? opponent?.id ?? null : null);
+    const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
+    setSelectedCardIdx(nextSelectedIdx);
+    setSelectedTargetId(
+      nextSelectedIdx !== null && isAttackCard(card.id) ? opponent?.id ?? null : null,
+    );
   }
 
   function executeSelectedCard() {
@@ -280,7 +283,7 @@ export function GameRoom({
               hitFlash={hitFlash}
               onSelectTarget={setSelectedTargetId}
               onExecute={executeSelectedCard}
-              onPassDefense={() => defend()}
+              onPassDefense={() => defend(selectedDefenseIdx ?? undefined)}
               onEndTurn={endTurn}
             />
             <MyArea
@@ -290,8 +293,9 @@ export function GameRoom({
               selectedCardIdx={selectedCardIdx}
               selectedDefenseIdx={selectedDefenseIdx}
               onPlayCard={playCard}
-              onSelectDefense={setSelectedDefenseIdx}
-              onDefend={defend}
+              onSelectDefense={(idx) =>
+                setSelectedDefenseIdx((current) => (current === idx ? null : idx))
+              }
             />
             <BattleLog entries={gameState.log} />
           </>
@@ -421,7 +425,6 @@ function MyArea({
   selectedDefenseIdx,
   onPlayCard,
   onSelectDefense,
-  onDefend,
 }: {
   me: PlayerState | null;
   isMyTurn: boolean;
@@ -429,8 +432,7 @@ function MyArea({
   selectedCardIdx: number | null;
   selectedDefenseIdx: number | null;
   onPlayCard: (idx: number) => void;
-  onSelectDefense: (idx: number | null) => void;
-  onDefend: (idx?: number) => void;
+  onSelectDefense: (idx: number) => void;
 }) {
   if (!me) return <div />;
   return (
@@ -490,7 +492,6 @@ function MyArea({
             onClick={() => {
               if (isDefending) {
                 onSelectDefense(idx);
-                onDefend(idx);
               } else {
                 onPlayCard(idx);
               }
