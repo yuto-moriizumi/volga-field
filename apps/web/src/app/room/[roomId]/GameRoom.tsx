@@ -218,12 +218,13 @@ export function GameRoom({
     gameState.turn > 0 &&
     gameState.players.length >= 2 &&
     gameState.players[0]!.hand.length > 0;
+  const displayedActionTurn = gameState.actionTurn ?? gameState.turn;
   const meReady = me?.ready ?? false;
 
   return (
     <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
       <TopBar
-        title={`G.F.${gameState.actionTurn}`}
+        title={`G.F.${displayedActionTurn}`}
         rightAction={{ label: "退出", icon: "🚪", onClick: leaveRoom }}
       />
 

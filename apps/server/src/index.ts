@@ -222,17 +222,21 @@ function handleCreateRoom(
   client.roomId = id;
   client.name = name || "プレイヤー";
   log(`create_room: ${id} by ${client.id} (${client.name})`);
-  send(client.ws, {
-    type: "room_created",
-    roomId: id,
-    gameState: room.gameState ?? placeholderState(id, room.players),
-  });
   if (mode === "training") {
     startGame(room);
   }
+  send(client.ws, {
+    type: "room_created",
+    roomId: id,
+    gameState: room.gameState ?? placeholderState(id, room.players, room.doomsdayTurn),
+  });
 }
 
-function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
+function placeholderState(
+  roomId: RoomId,
+  players: RoomPlayer[],
+  doomsdayTurn: DoomsdayTurn | null = null,
+): GameState {
   return {
     roomId,
     players: players.map((p) => ({
@@ -247,7 +251,7 @@ function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
     deckSize: 0,
     turn: 0,
     actionTurn: 0,
-    doomsdayTurn: null,
+    doomsdayTurn,
     doomsdayActive: false,
     activePlayerIndex: 0,
     phase: "draw",
@@ -287,7 +291,7 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
     log(`join_room: rejoin ${client.id} (${client.name}) to ${roomId}`);
     send(client.ws, {
       type: "room_joined",
-      gameState: room.gameState ?? placeholderState(roomId, room.players),
+      gameState: room.gameState ?? placeholderState(roomId, room.players, room.doomsdayTurn),
     });
     return;
   }
@@ -329,7 +333,7 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       ready: false,
     },
   });
-  const updatedState = room.gameState ?? placeholderState(roomId, room.players);
+  const updatedState = room.gameState ?? placeholderState(roomId, room.players, room.doomsdayTurn);
   for (const p of room.players) {
     if (p.id === newPlayer.id || !p.ws) continue;
     send(p.ws, {
@@ -352,7 +356,7 @@ function handleReady(client: Client): void {
   if (!player) return;
   player.ready = !player.ready;
   log(`ready: ${client.id} in ${room.id} -> ${player.ready}`);
-  const state = room.gameState ?? placeholderState(room.id, room.players);
+  const state = room.gameState ?? placeholderState(room.id, room.players, room.doomsdayTurn);
   for (const p of room.players) {
     if (!p.ws) continue;
     send(p.ws, {
