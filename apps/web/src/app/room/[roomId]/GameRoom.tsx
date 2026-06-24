@@ -3,8 +3,10 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
 import type { GameState, PlayerState } from "@volga/shared";
-import { CardView } from "./CardView";
+import { BottomBar } from "../../_components/BottomBar";
+import { TopBar } from "../../_components/TopBar";
 import { BattleLog } from "./BattleLog";
+import { CardView } from "./CardView";
 
 export function GameRoom({
   params,
@@ -105,251 +107,171 @@ export function GameRoom({
   if (!gameState) {
     const connecting = status !== "connected";
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 16,
-          padding: 24,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 28 }}>⚔️ Volga Field</h1>
-        <div style={{ color: "var(--text-dim)" }}>
-          ルームID: <code>{roomId}</code>
-        </div>
-        {connecting ? (
-          <div>サーバに接続中... ({status})</div>
-        ) : (
-          <section
+      <div className="gf-app">
+        <TopBar showBack={false} />
+        <main
+          className="gf-main"
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+          }}
+        >
+          <h1
+            className="gf-title"
+            style={{ fontSize: 44, WebkitTextStroke: "1.5px #4a2810" }}
+          >
+            Volga Field
+          </h1>
+          <div
             style={{
-              background: "var(--panel)",
-              padding: 24,
-              borderRadius: 8,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              minWidth: 280,
+              color: "var(--text-dark-soft)",
+              background: "var(--panel-cream)",
+              border: "2px solid var(--line-teal)",
+              borderRadius: 12,
+              padding: "6px 14px",
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 18 }}>ルームに参加</h2>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="あなたの名前"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitName();
-              }}
+            部屋: <code style={{ fontWeight: 900 }}>{roomId}</code>
+          </div>
+          {connecting ? (
+            <div style={{ color: "var(--text-dark-soft)" }}>
+              サーバに接続中... ({status})
+            </div>
+          ) : (
+            <section
+              className="gf-card"
               style={{
-                padding: "8px 12px",
-                borderRadius: 4,
-                border: "1px solid var(--border)",
-                background: "var(--bg)",
-                color: "var(--text)",
-                fontSize: 16,
-              }}
-            />
-            <button
-              onClick={submitName}
-              disabled={!name.trim() || joinRequested}
-              style={{
-                padding: "12px 24px",
-                borderRadius: 4,
-                background: "var(--accent)",
-                color: "#000",
-                fontWeight: 700,
-                fontSize: 16,
+                padding: 20,
+                width: "min(360px, 92%)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
               }}
             >
-              {joinRequested ? "参加中..." : "参加"}
-            </button>
-            {error && (
-              <div
-                style={{
-                  padding: 8,
-                  background: "var(--danger)",
-                  color: "#fff",
-                  borderRadius: 4,
-                  fontSize: 14,
+              <div className="gf-section-title">預言者の合流</div>
+              <input
+                className="gf-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="あなたの名前"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitName();
                 }}
+              />
+              <button
+                className="gf-btn"
+                onClick={submitName}
+                disabled={!name.trim() || joinRequested}
               >
-                {error}
-              </div>
-            )}
-          </section>
-        )}
-      </main>
+                {joinRequested ? "合流中…" : "唱える"}
+              </button>
+            </section>
+          )}
+          {error && <div className="gf-toast">{error}</div>}
+        </main>
+        <BottomBar playerName={name.trim() || "ヴォルガ"} />
+      </div>
     );
   }
 
-  const gameStarted = gameState.turn > 0 && gameState.players.length === 2 && gameState.players[0]!.hand.length > 0;
+  const gameStarted =
+    gameState.turn > 0 &&
+    gameState.players.length === 2 &&
+    gameState.players[0]!.hand.length > 0;
   const meReady = me?.ready ?? false;
   const oppReady = opponent?.ready ?? false;
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        padding: 16,
-        gap: 16,
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+    <div className="gf-app">
+      <TopBar
+        title={`ターン ${gameState.turn}`}
+        rightAction={{ label: "退出", icon: "🚪", onClick: leaveRoom }}
+      />
+
+      <main
+        className="gf-main"
+        style={{ gap: 14 }}
       >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>ルーム: {roomId}</h1>
-          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-            ターン {gameState.turn} · 山札残り {gameState.deckSize}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <span
+        {!gameStarted && (
+          <section
+            className="gf-card"
             style={{
-              padding: "4px 12px",
-              borderRadius: 12,
-              fontSize: 12,
-              background:
-                status === "connected" ? "var(--success)" : "var(--danger)",
-            }}
-          >
-            {status}
-          </span>
-          <button
-            onClick={leaveRoom}
-            style={{
-              padding: "4px 12px",
-              borderRadius: 4,
-              background: "var(--panel-light)",
-              color: "var(--text)",
-              fontSize: 12,
-            }}
-          >
-            退出
-          </button>
-        </div>
-      </header>
-
-      {!gameStarted && (
-        <section
-          style={{
-            background: "var(--panel)",
-            padding: 24,
-            borderRadius: 8,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            alignItems: "center",
-          }}
-        >
-          <h2 style={{ margin: 0 }}>対戦相手を待っています...</h2>
-          <div style={{ display: "flex", gap: 24 }}>
-            <PlayerSlot name={me?.name ?? "?"} ready={meReady} self />
-            <PlayerSlot name={opponent?.name ?? "?"} ready={oppReady} />
-          </div>
-          <button
-            onClick={ready}
-            disabled={!opponent}
-            style={{
-              padding: "12px 24px",
-              borderRadius: 4,
-              background: meReady ? "var(--panel-light)" : "var(--accent)",
-              color: meReady ? "var(--text)" : "#000",
-              fontWeight: 700,
-              fontSize: 16,
-            }}
-          >
-            {meReady ? "準備解除" : "準備完了"}
-          </button>
-        </section>
-      )}
-
-      {gameStarted && (
-        <>
-          <OpponentArea opponent={opponent} />
-          <BattleArea
-            isMyTurn={isMyTurn}
-            gameState={gameState}
-            onEndTurn={endTurn}
-          />
-          <MyArea
-            me={me}
-            isMyTurn={isMyTurn}
-            selectedCardIdx={selectedCardIdx}
-            onPlayCard={playCard}
-          />
-          <BattleLog entries={gameState.log} />
-        </>
-      )}
-
-      {error && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            padding: 12,
-            background: "var(--danger)",
-            color: "#fff",
-            borderRadius: 4,
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {gameState.winner && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: "var(--panel)",
-              padding: 32,
-              borderRadius: 12,
-              textAlign: "center",
+              padding: 22,
               display: "flex",
               flexDirection: "column",
-              gap: 16,
+              gap: 14,
+              alignItems: "center",
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 32 }}>
-              {gameState.winner === playerId
-                ? "🏆 あなたの勝利!"
-                : "💀 敗北..."}
-            </h2>
+            <div className="gf-section-title">対戦相手を待っています…</div>
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", justifyContent: "center" }}>
+              <PlayerSlot name={me?.name ?? "?"} ready={meReady} self />
+              <PlayerSlot name={opponent?.name ?? "?"} ready={oppReady} />
+            </div>
             <button
-              onClick={leaveRoom}
+              className="gf-btn"
+              onClick={ready}
+              disabled={!opponent}
               style={{
-                padding: "12px 24px",
-                borderRadius: 4,
-                background: "var(--accent)",
-                color: "#000",
-                fontWeight: 700,
+                background: meReady
+                  ? "linear-gradient(180deg, #b8b4d4, #908cb6)"
+                  : undefined,
+                color: meReady ? "#2c2745" : undefined,
               }}
             >
-              ロビーに戻る
+              {meReady ? "準備解除" : "準備完了"}
+            </button>
+          </section>
+        )}
+
+        {gameStarted && (
+          <>
+            <OpponentArea opponent={opponent} />
+            <BattleArea
+              isMyTurn={isMyTurn}
+              gameState={gameState}
+              onEndTurn={endTurn}
+            />
+            <MyArea
+              me={me}
+              isMyTurn={isMyTurn}
+              selectedCardIdx={selectedCardIdx}
+              onPlayCard={playCard}
+            />
+            <BattleLog entries={gameState.log} />
+          </>
+        )}
+
+        {error && <div className="gf-toast">{error}</div>}
+      </main>
+
+      <BottomBar playerName={(me?.name ?? name.trim()) || "ヴォルガ"}>
+        <span className="gf-tag">山札 {gameState.deckSize}</span>
+      </BottomBar>
+
+      {gameState.winner && (
+        <div className="gf-modal-backdrop">
+          <div className="gf-modal" style={{ alignItems: "center", textAlign: "center" }}>
+            <div style={{ fontSize: 56, lineHeight: 1 }}>
+              {gameState.winner === playerId ? "" : "💀"}
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 26,
+                color: "var(--bar-teal-dark)",
+              }}
+            >
+              {gameState.winner === playerId ? "あなたの勝利!" : "敗北…"}
+            </h2>
+            <button className="gf-btn" onClick={leaveRoom}>
+              戻る
             </button>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -364,21 +286,21 @@ function PlayerSlot({
 }) {
   return (
     <div
+      className="gf-card-soft"
       style={{
         padding: 16,
-        background: "var(--panel-light)",
-        borderRadius: 8,
-        minWidth: 120,
+        minWidth: 140,
         textAlign: "center",
       }}
     >
-      <div style={{ fontWeight: 700 }}>
-        {name} {self && "(あなた)"}
+      <div style={{ fontWeight: 900, fontSize: 16 }}>
+        {name} {self && <span style={{ fontSize: 12 }}>(あなた)</span>}
       </div>
       <div
         style={{
-          marginTop: 8,
-          color: ready ? "var(--success)" : "var(--text-dim)",
+          marginTop: 6,
+          color: ready ? "var(--success)" : "var(--text-dark-soft)",
+          fontWeight: 900,
         }}
       >
         {ready ? "✓ 準備完了" : "待機中"}
@@ -391,18 +313,26 @@ function OpponentArea({ opponent }: { opponent: PlayerState | null }) {
   if (!opponent) return <div />;
   return (
     <section
+      className="gf-card"
       style={{
-        background: "var(--panel)",
-        padding: 16,
-        borderRadius: 8,
+        padding: 14,
         display: "flex",
-        justifyContent: "space-between",
+        gap: 14,
         alignItems: "center",
+        flexWrap: "wrap",
       }}
     >
-      <div>
-        <div style={{ fontSize: 14, color: "var(--text-dim)" }}>対戦相手</div>
-        <div style={{ fontSize: 20, fontWeight: 700 }}>{opponent.name}</div>
+      <div style={{ flex: "0 0 auto" }}>
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-dark-soft)",
+            fontWeight: 900,
+          }}
+        >
+          対戦相手
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
       </div>
       <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
       <EquipDisplay player={opponent} />
@@ -425,10 +355,9 @@ function MyArea({
   if (!me) return <div />;
   return (
     <section
+      className="gf-card"
       style={{
-        background: "var(--panel)",
-        padding: 16,
-        borderRadius: 8,
+        padding: 14,
         display: "flex",
         flexDirection: "column",
         gap: 12,
@@ -437,13 +366,22 @@ function MyArea({
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          gap: 14,
           alignItems: "center",
+          flexWrap: "wrap",
         }}
       >
-        <div>
-          <div style={{ fontSize: 14, color: "var(--text-dim)" }}>あなた</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{me.name}</div>
+        <div style={{ flex: "0 0 auto" }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-dark-soft)",
+              fontWeight: 900,
+            }}
+          >
+            あなた
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 900 }}>{me.name}</div>
         </div>
         <HpBar hp={me.hp} maxHp={me.maxHp} self />
         <EquipDisplay player={me} self />
@@ -452,11 +390,17 @@ function MyArea({
       <div
         style={{
           display: "flex",
-          gap: 8,
+          gap: 10,
           flexWrap: "wrap",
           justifyContent: "center",
+          padding: "8px 4px 0",
         }}
       >
+        {me.hand.length === 0 && (
+          <div style={{ color: "var(--text-dark-soft)", fontWeight: 900 }}>
+            手札がない…
+          </div>
+        )}
         {me.hand.map((card, idx) => (
           <CardView
             key={`${card.id}-${idx}`}
@@ -483,34 +427,32 @@ function BattleArea({
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   return (
     <section
+      className="gf-card"
       style={{
-        background: "var(--panel)",
-        padding: 16,
-        borderRadius: 8,
+        padding: 14,
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 10,
         alignItems: "center",
       }}
     >
-      <div style={{ fontSize: 16 }}>
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 900,
+          color: isMyTurn ? "var(--bar-teal-dark)" : "var(--text-dark-soft)",
+        }}
+      >
         {gameState.winner
           ? "ゲーム終了"
           : isMyTurn
-            ? "▶ あなたのターン"
-            : `⏳ ${activePlayer?.name ?? "?"}のターン`}
+            ? "あなたのターン"
+            : `${activePlayer?.name ?? "?"}のターン`}
       </div>
       <button
+        className="gf-btn"
         onClick={onEndTurn}
         disabled={!isMyTurn || gameState.winner !== null}
-        style={{
-          padding: "12px 32px",
-          borderRadius: 4,
-          background: "var(--accent)",
-          color: "#000",
-          fontWeight: 700,
-          fontSize: 16,
-        }}
       >
         ターン終了
       </button>
@@ -529,30 +471,39 @@ function HpBar({
 }) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
   return (
-    <div style={{ minWidth: 200 }}>
+    <div style={{ flex: "1 1 220px", minWidth: 200 }}>
       <div
         style={{
-          fontSize: 12,
-          color: "var(--text-dim)",
+          fontSize: 11,
+          color: "var(--text-dark-soft)",
           marginBottom: 4,
+          fontWeight: 900,
+          display: "flex",
+          justifyContent: "space-between",
         }}
       >
-        HP {hp}/{maxHp}
+        <span>HP</span>
+        <span>
+          {hp}/{maxHp}
+        </span>
       </div>
       <div
         style={{
-          height: 16,
-          background: "var(--bg)",
-          borderRadius: 8,
+          height: 18,
+          background: "#1f5b50",
+          borderRadius: 10,
           overflow: "hidden",
-          border: "1px solid var(--border)",
+          border: "2px solid #1f5b50",
+          boxShadow: "inset 0 2px 0 rgba(0,0,0,0.25)",
         }}
       >
         <div
           style={{
             height: "100%",
             width: `${pct}%`,
-            background: self ? "var(--success)" : "var(--danger)",
+            background: self
+              ? "linear-gradient(180deg, #8fd49a, #4ca05a)"
+              : "linear-gradient(180deg, #f29180, #d04a36)",
             transition: "width 0.3s",
           }}
         />
@@ -569,14 +520,29 @@ function EquipDisplay({
   self?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", gap: 8, fontSize: 24 }}>
+    <div
+      className="gf-card-soft"
+      style={{
+        padding: "6px 10px",
+        display: "flex",
+        gap: 10,
+        fontSize: 22,
+        alignItems: "center",
+      }}
+    >
       <span title={player.equipped.weapon?.id ?? "武器なし"}>
-        {player.equipped.weapon ? "⚔️" : "➖"}
+        {player.equipped.weapon ? "⚔" : "—"}
+        <span style={{ fontSize: 11, marginLeft: 2 }}>
+          {player.equipped.weapon?.power ?? 0}
+        </span>
       </span>
       <span title={player.equipped.shield?.id ?? "盾なし"}>
-        {player.equipped.shield ? "🛡️" : "➖"}
+        {player.equipped.shield ? "🛡" : "—"}
+        <span style={{ fontSize: 11, marginLeft: 2 }}>
+          {player.equipped.shield?.power ?? 0}
+        </span>
       </span>
-      {player.equipped.barrier && <span title="バリア">🔮</span>}
+      {player.equipped.barrier && <span title="バリア">✦</span>}
       {void self}
     </div>
   );
@@ -585,14 +551,17 @@ function EquipDisplay({
 function HandCount({ count }: { count: number }) {
   return (
     <div
+      className="gf-card-soft"
       style={{
-        padding: "4px 12px",
-        background: "var(--bg)",
-        borderRadius: 12,
+        padding: "6px 12px",
         fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
       }}
     >
-      🃏 {count}枚
+      <span style={{ fontSize: 18 }}>✋</span>
+      <span style={{ fontWeight: 900 }}>{count}枚</span>
     </div>
   );
 }
