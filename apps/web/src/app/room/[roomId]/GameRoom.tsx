@@ -408,7 +408,6 @@ function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
             <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
           </div>
           <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
-          <EquipDisplay player={opponent} />
           <HandCount count={opponent.hand.length} />
         </div>
       ))}
@@ -467,7 +466,6 @@ function MyArea({
           <div style={{ fontSize: 20, fontWeight: 900 }}>{me.name}</div>
         </div>
         <HpBar hp={me.hp} maxHp={me.maxHp} self />
-        <EquipDisplay player={me} self />
         <HandCount count={me.hand.length} />
       </div>
       <div
@@ -690,7 +688,7 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
 }
 
 function isDefenseCard(cardId: string): boolean {
-  return findCard(cardId)?.effects.some((effect) => effect.kind === "equip_shield") ?? false;
+  return findCard(cardId)?.effects.some((effect) => effect.kind === "defense") ?? false;
 }
 
 function HpBar({
@@ -741,42 +739,6 @@ function HpBar({
           }}
         />
       </div>
-    </div>
-  );
-}
-
-function EquipDisplay({
-  player,
-  self,
-}: {
-  player: PlayerState;
-  self?: boolean;
-}) {
-  return (
-    <div
-      className="gf-card-soft"
-      style={{
-        padding: "6px 10px",
-        display: "flex",
-        gap: 10,
-        fontSize: 22,
-        alignItems: "center",
-      }}
-    >
-      <span title={player.equipped.weapon?.id ?? "武器なし"}>
-        {player.equipped.weapon ? "⚔" : "—"}
-        <span style={{ fontSize: 11, marginLeft: 2 }}>
-          {player.equipped.weapon?.power ?? 0}
-        </span>
-      </span>
-      <span title={player.equipped.shield?.id ?? "盾なし"}>
-        {player.equipped.shield ? "🛡" : "—"}
-        <span style={{ fontSize: 11, marginLeft: 2 }}>
-          {player.equipped.shield?.power ?? 0}
-        </span>
-      </span>
-      {player.equipped.barrier && <span title="バリア">✦</span>}
-      {void self}
     </div>
   );
 }

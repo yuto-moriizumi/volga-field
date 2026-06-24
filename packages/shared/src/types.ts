@@ -9,27 +9,12 @@ export interface CardRef {
   power?: number;
 }
 
-export interface EquippedWeapon extends CardRef {
-  power: number;
-}
-
-export interface EquippedShield extends CardRef {
-  power: number;
-}
-
-export interface EquippedItems {
-  weapon: EquippedWeapon | null;
-  shield: EquippedShield | null;
-  barrier: boolean;
-}
-
 export interface PlayerState {
   id: PlayerId;
   name: string;
   hp: number;
   maxHp: number;
   hand: CardRef[];
-  equipped: EquippedItems;
   ready: boolean;
 }
 
@@ -49,7 +34,7 @@ export interface BattleLogEntry {
   turn: number;
   playerId: PlayerId;
   message: string;
-  kind: "attack" | "heal" | "equip" | "miracle" | "system" | "special";
+  kind: "attack" | "heal" | "defense" | "miracle" | "system" | "special";
   damage?: number;
 }
 

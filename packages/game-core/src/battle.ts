@@ -41,7 +41,6 @@ export function createGame(
       hp: INITIAL_HP,
       maxHp: INITIAL_HP,
       hand: drawn,
-      equipped: { weapon: null, shield: null, barrier: false },
       ready: false,
     });
   }
@@ -145,39 +144,14 @@ function resolveDamage(
   turn: number,
 ): { target: PlayerState; log: BattleLogEntry[] } {
   const logs: BattleLogEntry[] = [];
-  if (target.equipped.barrier) {
+  const damaged = damagePlayer(target, amount);
+  if (amount > 0) {
     logs.push({
       turn,
       playerId,
-      message: `${fromCardName}はバリアに阻まれた`,
-      kind: "miracle",
-    });
-    return {
-      target: {
-        ...target,
-        equipped: { ...target.equipped, barrier: false },
-      },
-      log: logs,
-    };
-  }
-  const shieldPower = target.equipped.shield?.power ?? 0;
-  const reduced = Math.max(0, amount - shieldPower);
-  const damaged = damagePlayer(target, reduced);
-  if (reduced > 0) {
-    logs.push({
-      turn,
-      playerId,
-      message: `${target.name}が${reduced}ダメージを受けた (${fromCardName})`,
+      message: `${target.name}が${amount}ダメージを受けた (${fromCardName})`,
       kind: "attack",
-      damage: reduced,
-    });
-  }
-  if (shieldPower > 0 && reduced < amount) {
-    logs.push({
-      turn,
-      playerId,
-      message: `${target.name}の盾が${amount - reduced}ダメージを吸収`,
-      kind: "equip",
+      damage: amount,
     });
   }
   return { target: damaged, log: logs };
@@ -233,167 +207,8 @@ function applyEffect(
       if (effect.target === "self") return { self: updated, opponent, log: logs };
       return { self, opponent: updated, log: logs };
     }
-    case "equip_weapon": {
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${self.id === actorId ? self.name : opponent.name}が${cardName}を装備`,
-        kind: "equip",
-      });
-      const equipped = {
-        id: cardId,
-        power: effect.amount ?? 0,
-      };
-      if (self.id === actorId) {
-        return {
-          self: { ...self, equipped: { ...self.equipped, weapon: equipped } },
-          opponent,
-          log: logs,
-        };
-      }
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, weapon: equipped } },
-        log: logs,
-      };
-    }
-    case "equip_shield": {
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${self.id === actorId ? self.name : opponent.name}が${cardName}を装備`,
-        kind: "equip",
-      });
-      const equipped = {
-        id: cardId,
-        power: effect.amount ?? 0,
-      };
-      if (self.id === actorId) {
-        return {
-          self: { ...self, equipped: { ...self.equipped, shield: equipped } },
-          opponent,
-          log: logs,
-        };
-      }
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, shield: equipped } },
-        log: logs,
-      };
-    }
-    case "barrier": {
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${self.id === actorId ? self.name : opponent.name}がバリアを纏った`,
-        kind: "miracle",
-      });
-      if (self.id === actorId) {
-        return {
-          self: { ...self, equipped: { ...self.equipped, barrier: true } },
-          opponent,
-          log: logs,
-        };
-      }
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, barrier: true } },
-        log: logs,
-      };
-    }
-    case "steal_weapon": {
-      const target = opponent;
-      const stolen = target.equipped.weapon;
-      if (!stolen) {
-        logs.push({
-          turn,
-          playerId: actorId,
-          message: `${cardName}: 奪える武器がない`,
-          kind: "special",
-        });
-        return { self, opponent, log: logs };
-      }
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${self.id === actorId ? self.name : opponent.name}が${opponent.name}の武器を奪った`,
-        kind: "special",
-      });
-      if (self.id === actorId) {
-        return {
-          self: { ...self, equipped: { ...self.equipped, weapon: stolen } },
-          opponent: { ...opponent, equipped: { ...opponent.equipped, weapon: null } },
-          log: logs,
-        };
-      }
-      return {
-        self: { ...self, equipped: { ...self.equipped, weapon: stolen } },
-        opponent: { ...opponent, equipped: { ...opponent.equipped, weapon: null } },
-        log: logs,
-      };
-    }
-    case "steal_shield": {
-      const stolen = opponent.equipped.shield;
-      if (!stolen) {
-        logs.push({
-          turn,
-          playerId: actorId,
-          message: `${cardName}: 奪える盾がない`,
-          kind: "special",
-        });
-        return { self, opponent, log: logs };
-      }
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${self.id === actorId ? self.name : opponent.name}が${opponent.name}の盾を奪った`,
-        kind: "special",
-      });
-      if (self.id === actorId) {
-        return {
-          self: { ...self, equipped: { ...self.equipped, shield: stolen } },
-          opponent: { ...opponent, equipped: { ...opponent.equipped, shield: null } },
-          log: logs,
-        };
-      }
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, shield: stolen } },
-        log: logs,
-      };
-    }
-    case "destroy_weapon": {
-      if (!opponent.equipped.weapon) {
-        return { self, opponent, log: logs };
-      }
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${opponent.name}の武器を破壊した`,
-        kind: "special",
-      });
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, weapon: null } },
-        log: logs,
-      };
-    }
-    case "destroy_shield": {
-      if (!opponent.equipped.shield) {
-        return { self, opponent, log: logs };
-      }
-      logs.push({
-        turn,
-        playerId: actorId,
-        message: `${opponent.name}の盾を破壊した`,
-        kind: "special",
-      });
-      return {
-        self,
-        opponent: { ...opponent, equipped: { ...opponent.equipped, shield: null } },
-        log: logs,
-      };
-    }
+    case "defense":
+      return { self, opponent, log: logs };
   }
 }
 
@@ -542,9 +357,9 @@ export function defendAttack(
     const idx = defender.hand.findIndex((c) => c.id === cardRef.id);
     if (idx === -1) return { ok: false, reason: "card not in hand" };
     const card = findCard(cardRef.id);
-    const shieldEffect = card?.effects.find((effect) => effect.kind === "equip_shield");
-    if (!card || !shieldEffect) return { ok: false, reason: "not a defense card" };
-    defensePower = shieldEffect.amount ?? 0;
+    const defenseEffect = card?.effects.find((effect) => effect.kind === "defense");
+    if (!card || !defenseEffect) return { ok: false, reason: "not a defense card" };
+    defensePower = defenseEffect.amount ?? 0;
     nextHand = [...defender.hand];
     nextHand.splice(idx, 1);
     defender = { ...defender, hand: nextHand };
@@ -552,7 +367,7 @@ export function defendAttack(
       turn: state.turn,
       playerId,
       message: `${defender.name}が${card.name}で防御`,
-      kind: "equip",
+      kind: "defense",
     });
   }
 

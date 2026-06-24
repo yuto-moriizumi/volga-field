@@ -5,7 +5,7 @@ import type { BattleLogEntry } from "@volga/shared";
 const KIND_ICON: Record<BattleLogEntry["kind"], string> = {
   attack: "⚔",
   heal: "♥",
-  equip: "🛡",
+  defense: "🛡",
   miracle: "✦",
   system: "i",
   special: "✪",

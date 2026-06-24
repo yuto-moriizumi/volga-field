@@ -12,7 +12,6 @@ export function createPlayer(
     hp: INITIAL_HP,
     maxHp: INITIAL_HP,
     hand: startingHand,
-    equipped: { weapon: null, shield: null, barrier: false },
     ready: false,
   };
 }

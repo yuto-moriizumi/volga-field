@@ -3,16 +3,7 @@ import type { CardCategory } from "@volga/shared";
 export type Target = "self" | "opponent" | "either";
 
 export interface CardEffect {
-  kind:
-    | "damage"
-    | "heal"
-    | "equip_weapon"
-    | "equip_shield"
-    | "steal_weapon"
-    | "steal_shield"
-    | "destroy_weapon"
-    | "destroy_shield"
-    | "barrier";
+  kind: "damage" | "heal" | "defense";
   amount?: number;
   target: Target;
   description: string;
@@ -124,7 +115,7 @@ export const BASE_CARDS: CardDefinition[] = [
     description: "防御力+3",
     effects: [
       {
-        kind: "equip_shield",
+        kind: "defense",
         amount: 3,
         target: "self",
         description: "防御力+3",
@@ -139,7 +130,7 @@ export const BASE_CARDS: CardDefinition[] = [
     description: "防御力+6 (攻撃時-3)",
     effects: [
       {
-        kind: "equip_shield",
+        kind: "defense",
         amount: 6,
         target: "self",
         description: "防御力+6",
@@ -154,7 +145,7 @@ export const BASE_CARDS: CardDefinition[] = [
     description: "防御力+1",
     effects: [
       {
-        kind: "equip_shield",
+        kind: "defense",
         amount: 1,
         target: "self",
         description: "防御力+1",
@@ -254,39 +245,6 @@ export const BASE_CARDS: CardDefinition[] = [
         amount: 8,
         target: "self",
         description: "HP+8",
-      },
-    ],
-  },
-  {
-    id: "barrier",
-    name: "バリア",
-    category: "special",
-    emoji: "🔮",
-    description: "次の攻撃を無効化",
-    effects: [
-      {
-        kind: "barrier",
-        target: "self",
-        description: "次の攻撃を無効化",
-      },
-    ],
-  },
-  {
-    id: "thief",
-    name: "ドロボウ",
-    category: "special",
-    emoji: "🥷",
-    description: "相手の装備を奪う",
-    effects: [
-      {
-        kind: "steal_weapon",
-        target: "opponent",
-        description: "武器を奪う",
-      },
-      {
-        kind: "steal_shield",
-        target: "opponent",
-        description: "盾を奪う",
       },
     ],
   },

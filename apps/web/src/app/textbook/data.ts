@@ -199,8 +199,6 @@ export const ITEMS: ItemCard[] = [
 
 export const MIRACLES: MiracleCard[] = [
   { id: "heal", name: "ヒール", emoji: "✨", price: 5, description: "HP+8" },
-  { id: "barrier", name: "バリア", emoji: "🔮", price: 5, description: "次の攻撃を無効化" },
-  { id: "thief", name: "ドロボウ", emoji: "🥷", price: 6, description: "相手の装備を奪う" },
   {
     id: "tenbin",
     name: "天罰",
@@ -208,14 +206,6 @@ export const MIRACLES: MiracleCard[] = [
     price: 8,
     description: "相手-5",
     attribute: "light",
-  },
-  {
-    id: "meifu",
-    name: "冥府の門",
-    emoji: "🌑",
-    price: 8,
-    description: "相手装備を全て破壊",
-    attribute: "dark",
   },
   {
     id: "kokoro_no_omoi",
