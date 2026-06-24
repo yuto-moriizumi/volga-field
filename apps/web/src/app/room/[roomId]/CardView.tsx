@@ -8,6 +8,7 @@ interface CardViewProps {
   selected?: boolean;
   playable?: boolean;
   hidden?: boolean;
+  learned?: boolean;
   onClick?: () => void;
 }
 
@@ -24,6 +25,7 @@ export function CardView({
   selected,
   playable,
   hidden,
+  learned,
   onClick,
 }: CardViewProps) {
   if (hidden || cardRef.id === "hidden") {
@@ -101,6 +103,7 @@ export function CardView({
         }}
       >
         {categoryLabel(card.category)}
+        {learned ? " / 習得" : ""}
       </div>
       <div style={{ fontSize: 38, lineHeight: 1 }}>{card.emoji}</div>
       <div>

@@ -101,7 +101,7 @@ export function GameRoom({
 
   function playCard(idx: number) {
     if (!me || !isMyTurn) return;
-    const card = me.hand[idx];
+    const card = playableCards(me)[idx];
     if (!card) return;
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
     setSelectedCardIdx(nextSelectedIdx);
@@ -112,7 +112,7 @@ export function GameRoom({
 
   function executeSelectedCard() {
     if (!me || !isMyTurn || selectedCardIdx === null) return;
-    const card = me.hand[selectedCardIdx];
+    const card = playableCards(me)[selectedCardIdx];
     if (!card) return;
     send({
       type: "play_card",
@@ -409,6 +409,7 @@ function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
             <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
           </div>
           <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
+          <MpBar mp={opponent.mp} maxMp={opponent.maxMp} />
           <HandCount count={opponent.hand.length} />
         </div>
       ))}
@@ -434,6 +435,7 @@ function MyArea({
   onSelectDefense: (idx: number) => void;
 }) {
   if (!me) return <div />;
+  const cards = playableCards(me);
   return (
     <section
       className="gf-card"
@@ -465,6 +467,7 @@ function MyArea({
           <div style={{ fontSize: 20, fontWeight: 900 }}>{me.name}</div>
         </div>
         <HpBar hp={me.hp} maxHp={me.maxHp} self />
+        <MpBar mp={me.mp} maxMp={me.maxMp} />
         <HandCount count={me.hand.length} />
       </div>
       <div
@@ -476,26 +479,32 @@ function MyArea({
           padding: "8px 4px 0",
         }}
       >
-        {me.hand.length === 0 && (
+        {cards.length === 0 && (
           <div style={{ color: "var(--text-dark-soft)", fontWeight: 900 }}>
             手札がない…
           </div>
         )}
-        {me.hand.map((card, idx) => (
+        {cards.map((card, idx) => {
+          const definition = findCard(card.id);
+          const isLearned = idx >= me.hand.length;
+          const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
+          return (
           <CardView
             key={`${card.id}-${idx}`}
             cardRef={card}
             selected={selectedCardIdx === idx || selectedDefenseIdx === idx}
-            playable={isDefending ? isDefenseCard(card.id) : isMyTurn}
+            playable={isDefending ? !isLearned && isDefenseCard(card.id) : isMyTurn && hasEnoughMp}
+            learned={isLearned}
             onClick={() => {
               if (isDefending) {
-                onSelectDefense(idx);
+                if (!isLearned) onSelectDefense(idx);
               } else {
                 onPlayCard(idx);
               }
             }}
           />
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -531,7 +540,7 @@ function BattleBoard({
   onEndTurn: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
-  const selectedCard = selectedCardIdx !== null ? me?.hand[selectedCardIdx] : null;
+  const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
   const defenseCard = selectedDefenseIdx !== null ? me?.hand[selectedDefenseIdx] : null;
   const pending = gameState.pendingAttack;
   const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
@@ -655,7 +664,7 @@ function BattleBoard({
           >
             <span style={{ fontSize: 22, fontWeight: 900 }}>{p.name}</span>
             <span style={{ color: "var(--text-dark)", fontSize: 18, fontWeight: 900 }}>
-              HP {p.hp}
+              HP {p.hp} / MP {p.mp}
             </span>
           </button>
         ))}
@@ -667,7 +676,10 @@ function BattleBoard({
 function LargeCard({ cardRef }: { cardRef: { id: string } }) {
   const card = findCard(cardRef.id);
   if (!card) return null;
-  const power = card.effects.find((effect) => typeof effect.amount === "number")?.amount;
+  const power =
+    card.category === "miracle"
+      ? card.mpCost
+      : card.effects.find((effect) => typeof effect.amount === "number")?.amount;
   return (
     <div style={{ width: "100%", height: "100%", display: "grid", gridTemplateColumns: "88px 1fr" }}>
       <div style={{ fontSize: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -676,7 +688,7 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
       <div style={{ padding: 8, textAlign: "left" }}>
         <div style={{ fontSize: 20, borderBottom: "2px solid #8ccf80" }}>{card.name}</div>
         <div style={{ fontSize: 24, marginTop: 8 }}>
-          {card.category === "shield" ? "守" : "攻"}
+          {card.category === "miracle" ? "MP" : card.category === "shield" ? "守" : "攻"}
           {power ?? ""}
         </div>
         <div style={{ fontSize: 12, color: "var(--text-dark-soft)" }}>{card.description}</div>
@@ -695,6 +707,10 @@ function isAttackCard(cardId: string): boolean {
       (effect) => effect.kind === "damage" && effect.target === "opponent",
     ) ?? false
   );
+}
+
+function playableCards(player: PlayerState): { id: string }[] {
+  return [...player.hand, ...player.learnedMiracles];
 }
 
 function HpBar({
@@ -741,6 +757,54 @@ function HpBar({
             background: self
               ? "linear-gradient(180deg, #8fd49a, #4ca05a)"
               : "linear-gradient(180deg, #f29180, #d04a36)",
+            transition: "width 0.3s",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MpBar({
+  mp,
+  maxMp,
+}: {
+  mp: number;
+  maxMp: number;
+}) {
+  const pct = Math.max(0, Math.min(100, (mp / maxMp) * 100));
+  return (
+    <div style={{ flex: "1 1 160px", minWidth: 150 }}>
+      <div
+        style={{
+          fontSize: 11,
+          color: "var(--text-dark-soft)",
+          marginBottom: 4,
+          fontWeight: 900,
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>MP</span>
+        <span>
+          {mp}/{maxMp}
+        </span>
+      </div>
+      <div
+        style={{
+          height: 18,
+          background: "#2f3475",
+          borderRadius: 10,
+          overflow: "hidden",
+          border: "2px solid #2f3475",
+          boxShadow: "inset 0 2px 0 rgba(0,0,0,0.25)",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${pct}%`,
+            background: "linear-gradient(180deg, #8fb6ff, #5166d6)",
             transition: "width 0.3s",
           }}
         />

@@ -8,8 +8,9 @@ import type {
 } from "@volga/shared";
 import { findCard } from "./cards.js";
 import type { CardEffect } from "./cards.js";
+import { MAX_LEARNED_MIRACLES, INITIAL_MP } from "./cards.js";
 import { buildDeck, drawCards } from "./deck.js";
-import { damagePlayer, healPlayer } from "./player.js";
+import { damagePlayer, healPlayer, spendMp } from "./player.js";
 
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
@@ -40,7 +41,10 @@ export function createGame(
       name: p.name,
       hp: INITIAL_HP,
       maxHp: INITIAL_HP,
+      mp: INITIAL_MP,
+      maxMp: INITIAL_MP,
       hand: drawn,
+      learnedMiracles: [],
       ready: false,
     });
   }
@@ -217,25 +221,70 @@ export function playCard(
   playerId: PlayerId,
   cardRef: CardRef,
   targetPlayerId?: PlayerId,
+  deck: CardRef[] = [],
 ): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
   if (state.phase === "defense") return { ok: false, reason: "defense pending" };
-  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
-  if (idx === -1) return { ok: false, reason: "card not in hand" };
   const card = findCard(cardRef.id);
   if (!card) return { ok: false, reason: "unknown card" };
+  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
+  const learnedMiracle = active.learnedMiracles.some((c) => c.id === cardRef.id);
+  const isMiracle = card.category === "miracle";
+  if (idx === -1 && !(isMiracle && learnedMiracle)) {
+    return { ok: false, reason: "card not in hand" };
+  }
+  const mpCost = isMiracle ? (card.mpCost ?? 0) : 0;
+  if (mpCost > active.mp) return { ok: false, reason: "not enough MP" };
 
   const newHand = [...active.hand];
-  newHand.splice(idx, 1);
+  if (idx !== -1) newHand.splice(idx, 1);
 
-  let self: PlayerState = { ...active, hand: newHand };
+  const nextLearnedMiracles =
+    isMiracle && !learnedMiracle
+      ? [...active.learnedMiracles, { id: card.id }].slice(-MAX_LEARNED_MIRACLES)
+      : active.learnedMiracles;
+  let self: PlayerState = spendMp(
+    { ...active, hand: newHand, learnedMiracles: nextLearnedMiracles },
+    mpCost,
+  );
+  let newDeck = deck;
+  const miracleLogs: BattleLogEntry[] = [];
+  if (isMiracle) {
+    if (!learnedMiracle) {
+      miracleLogs.push({
+        turn: state.turn,
+        playerId,
+        message: `${active.name}が${card.name}を習得`,
+        kind: "miracle",
+      });
+    }
+    if (mpCost > 0) {
+      miracleLogs.push({
+        turn: state.turn,
+        playerId,
+        message: `${active.name}がMP${mpCost}を消費 (${card.name})`,
+        kind: "miracle",
+      });
+    }
+    if (newDeck.length > 0 && self.hand.length < HAND_SIZE) {
+      const result = drawCards(newDeck, 1);
+      newDeck = result.deck;
+      self = { ...self, hand: [...self.hand, ...result.drawn] };
+      miracleLogs.push({
+        turn: state.turn,
+        playerId,
+        message: `${active.name}が奇跡の効果で神器を1枚授かった`,
+        kind: "miracle",
+      });
+    }
+  }
   let opponent =
     state.players.find((p) => p.id === targetPlayerId && p.id !== playerId) ??
     state.players.find((p) => p.id !== playerId) ??
     state.players[0]!;
-  const logs: BattleLogEntry[] = [];
+  const logs: BattleLogEntry[] = [...miracleLogs];
   const pendingDamage = card.effects
     .filter((effect) => effect.kind === "damage" && effect.target === "opponent")
     .reduce((total, effect) => total + (effect.amount ?? 0), 0);
@@ -260,7 +309,8 @@ export function playCard(
 
     const finalPlayers = state.players.map((p) => {
       if (p.id === playerId) return self;
-      return opponent;
+      if (p.id === opponent.id) return opponent;
+      return p;
     });
 
     return {
@@ -268,6 +318,7 @@ export function playCard(
       state: {
         ...state,
         players: finalPlayers,
+        deckSize: newDeck.length,
         phase: "defense",
         pendingAttack: {
           attackerId: playerId,
@@ -287,7 +338,7 @@ export function playCard(
           },
         ],
       },
-      deck: [],
+      deck: newDeck,
     };
   }
 
@@ -316,6 +367,7 @@ export function playCard(
   const newState: GameState = {
     ...state,
     players: finalPlayers,
+    deckSize: newDeck.length,
     phase: "play",
     pendingAttack: null,
     log: [...state.log, ...logs],
@@ -331,7 +383,7 @@ export function playCard(
     });
   }
 
-  return { ok: true, state: newState, deck: [] };
+  return { ok: true, state: newState, deck: newDeck };
 }
 
 export function defendAttack(
