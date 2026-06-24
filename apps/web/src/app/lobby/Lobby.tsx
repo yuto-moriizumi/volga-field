@@ -182,11 +182,6 @@ export function Lobby() {
           ))}
         </div>
 
-        <section className="gf-card gf-doomsday-picker">
-          <div className="gf-section-title">終末の時</div>
-          <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
-        </section>
-
         {error && <div className="gf-toast">{error}</div>}
       </main>
 
