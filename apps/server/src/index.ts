@@ -19,6 +19,7 @@ import {
   isRoomFull,
   roomSummary,
   type Room,
+  type RoomMode,
   type RoomPlayer,
 } from "./room.js";
 
@@ -47,6 +48,7 @@ function send(ws: WebSocket, msg: ServerMessage): void {
 function broadcastRoom(room: Room, msg: ServerMessage, except?: PlayerId): void {
   for (const p of room.players) {
     if (except && p.id === except) continue;
+    if (!p.ws) continue;
     send(p.ws, msg);
   }
 }
@@ -68,6 +70,7 @@ function sanitizeHandForViewer(
 function broadcastStateToAll(room: Room): void {
   if (!room.gameState) return;
   for (const p of room.players) {
+    if (!p.ws) continue;
     send(p.ws, {
       type: "game_state",
       gameState: sanitizeHandForViewer(room.gameState, p.id),
@@ -85,8 +88,44 @@ function startGame(room: Room): void {
   room.gameState = state;
   room.deck = deck;
   room.started = true;
-  broadcastRoom(room, { type: "game_started", gameState: state });
+  for (const p of room.players) {
+    if (!p.ws) continue;
+    send(p.ws, {
+      type: "game_started",
+      gameState: sanitizeHandForViewer(state, p.id),
+    });
+  }
   broadcastStateToAll(room);
+}
+
+function activePlayer(room: Room): RoomPlayer | null {
+  if (!room.gameState) return null;
+  const activeState = room.gameState.players[room.gameState.activePlayerIndex];
+  if (!activeState) return null;
+  return room.players.find((p) => p.id === activeState.id) ?? null;
+}
+
+function runAiTurn(room: Room): void {
+  const ai = activePlayer(room);
+  if (!ai?.ai || !room.gameState || room.gameState.winner) return;
+
+  const aiState = room.gameState.players.find((p) => p.id === ai.id);
+  const card = aiState?.hand[0];
+  if (card) {
+    const played = playCard(room.gameState, ai.id, { id: card.id });
+    if (played.ok) {
+      room.gameState = played.state;
+      broadcastStateToAll(room);
+    }
+  }
+
+  if (!room.gameState || room.gameState.winner) return;
+  const ended = endTurn(room.gameState, ai.id, room.deck);
+  if (ended.ok) {
+    room.gameState = ended.state;
+    room.deck = ended.deck;
+    broadcastStateToAll(room);
+  }
 }
 
 function tryAutoStart(room: Room): void {
@@ -105,9 +144,9 @@ function removePlayerFromRoom(client: Client): void {
   }
   room.players = room.players.filter((p) => p.id !== client.id);
   log(`remove_player: ${client.id} left room ${room.id} (${room.players.length} remaining)`);
-  if (room.players.length === 0) {
+  if (!room.players.some((p) => !p.ai)) {
     rooms.delete(room.id);
-    log(`room_deleted: ${room.id} (empty)`);
+    log(`room_deleted: ${room.id} (no human players)`);
     client.roomId = null;
     return;
   }
@@ -124,7 +163,12 @@ function normalizeRoomId(roomId?: RoomId): RoomId | null {
   return trimmed ? trimmed : null;
 }
 
-function handleCreateRoom(client: Client, name: string, requestedRoomId?: RoomId): void {
+function handleCreateRoom(
+  client: Client,
+  name: string,
+  requestedRoomId?: RoomId,
+  mode: RoomMode = "versus",
+): void {
   if (client.roomId) {
     log(`create_room rejected (already in room ${client.roomId}) from ${client.id}`);
     send(client.ws, { type: "error", message: "既にルームに参加しています" });
@@ -142,7 +186,17 @@ function handleCreateRoom(client: Client, name: string, requestedRoomId?: RoomId
     name: name || "プレイヤー",
     ready: false,
   };
-  const room = createRoom(id, roomPlayer);
+  const room = createRoom(id, roomPlayer, mode);
+  if (mode === "training") {
+    room.players.push({
+      id: genId("ai"),
+      ws: null,
+      name: "修行相手",
+      ready: true,
+      ai: true,
+    });
+    roomPlayer.ready = true;
+  }
   rooms.set(id, room);
   client.roomId = id;
   client.name = name || "プレイヤー";
@@ -152,6 +206,9 @@ function handleCreateRoom(client: Client, name: string, requestedRoomId?: RoomId
     roomId: id,
     gameState: room.gameState ?? placeholderState(id, [roomPlayer]),
   });
+  if (mode === "training") {
+    startGame(room);
+  }
 }
 
 function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
@@ -249,7 +306,7 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
   });
   const updatedState = room.gameState ?? placeholderState(roomId, room.players);
   for (const p of room.players) {
-    if (p.id === newPlayer.id) continue;
+    if (p.id === newPlayer.id || !p.ws) continue;
     send(p.ws, {
       type: "game_state",
       gameState: sanitizeHandForViewer(updatedState, p.id),
@@ -272,6 +329,7 @@ function handleReady(client: Client): void {
   log(`ready: ${client.id} in ${room.id} -> ${player.ready}`);
   const state = room.gameState ?? placeholderState(room.id, room.players);
   for (const p of room.players) {
+    if (!p.ws) continue;
     send(p.ws, {
       type: "game_state",
       gameState: sanitizeHandForViewer(state, p.id),
@@ -313,6 +371,7 @@ function handleEndTurn(client: Client): void {
   room.gameState = result.state;
   room.deck = result.deck;
   broadcastStateToAll(room);
+  runAiTurn(room);
 }
 
 function handleLeaveRoom(client: Client): void {
@@ -339,7 +398,7 @@ function handlePing(client: Client): void {
 function dispatch(client: Client, msg: ClientMessage): void {
   switch (msg.type) {
     case "create_room":
-      handleCreateRoom(client, msg.playerName, msg.roomId);
+      handleCreateRoom(client, msg.playerName, msg.roomId, msg.mode);
       break;
     case "join_room":
       handleJoinRoom(client, msg.roomId, msg.playerName);

@@ -2,10 +2,13 @@ import type { CardRef, GameState, PlayerId, RoomId } from "@volga/shared";
 
 export interface RoomPlayer {
   id: PlayerId;
-  ws: import("ws").WebSocket;
+  ws: import("ws").WebSocket | null;
   name: string;
   ready: boolean;
+  ai?: boolean;
 }
+
+export type RoomMode = "training" | "versus";
 
 export interface Room {
   id: RoomId;
@@ -14,11 +17,12 @@ export interface Room {
   gameState: GameState | null;
   deck: CardRef[];
   started: boolean;
+  mode: RoomMode;
 }
 
 export const MAX_PLAYERS = 2;
 
-export function createRoom(id: RoomId, host: RoomPlayer): Room {
+export function createRoom(id: RoomId, host: RoomPlayer, mode: RoomMode = "versus"): Room {
   return {
     id,
     hostId: host.id,
@@ -26,6 +30,7 @@ export function createRoom(id: RoomId, host: RoomPlayer): Room {
     gameState: null,
     deck: [],
     started: false,
+    mode,
   };
 }
 
