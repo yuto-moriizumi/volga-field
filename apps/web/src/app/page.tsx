@@ -20,16 +20,9 @@ export default function HomePage() {
     }
   }
 
-  function openSettings() {
-    window.location.href = "/lobby";
-  }
-
   return (
     <div className="gf-app">
-      <TopBar
-        showBack={false}
-        rightAction={{ label: "設定", icon: "⚙", onClick: openSettings }}
-      />
+      <TopBar showBack={false} />
 
       <main className="gf-main">
         <section
@@ -64,12 +57,6 @@ export default function HomePage() {
             <h1 className="gf-title" style={{ position: "relative", zIndex: 1 }}>
               VOLGA FIELD
             </h1>
-            <div
-              className="gf-title-sub"
-              style={{ position: "relative", zIndex: 1, marginTop: 6 }}
-            >
-              ヴォルガ
-            </div>
           </div>
 
           <div
@@ -105,45 +92,10 @@ export default function HomePage() {
             </button>
           </Link>
 
-          <div style={{ display: "flex", gap: 14, marginTop: 4 }}>
-            <AppBadge label="App Store" sub="からダウンロード" icon="" />
-            <AppBadge label="Google Play" sub="で手に入れよう" icon="▶" />
-          </div>
         </section>
       </main>
 
       <BottomBar />
-    </div>
-  );
-}
-
-function AppBadge({
-  label,
-  sub,
-  icon,
-}: {
-  label: string;
-  sub: string;
-  icon: string;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        background: "#1f1f1f",
-        color: "#fff",
-        padding: "8px 14px",
-        borderRadius: 10,
-        minWidth: 160,
-      }}
-    >
-      <span style={{ fontSize: 20 }}>{icon || " "}</span>
-      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-        <span style={{ fontSize: 14, fontWeight: 900 }}>{label}</span>
-        <span style={{ fontSize: 10, opacity: 0.85 }}>{sub}</span>
-      </div>
     </div>
   );
 }
