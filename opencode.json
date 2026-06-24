@@ -30,7 +30,7 @@
         "minimax/minimax-m3": {
           "options": {
             "provider": {
-              "order": ["together"],
+              "order": ["minimax"],
               "allow_fallbacks": false
             }
           }
