@@ -90,18 +90,23 @@ export function Lobby() {
       send({ type: "create_room", playerName: name.trim() });
     } else {
       setHostMode(mode);
-      setHostPassword(generatePassword());
+      setHostPassword("");
     }
   }
 
   function confirmHost() {
     if (!hostMode) return;
+    const trimmedPassword = hostPassword.trim();
+    if (!trimmedPassword) {
+      setError("部屋の合言葉を入力してください");
+      return;
+    }
     localStorage.setItem("volga-player-name", name.trim());
     localStorage.setItem(
       "volga-room-password",
-      JSON.stringify({ mode: hostMode, password: hostPassword }),
+      JSON.stringify({ mode: hostMode, password: trimmedPassword }),
     );
-    send({ type: "create_room", playerName: name.trim() });
+    send({ type: "create_room", roomId: trimmedPassword, playerName: name.trim() });
   }
 
   function joinWithPassword() {
@@ -203,13 +208,17 @@ export function Lobby() {
                 color: "var(--text-dark-soft)",
               }}
             >
-              以下の合言葉を仲間に伝えてください
+              仲間と同じ合言葉を入力してください
             </p>
             <input
               className="gf-input"
               value={hostPassword}
               onChange={(e) => setHostPassword(e.target.value)}
+              placeholder="部屋の合言葉"
               style={{ fontSize: 18, textAlign: "center", letterSpacing: "0.2em" }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmHost();
+              }}
             />
             <button className="gf-btn" onClick={confirmHost}>
               唱える
@@ -222,16 +231,6 @@ export function Lobby() {
     </div>
   );
 }
-
-function generatePassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 8; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
 function getProphetCount(mode: ModeId, roomPlayerCount: number): number {
   if (mode === "kakure") return roomPlayerCount;
   return 0;
