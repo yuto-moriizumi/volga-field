@@ -304,10 +304,16 @@ function handleLeaveRoom(client: Client): void {
 }
 
 function handleListRooms(client: Client): void {
-  const list = Array.from(rooms.values())
-    .filter((r) => !r.started)
-    .map(roomSummary);
-  send(client.ws, { type: "rooms_list", rooms: list });
+  const waitingRooms = Array.from(rooms.values()).filter((r) => !r.started);
+  const playerCount = waitingRooms.reduce(
+    (total, room) => total + room.players.length,
+    0,
+  );
+  send(client.ws, {
+    type: "rooms_list",
+    rooms: waitingRooms.map(roomSummary),
+    playerCount,
+  });
 }
 
 function handlePing(client: Client): void {

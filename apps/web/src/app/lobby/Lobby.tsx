@@ -13,28 +13,24 @@ const MODES: {
   title: string;
   subtitle: string;
   tone: "tone-lavender" | "tone-teal" | "tone-pink";
-  players: number;
 }[] = [
   {
     id: "shugyo",
     title: "修行",
     subtitle: "コンピュータと対戦",
     tone: "tone-lavender",
-    players: 274,
   },
   {
     id: "kakure",
     title: "隠れ乱闘",
     subtitle: "友達と対戦",
     tone: "tone-teal",
-    players: 850,
   },
   {
     id: "shinken",
     title: "真剣タイマン",
     subtitle: "2人個人戦",
     tone: "tone-pink",
-    players: 1734,
   },
 ];
 
@@ -47,6 +43,7 @@ export function Lobby() {
   const [hostMode, setHostMode] = useState<ModeId | null>(null);
   const [hostPassword, setHostPassword] = useState("");
   const [showJoin, setShowJoin] = useState(false);
+  const [prophetCount, setProphetCount] = useState(0);
 
   useEffect(() => {
     const stored = localStorage.getItem("volga-player-name");
@@ -67,7 +64,19 @@ export function Lobby() {
       localStorage.setItem("volga-player-name", name.trim());
       router.push(`/room/${lastMessage.gameState.roomId}`);
     }
+    if (lastMessage.type === "rooms_list") {
+      setProphetCount(lastMessage.playerCount);
+    }
   }, [lastMessage, router, name]);
+
+  useEffect(() => {
+    if (status !== "connected") return;
+    send({ type: "list_rooms" });
+    const intervalId = window.setInterval(() => {
+      send({ type: "list_rooms" });
+    }, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [send, status]);
 
   function startHost(mode: ModeId) {
     setError(null);
@@ -144,7 +153,9 @@ export function Lobby() {
               disabled={status !== "connected"}
             >
               <div className="head">{m.title}</div>
-              <div className="count">預言者 {m.players.toLocaleString()} 人</div>
+              <div className="count">
+                預言者 {getProphetCount(m.id, prophetCount).toLocaleString()} 人
+              </div>
               <div className="foot">{m.subtitle}</div>
             </button>
           ))}
@@ -218,4 +229,9 @@ function generatePassword(): string {
     out += chars[Math.floor(Math.random() * chars.length)];
   }
   return out;
+}
+
+function getProphetCount(mode: ModeId, roomPlayerCount: number): number {
+  if (mode === "kakure") return roomPlayerCount;
+  return 0;
 }
