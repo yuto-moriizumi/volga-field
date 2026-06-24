@@ -459,7 +459,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
+  min-height: 36px;
+  padding: 6px 4px;
   border-radius: 8px;
   background: var(--bar-teal);
   color: #fff;
@@ -470,6 +471,9 @@ a {
   box-shadow: 0 2px 0 rgba(31, 91, 80, 0.35);
   cursor: pointer;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .gf-textbook-cat:hover {
@@ -564,4 +568,312 @@ a {
   font-size: 12px;
   color: var(--text-dark-soft);
   font-style: italic;
+}
+
+.gf-textbook-weapon {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.gf-textbook-weapon-detail {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #d6e89a, #b6cf6a);
+  border: 2px solid #6f8b3a;
+  border-radius: 12px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.gf-textbook-weapon-icon {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7f1d8;
+  border: 2px solid #6f8b3a;
+  border-radius: 8px;
+  flex-shrink: 0;
+  font-size: 32px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.gf-textbook-attr-mark {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1.5px solid;
+  font-size: 12px;
+  font-weight: 900;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+
+.gf-textbook-weapon-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gf-textbook-weapon-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: #2c3d12;
+  letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.gf-textbook-weapon-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  color: #2c3d12;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gf-textbook-weapon-note {
+  font-size: 12px;
+  color: #5a4012;
+  font-weight: 700;
+}
+
+.gf-textbook-weapon-price {
+  background: linear-gradient(180deg, #f1dfa1, #e0c66b);
+  border: 2px solid #a17a1f;
+  border-radius: 999px;
+  padding: 4px 14px;
+  color: #4a3812;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.gf-textbook-weapon-rate {
+  align-self: flex-end;
+  padding: 4px 14px;
+  background: var(--panel-cream);
+  border: 1.5px solid var(--line-teal);
+  border-radius: 6px;
+  color: var(--text-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.gf-textbook-weapon-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 2px solid var(--line-teal);
+  border-radius: 10px;
+  overflow-y: auto;
+  align-content: start;
+  min-height: 0;
+}
+
+.gf-textbook-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-cream);
+  border: 2px solid var(--line-teal);
+  border-radius: 8px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.1), 0 1px 0 rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.08s ease;
+  overflow: hidden;
+}
+
+.gf-textbook-tile:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.gf-textbook-tile.is-active {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 2px #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.gf-textbook-tile-emoji {
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(1px 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+.gf-textbook-calamity {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+}
+
+.gf-textbook-calamity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0;
+}
+
+.gf-textbook-calamity-card {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #e2efe5;
+  border: 2px solid #6cae8a;
+  border-radius: 8px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.gf-textbook-calamity-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #fff, #e8efe6);
+  border: 1.5px solid #6cae8a;
+  border-radius: 6px;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.gf-textbook-calamity-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gf-textbook-calamity-name {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.gf-textbook-calamity-desc {
+  font-size: 12px;
+  color: #1f3a35;
+  font-weight: 700;
+}
+
+.gf-textbook-calamity-note {
+  font-size: 11px;
+  color: #5a2c1f;
+  font-weight: 700;
+}
+
+.gf-textbook-item-card {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel-cream);
+  border: 2px solid var(--line-teal);
+  border-radius: 8px;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.gf-textbook-item-name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--text-dark);
+}
+
+.gf-textbook-item-price {
+  font-size: 11px;
+  background: linear-gradient(180deg, #f1dfa1, #e0c66b);
+  border: 1.5px solid #a17a1f;
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: #4a3812;
+}
+
+.gf-textbook-calamity-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--panel-cream);
+  border: 1.5px solid var(--panel-cream-line);
+  border-radius: 10px;
+}
+
+.gf-textbook-calamity-footer p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dark);
+  font-weight: 700;
+}
+
+.gf-textbook-trade {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 4px 4px 0;
+}
+
+.gf-textbook-trade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gf-textbook-trade-item {
+  background: var(--panel-cream);
+  border: 1.5px solid var(--panel-cream-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.gf-textbook-trade-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--bar-teal-dark);
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.gf-textbook-trade-desc {
+  font-size: 13px;
+  color: var(--text-dark);
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .gf-textbook-calamity-grid {
+    grid-template-columns: 1fr;
+  }
 }
