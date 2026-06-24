@@ -41,14 +41,12 @@ export function Lobby() {
   const router = useRouter();
   const { status, send, lastMessage } = useGameSocket();
   const [name, setName] = useState("");
-  const [joinRoomId, setJoinRoomId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hostMode, setHostMode] = useState<ModeId | null>(null);
   const [hostPassword, setHostPassword] = useState("");
   const [doomsdayTurn, setDoomsdayTurn] = useState<DoomsdayTurn | null>(50);
   const [trainingPlayerCount, setTrainingPlayerCount] = useState<TrainingPlayerCount>(2);
   const [showTrainingSettings, setShowTrainingSettings] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
   const [prophetCount, setProphetCount] = useState(0);
 
   useEffect(() => {
@@ -147,30 +145,9 @@ export function Lobby() {
     });
   }
 
-  function joinWithPassword() {
-    setError(null);
-    if (!name.trim()) {
-      setError("預言者の名前を入力してください");
-      return;
-    }
-    if (!joinRoomId.trim()) {
-      setError("部屋の合言葉を入力してください");
-      return;
-    }
-    localStorage.setItem("volga-player-name", name.trim());
-    send({ type: "join_room", roomId: joinRoomId.trim(), playerName: name.trim() });
-  }
-
   return (
     <div className="gf-app">
-      <TopBar
-        showBack={false}
-        rightAction={{
-          label: "合言葉",
-          icon: "🔑",
-          onClick: () => setShowJoin((v) => !v),
-        }}
-      />
+      <TopBar showBack={false} />
 
       <main
         className="gf-main"
@@ -237,33 +214,6 @@ export function Lobby() {
           <section className="gf-card gf-doomsday-picker">
             <div className="gf-section-title">終末の時</div>
             <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
-          </section>
-        )}
-
-        {showJoin && (
-          <section
-            className="gf-card"
-            style={{
-              padding: 18,
-              width: "min(420px, 92%)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            <div className="gf-section-title">合言葉で合流する</div>
-            <input
-              className="gf-input"
-              value={joinRoomId}
-              onChange={(e) => setJoinRoomId(e.target.value)}
-              placeholder="部屋の合言葉"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") joinWithPassword();
-              }}
-            />
-            <button className="gf-btn" onClick={joinWithPassword}>
-              唱える
-            </button>
           </section>
         )}
 
