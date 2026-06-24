@@ -174,9 +174,23 @@ function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
 }
 
 function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
-  if (client.roomId) {
+  if (client.roomId && client.roomId !== roomId) {
     log(`join_room rejected (${client.id} already in ${client.roomId}, requested ${roomId})`);
     send(client.ws, { type: "error", message: "既にルームに参加しています" });
+    return;
+  }
+  if (client.roomId === roomId) {
+    const room = rooms.get(roomId);
+    if (!room) {
+      log(`join_room rejected (room ${roomId} not found) from ${client.id}`);
+      send(client.ws, { type: "error", message: "ルームが存在しません" });
+      return;
+    }
+    log(`join_room: rejoin ${client.id} (${client.name}) to ${roomId}`);
+    send(client.ws, {
+      type: "room_joined",
+      gameState: room.gameState ?? placeholderState(roomId, room.players),
+    });
     return;
   }
   const room = rooms.get(roomId);
@@ -217,9 +231,17 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       ready: false,
     },
   });
+  const updatedState = room.gameState ?? placeholderState(roomId, room.players);
+  for (const p of room.players) {
+    if (p.id === newPlayer.id) continue;
+    send(p.ws, {
+      type: "game_state",
+      gameState: sanitizeHandForViewer(updatedState, p.id),
+    });
+  }
   send(client.ws, {
     type: "room_joined",
-    gameState: room.gameState ?? placeholderState(roomId, room.players),
+    gameState: updatedState,
   });
   tryAutoStart(room);
 }
@@ -231,6 +253,14 @@ function handleReady(client: Client): void {
   const player = room.players.find((p) => p.id === client.id);
   if (!player) return;
   player.ready = !player.ready;
+  log(`ready: ${client.id} in ${room.id} -> ${player.ready}`);
+  const state = room.gameState ?? placeholderState(room.id, room.players);
+  for (const p of room.players) {
+    send(p.ws, {
+      type: "game_state",
+      gameState: sanitizeHandForViewer(state, p.id),
+    });
+  }
   tryAutoStart(room);
 }
 

@@ -12,12 +12,19 @@ export function GameRoom({
   params: Promise<{ roomId: string }>;
 }) {
   const { roomId } = use(params);
-  const { status, playerId, send, lastMessage } = useGameSocket();
-  const [gameState, setGameState] = useState<GameState | null>(null);
+  const { status, playerId, gameState: ctxGameState, send, lastMessage } = useGameSocket();
+  const [gameState, setGameState] = useState<GameState | null>(() => {
+    if (ctxGameState && ctxGameState.roomId === roomId) {
+      return ctxGameState;
+    }
+    return null;
+  });
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [joinRequested, setJoinRequested] = useState(false);
+  const [joinRequested, setJoinRequested] = useState(
+    ctxGameState?.roomId === roomId && !!playerId,
+  );
 
   useEffect(() => {
     const stored = localStorage.getItem("volga-player-name");

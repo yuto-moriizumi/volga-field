@@ -26,6 +26,15 @@ export function Lobby() {
   }, []);
 
   useEffect(() => {
+    if (status !== "connected") return;
+    send({ type: "list_rooms" });
+    const interval = setInterval(() => {
+      send({ type: "list_rooms" });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [status, send]);
+
+  useEffect(() => {
     if (lastMessage?.type === "rooms_list") {
       setRooms(lastMessage.rooms);
     }
