@@ -6,7 +6,7 @@ const KIND_ICON: Record<BattleLogEntry["kind"], string> = {
   attack: "⚔",
   heal: "♥",
   equip: "🛡",
-  magic: "✦",
+  miracle: "✦",
   system: "i",
   special: "✪",
 };

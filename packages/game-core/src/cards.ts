@@ -209,7 +209,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "fire",
     name: "ファイア",
-    category: "magic",
+    category: "miracle",
     emoji: "🔥",
     description: "相手-4",
     effects: [
@@ -224,7 +224,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "thunder",
     name: "サンダー",
-    category: "magic",
+    category: "miracle",
     emoji: "⚡",
     description: "相手-3 / 自分も-1",
     effects: [
@@ -245,7 +245,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "heal",
     name: "ヒール",
-    category: "magic",
+    category: "miracle",
     emoji: "✨",
     description: "HP+8",
     effects: [
