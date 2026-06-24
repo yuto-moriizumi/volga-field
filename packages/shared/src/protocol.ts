@@ -21,7 +21,7 @@ export type ServerMessage =
   | { type: "connected"; playerId: PlayerId }
   | { type: "room_created"; roomId: RoomId; gameState: GameState }
   | { type: "room_joined"; gameState: GameState }
-  | { type: "rooms_list"; rooms: RoomSummary[] }
+  | { type: "rooms_list"; rooms: RoomSummary[]; playerCount: number }
   | { type: "player_joined"; player: PlayerState }
   | { type: "player_left"; playerId: PlayerId }
   | { type: "game_started"; gameState: GameState }
