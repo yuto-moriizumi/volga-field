@@ -6,6 +6,7 @@ build/
 .env*.local
 .DS_Store
 .turbo
+*.tsbuildinfo
 coverage/
 .opencode/goals/
 .playwright-mcp/
