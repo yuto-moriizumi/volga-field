@@ -118,9 +118,10 @@ function runAiTurn(room: Room): void {
     const target = room.gameState.players.find((p) => p.id !== ai.id && p.hp > 0);
     const card = aiState?.hand[0];
     if (card) {
-      const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id);
+      const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id, room.deck);
       if (played.ok) {
         room.gameState = played.state;
+        room.deck = played.deck;
         broadcastStateToAll(room);
       }
     }
@@ -244,7 +245,10 @@ function placeholderState(
       name: p.name,
       hp: 20,
       maxHp: 20,
+      mp: 10,
+      maxMp: 10,
       hand: [],
+      learnedMiracles: [],
       ready: p.ready,
     })),
     deckSize: 0,
@@ -327,7 +331,10 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       name: newPlayer.name,
       hp: 20,
       maxHp: 20,
+      mp: 10,
+      maxMp: 10,
       hand: [],
+      learnedMiracles: [],
       ready: false,
     },
   });
@@ -373,12 +380,13 @@ function handlePlayCard(
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
-  const result = playCard(room.gameState, client.id, { id: cardId }, targetPlayerId);
+  const result = playCard(room.gameState, client.id, { id: cardId }, targetPlayerId, room.deck);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
     return;
   }
   room.gameState = result.state;
+  room.deck = result.deck;
   broadcastStateToAll(room);
   broadcastRoom(room, {
     type: "card_played",

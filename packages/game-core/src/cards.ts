@@ -16,6 +16,7 @@ export interface CardDefinition {
   emoji: string;
   description: string;
   effects: CardEffect[];
+  mpCost?: number;
   customTags?: string[];
 }
 
@@ -202,7 +203,8 @@ export const BASE_CARDS: CardDefinition[] = [
     name: "ファイア",
     category: "miracle",
     emoji: "🔥",
-    description: "相手-4",
+    description: "MP2 / 相手-4",
+    mpCost: 2,
     effects: [
       {
         kind: "damage",
@@ -217,7 +219,8 @@ export const BASE_CARDS: CardDefinition[] = [
     name: "サンダー",
     category: "miracle",
     emoji: "⚡",
-    description: "相手-3 / 自分も-1",
+    description: "MP4 / 相手-3 / 自分も-1",
+    mpCost: 4,
     effects: [
       {
         kind: "damage",
@@ -238,7 +241,8 @@ export const BASE_CARDS: CardDefinition[] = [
     name: "ヒール",
     category: "miracle",
     emoji: "✨",
-    description: "HP+8",
+    description: "MP7 / HP+8",
+    mpCost: 7,
     effects: [
       {
         kind: "heal",
@@ -281,4 +285,6 @@ export function getCardsByTag(tag: string): CardDefinition[] {
 
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
+export const INITIAL_MP = 10;
+export const MAX_LEARNED_MIRACLES = 6;
 export const DECK_SIZE = 30;
