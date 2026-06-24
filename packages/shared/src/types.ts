@@ -35,6 +35,7 @@ export interface PlayerState {
 
 export type TurnPhase = "draw" | "play" | "defense" | "resolved";
 export type DoomsdayTurn = 50 | 75 | 100;
+export type TrainingPlayerCount = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export interface PendingAttack {
   attackerId: PlayerId;

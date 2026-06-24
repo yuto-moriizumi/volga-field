@@ -82,6 +82,10 @@ export function GameRoom({
     if (!gameState || !playerId) return null;
     return gameState.players.find((p) => p.id !== playerId) ?? null;
   }, [gameState, playerId]);
+  const opponents = useMemo<PlayerState[]>(() => {
+    if (!gameState || !playerId) return [];
+    return gameState.players.filter((p) => p.id !== playerId);
+  }, [gameState, playerId]);
 
   const isMyTurn =
     gameState?.players[gameState.activePlayerIndex]?.id === playerId;
@@ -212,10 +216,9 @@ export function GameRoom({
 
   const gameStarted =
     gameState.turn > 0 &&
-    gameState.players.length === 2 &&
+    gameState.players.length >= 2 &&
     gameState.players[0]!.hand.length > 0;
   const meReady = me?.ready ?? false;
-  const oppReady = opponent?.ready ?? false;
 
   return (
     <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
@@ -242,7 +245,11 @@ export function GameRoom({
             <div className="gf-section-title">対戦相手を待っています…</div>
             <div style={{ display: "flex", gap: 18, flexWrap: "wrap", justifyContent: "center" }}>
               <PlayerSlot name={me?.name ?? "?"} ready={meReady} self />
-              <PlayerSlot name={opponent?.name ?? "?"} ready={oppReady} />
+              {opponents.length > 0 ? (
+                opponents.map((p) => <PlayerSlot key={p.id} name={p.name} ready={p.ready} />)
+              ) : (
+                <PlayerSlot name="?" ready={false} />
+              )}
             </div>
             <button
               className="gf-btn"
@@ -262,10 +269,10 @@ export function GameRoom({
 
         {gameStarted && (
           <>
-            <OpponentArea opponent={opponent} />
+            <OpponentArea opponents={opponents} />
             <BattleBoard
               me={me}
-              opponent={opponent}
+              players={gameState.players}
               gameState={gameState}
               playerId={playerId}
               isMyTurn={isMyTurn}
@@ -363,8 +370,8 @@ function PlayerSlot({
   );
 }
 
-function OpponentArea({ opponent }: { opponent: PlayerState | null }) {
-  if (!opponent) return <div />;
+function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
+  if (opponents.length === 0) return <div />;
   return (
     <section
       className="gf-card"
@@ -376,21 +383,34 @@ function OpponentArea({ opponent }: { opponent: PlayerState | null }) {
         flexWrap: "wrap",
       }}
     >
-      <div style={{ flex: "0 0 auto" }}>
+      {opponents.map((opponent) => (
         <div
+          key={opponent.id}
           style={{
-            fontSize: 11,
-            color: "var(--text-dark-soft)",
-            fontWeight: 900,
+            display: "flex",
+            gap: 14,
+            alignItems: "center",
+            flex: "1 1 280px",
+            flexWrap: "wrap",
           }}
         >
-          対戦相手
+          <div style={{ flex: "0 0 auto" }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-dark-soft)",
+                fontWeight: 900,
+              }}
+            >
+              対戦相手
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
+          </div>
+          <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
+          <EquipDisplay player={opponent} />
+          <HandCount count={opponent.hand.length} />
         </div>
-        <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
-      </div>
-      <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
-      <EquipDisplay player={opponent} />
-      <HandCount count={opponent.hand.length} />
+      ))}
     </section>
   );
 }
@@ -486,7 +506,7 @@ function MyArea({
 
 function BattleBoard({
   me,
-  opponent,
+  players,
   gameState,
   playerId,
   isMyTurn,
@@ -500,7 +520,7 @@ function BattleBoard({
   onEndTurn,
 }: {
   me: PlayerState | null;
-  opponent: PlayerState | null;
+  players: PlayerState[];
   gameState: GameState;
   playerId: string | null;
   isMyTurn: boolean;
@@ -618,10 +638,10 @@ function BattleBoard({
       </button>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center" }}>
-        {[me, opponent].filter(Boolean).map((p) => (
+        {players.map((p) => (
           <button
-            key={p!.id}
-            onClick={() => onSelectTarget(p!.id)}
+            key={p.id}
+            onClick={() => onSelectTarget(p.id)}
             disabled={!isMyTurn || isDefending}
             style={{
               display: "grid",
@@ -630,15 +650,15 @@ function BattleBoard({
               alignItems: "center",
               padding: "8px 12px",
               borderRadius: 999,
-              border: `3px solid ${selectedTargetId === p!.id ? "#ff6aa2" : "#b9aaa5"}`,
+              border: `3px solid ${selectedTargetId === p.id ? "#ff6aa2" : "#b9aaa5"}`,
               background: "#f2f2ef",
-              color: p!.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
-              boxShadow: selectedTargetId === p!.id ? "0 0 0 4px rgba(255,106,162,.22)" : "none",
+              color: p.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
+              boxShadow: selectedTargetId === p.id ? "0 0 0 4px rgba(255,106,162,.22)" : "none",
             }}
           >
-            <span style={{ fontSize: 22, fontWeight: 900 }}>{p!.name}</span>
+            <span style={{ fontSize: 22, fontWeight: 900 }}>{p.name}</span>
             <span style={{ color: "var(--text-dark)", fontSize: 18, fontWeight: 900 }}>
-              HP {p!.hp}
+              HP {p.hp}
             </span>
           </button>
         ))}

@@ -5,6 +5,7 @@ import type {
   PlayerId,
   RoomId,
   ServerMessage,
+  TrainingPlayerCount,
 } from "@volga/shared";
 import {
   CLIENT_MESSAGE_TYPES,
@@ -81,7 +82,7 @@ function broadcastStateToAll(room: Room): void {
 }
 
 function startGame(room: Room): void {
-  if (room.players.length !== 2) return;
+  if (room.players.length < 2) return;
   if (room.started) return;
   const { state, deck } = createGame(
     room.id,
@@ -109,22 +110,24 @@ function activePlayer(room: Room): RoomPlayer | null {
 }
 
 function runAiTurn(room: Room): void {
-  const ai = activePlayer(room);
-  if (!ai?.ai || !room.gameState || room.gameState.winner) return;
+  for (let guard = 0; guard < room.players.length * 2; guard += 1) {
+    const ai = activePlayer(room);
+    if (!ai?.ai || !room.gameState || room.gameState.winner) return;
 
-  const aiState = room.gameState.players.find((p) => p.id === ai.id);
-  const card = aiState?.hand[0];
-  if (card) {
-    const played = playCard(room.gameState, ai.id, { id: card.id });
-    if (played.ok) {
-      room.gameState = played.state;
-      broadcastStateToAll(room);
+    const aiState = room.gameState.players.find((p) => p.id === ai.id);
+    const target = room.gameState.players.find((p) => p.id !== ai.id && p.hp > 0);
+    const card = aiState?.hand[0];
+    if (card) {
+      const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id);
+      if (played.ok) {
+        room.gameState = played.state;
+        broadcastStateToAll(room);
+      }
     }
-  }
 
-  if (!room.gameState || room.gameState.winner) return;
-  const ended = endTurn(room.gameState, ai.id, room.deck);
-  if (ended.ok) {
+    if (!room.gameState || room.gameState.winner) return;
+    const ended = endTurn(room.gameState, ai.id, room.deck);
+    if (!ended.ok) return;
     room.gameState = ended.state;
     room.deck = ended.deck;
     broadcastStateToAll(room);
@@ -132,7 +135,7 @@ function runAiTurn(room: Room): void {
 }
 
 function tryAutoStart(room: Room): void {
-  if (room.players.length === 2 && !room.started) {
+  if (room.players.length >= 2 && !room.started) {
     const allReady = room.players.every((p) => p.ready);
     if (allReady) startGame(room);
   }
@@ -170,12 +173,19 @@ function normalizeDoomsdayTurn(value: DoomsdayTurn | undefined | null): Doomsday
   return value === 50 || value === 75 || value === 100 ? value : null;
 }
 
+function normalizeTrainingPlayerCount(value: TrainingPlayerCount | undefined): TrainingPlayerCount {
+  return typeof value === "number" && value >= 2 && value <= 9
+    ? (Math.floor(value) as TrainingPlayerCount)
+    : 2;
+}
+
 function handleCreateRoom(
   client: Client,
   name: string,
   requestedRoomId?: RoomId,
   mode: RoomMode = "versus",
   doomsdayTurn: DoomsdayTurn | null = null,
+  trainingPlayerCount: TrainingPlayerCount = 2,
 ): void {
   if (client.roomId) {
     log(`create_room rejected (already in room ${client.roomId}) from ${client.id}`);
@@ -196,13 +206,16 @@ function handleCreateRoom(
   };
   const room = createRoom(id, roomPlayer, mode, normalizeDoomsdayTurn(doomsdayTurn));
   if (mode === "training") {
-    room.players.push({
-      id: genId("ai"),
-      ws: null,
-      name: "修行相手",
-      ready: true,
-      ai: true,
-    });
+    const totalPlayers = normalizeTrainingPlayerCount(trainingPlayerCount);
+    for (let i = 2; i <= totalPlayers; i += 1) {
+      room.players.push({
+        id: genId("ai"),
+        ws: null,
+        name: totalPlayers === 2 ? "修行相手" : `修行相手${i - 1}`,
+        ready: true,
+        ai: true,
+      });
+    }
     roomPlayer.ready = true;
   }
   rooms.set(id, room);
@@ -212,7 +225,7 @@ function handleCreateRoom(
   send(client.ws, {
     type: "room_created",
     roomId: id,
-    gameState: room.gameState ?? placeholderState(id, [roomPlayer]),
+    gameState: room.gameState ?? placeholderState(id, room.players),
   });
   if (mode === "training") {
     startGame(room);
@@ -434,6 +447,7 @@ function dispatch(client: Client, msg: ClientMessage): void {
         msg.roomId,
         msg.mode,
         normalizeDoomsdayTurn(msg.doomsdayTurn),
+        normalizeTrainingPlayerCount(msg.trainingPlayerCount),
       );
       break;
     case "join_room":

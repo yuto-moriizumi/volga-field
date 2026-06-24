@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DoomsdayTurn } from "@volga/shared";
+import type { DoomsdayTurn, TrainingPlayerCount } from "@volga/shared";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 
 type ModeId = "shugyo" | "kakure" | "shinken";
-const DOOMSDAY_TURNS: DoomsdayTurn[] = [50, 75, 100];
+const DOOMSDAY_OPTIONS: (DoomsdayTurn | null)[] = [null, 50, 75, 100];
+const TRAINING_PLAYER_COUNTS: TrainingPlayerCount[] = [2, 3, 4, 5, 6, 7, 8, 9];
 
 const MODES: {
   id: ModeId;
@@ -44,7 +45,9 @@ export function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const [hostMode, setHostMode] = useState<ModeId | null>(null);
   const [hostPassword, setHostPassword] = useState("");
-  const [doomsdayTurn, setDoomsdayTurn] = useState<DoomsdayTurn>(50);
+  const [doomsdayTurn, setDoomsdayTurn] = useState<DoomsdayTurn | null>(50);
+  const [trainingPlayerCount, setTrainingPlayerCount] = useState<TrainingPlayerCount>(2);
+  const [showTrainingSettings, setShowTrainingSettings] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [prophetCount, setProphetCount] = useState(0);
 
@@ -58,6 +61,7 @@ export function Lobby() {
     if (lastMessage.type === "error") {
       setError(lastMessage.message);
       setHostMode(null);
+      setShowTrainingSettings(false);
     }
     if (lastMessage.type === "room_created") {
       localStorage.setItem("volga-player-name", name.trim());
@@ -87,19 +91,40 @@ export function Lobby() {
       setError("預言者の名前を入力してください");
       return;
     }
-    if (mode === "shugyo" || mode === "shinken") {
+    if (mode === "shugyo") {
+      setShowTrainingSettings(true);
+      setHostMode(null);
+      return;
+    }
+    if (mode === "shinken") {
       localStorage.setItem("volga-player-name", name.trim());
       localStorage.removeItem("volga-room-password");
       send({
         type: "create_room",
         playerName: name.trim(),
-        mode: mode === "shugyo" ? "training" : "versus",
-        doomsdayTurn: mode === "shugyo" ? doomsdayTurn : undefined,
+        mode: "versus",
       });
     } else {
       setHostMode(mode);
       setHostPassword("");
     }
+  }
+
+  function startTraining() {
+    setError(null);
+    if (!name.trim()) {
+      setError("預言者の名前を入力してください");
+      return;
+    }
+    localStorage.setItem("volga-player-name", name.trim());
+    localStorage.removeItem("volga-room-password");
+    send({
+      type: "create_room",
+      playerName: name.trim(),
+      mode: "training",
+      doomsdayTurn,
+      trainingPlayerCount,
+    });
   }
 
   function confirmHost() {
@@ -180,21 +205,40 @@ export function Lobby() {
           ))}
         </div>
 
-        <section className="gf-card gf-doomsday-picker">
-          <div className="gf-section-title">終末の時</div>
-          <div className="gf-segmented" role="group" aria-label="終末の時">
-            {DOOMSDAY_TURNS.map((turn) => (
-              <button
-                key={turn}
-                type="button"
-                className={turn === doomsdayTurn ? "active" : ""}
-                onClick={() => setDoomsdayTurn(turn)}
-              >
-                G.F.{turn}
-              </button>
-            ))}
-          </div>
-        </section>
+        {showTrainingSettings && (
+          <section className="gf-card gf-doomsday-picker">
+            <div className="gf-section-title">修行の設定</div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
+              修行者の人数
+            </div>
+            <div className="gf-segmented" role="group" aria-label="修行者の人数">
+              {TRAINING_PLAYER_COUNTS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={count === trainingPlayerCount ? "active" : ""}
+                  onClick={() => setTrainingPlayerCount(count)}
+                >
+                  {count}人
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
+              終末の時
+            </div>
+            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
+            <button className="gf-btn" onClick={startTraining} disabled={status !== "connected"}>
+              戦いを始める
+            </button>
+          </section>
+        )}
+
+        {!showTrainingSettings && (
+          <section className="gf-card gf-doomsday-picker">
+            <div className="gf-section-title">終末の時</div>
+            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
+          </section>
+        )}
 
         {showJoin && (
           <section
@@ -239,18 +283,7 @@ export function Lobby() {
             >
               仲間と同じ合言葉を入力してください
             </p>
-            <div className="gf-segmented" role="group" aria-label="終末の時">
-              {DOOMSDAY_TURNS.map((turn) => (
-                <button
-                  key={turn}
-                  type="button"
-                  className={turn === doomsdayTurn ? "active" : ""}
-                  onClick={() => setDoomsdayTurn(turn)}
-                >
-                  G.F.{turn}
-                </button>
-              ))}
-            </div>
+            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
             <input
               className="gf-input"
               value={hostPassword}
@@ -269,6 +302,29 @@ export function Lobby() {
       )}
 
       <BottomBar playerName={name.trim() || "ヴォルガ"} />
+    </div>
+  );
+}
+
+function DoomsdayPicker({
+  value,
+  onChange,
+}: {
+  value: DoomsdayTurn | null;
+  onChange: (turn: DoomsdayTurn | null) => void;
+}) {
+  return (
+    <div className="gf-segmented" role="group" aria-label="終末の時">
+      {DOOMSDAY_OPTIONS.map((turn) => (
+        <button
+          key={turn ?? "none"}
+          type="button"
+          className={turn === value ? "active" : ""}
+          onClick={() => onChange(turn)}
+        >
+          {turn === null ? "なし" : `G.F.${turn}`}
+        </button>
+      ))}
     </div>
   );
 }

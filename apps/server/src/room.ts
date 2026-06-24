@@ -21,7 +21,8 @@ export interface Room {
   doomsdayTurn: DoomsdayTurn | null;
 }
 
-export const MAX_PLAYERS = 2;
+export const MAX_PLAYERS = 9;
+export const VERSUS_MAX_PLAYERS = 2;
 
 export function createRoom(
   id: RoomId,
@@ -46,7 +47,8 @@ export function findOpponent(room: Room, selfId: PlayerId): RoomPlayer | null {
 }
 
 export function isRoomFull(room: Room): boolean {
-  return room.players.length >= MAX_PLAYERS;
+  const maxPlayers = room.mode === "training" ? MAX_PLAYERS : VERSUS_MAX_PLAYERS;
+  return room.players.length >= maxPlayers;
 }
 
 export function playerIds(room: Room): PlayerId[] {
@@ -66,7 +68,7 @@ export function roomSummary(room: Room) {
     id: room.id,
     hostName: room.players[0]?.name ?? "?",
     playerCount: room.players.length,
-    maxPlayers: MAX_PLAYERS,
+    maxPlayers: room.mode === "training" ? MAX_PLAYERS : VERSUS_MAX_PLAYERS,
     status: room.started
       ? ("playing" as const)
       : room.gameState?.winner
