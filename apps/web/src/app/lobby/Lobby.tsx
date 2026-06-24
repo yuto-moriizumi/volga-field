@@ -182,40 +182,10 @@ export function Lobby() {
           ))}
         </div>
 
-        {showTrainingSettings && (
-          <section className="gf-card gf-doomsday-picker">
-            <div className="gf-section-title">修行の設定</div>
-            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
-              修行者の人数
-            </div>
-            <div className="gf-segmented" role="group" aria-label="修行者の人数">
-              {TRAINING_PLAYER_COUNTS.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  className={count === trainingPlayerCount ? "active" : ""}
-                  onClick={() => setTrainingPlayerCount(count)}
-                >
-                  {count}人
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
-              終末の時
-            </div>
-            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
-            <button className="gf-btn" onClick={startTraining} disabled={status !== "connected"}>
-              戦いを始める
-            </button>
-          </section>
-        )}
-
-        {!showTrainingSettings && (
-          <section className="gf-card gf-doomsday-picker">
-            <div className="gf-section-title">終末の時</div>
-            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
-          </section>
-        )}
+        <section className="gf-card gf-doomsday-picker">
+          <div className="gf-section-title">終末の時</div>
+          <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
+        </section>
 
         {error && <div className="gf-toast">{error}</div>}
       </main>
@@ -247,6 +217,44 @@ export function Lobby() {
             <button className="gf-btn" onClick={confirmHost}>
               唱える
             </button>
+          </div>
+        </div>
+      )}
+
+      {showTrainingSettings && (
+        <div className="gf-modal-backdrop" onClick={() => setShowTrainingSettings(false)}>
+          <div className="gf-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>修行の設定</h3>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
+              修行者の人数
+            </div>
+            <div className="gf-segmented" role="group" aria-label="修行者の人数">
+              {TRAINING_PLAYER_COUNTS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={count === trainingPlayerCount ? "active" : ""}
+                  onClick={() => setTrainingPlayerCount(count)}
+                >
+                  {count}人
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 900, color: "var(--text-dark-soft)" }}>
+              終末の時
+            </div>
+            <DoomsdayPicker value={doomsdayTurn} onChange={setDoomsdayTurn} />
+            <div className="gf-btn-row">
+              <button
+                className="gf-btn gf-btn-ghost gf-btn-modal-secondary"
+                onClick={() => setShowTrainingSettings(false)}
+              >
+                戻る
+              </button>
+              <button className="gf-btn" onClick={startTraining} disabled={status !== "connected"}>
+                始める
+              </button>
+            </div>
           </div>
         </div>
       )}
