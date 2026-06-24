@@ -75,8 +75,9 @@ export function Lobby() {
       setError("預言者の名前を入力してください");
       return;
     }
-    if (mode === "shinken") {
+    if (mode === "shugyo" || mode === "shinken") {
       localStorage.setItem("volga-player-name", name.trim());
+      localStorage.removeItem("volga-room-password");
       send({ type: "create_room", playerName: name.trim() });
     } else {
       setHostMode(mode);
