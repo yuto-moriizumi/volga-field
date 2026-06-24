@@ -11,6 +11,7 @@ import {
 } from "@volga/shared";
 import {
   createGame,
+  defendAttack,
   endTurn,
   playCard,
 } from "@volga/game-core";
@@ -227,6 +228,7 @@ function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
     turn: 0,
     activePlayerIndex: 0,
     phase: "draw",
+    pendingAttack: null,
     log: [
       {
         turn: 0,
@@ -341,11 +343,12 @@ function handleReady(client: Client): void {
 function handlePlayCard(
   client: Client,
   cardId: string,
+  targetPlayerId?: PlayerId,
 ): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
-  const result = playCard(room.gameState, client.id, { id: cardId });
+  const result = playCard(room.gameState, client.id, { id: cardId }, targetPlayerId);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
     return;
@@ -357,6 +360,23 @@ function handlePlayCard(
     playerId: client.id,
     cardRef: { id: cardId },
   });
+}
+
+function handleDefend(client: Client, cardId?: string): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = defendAttack(
+    room.gameState,
+    client.id,
+    cardId ? { id: cardId } : undefined,
+  );
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
 }
 
 function handleEndTurn(client: Client): void {
@@ -410,7 +430,10 @@ function dispatch(client: Client, msg: ClientMessage): void {
       handleReady(client);
       break;
     case "play_card":
-      handlePlayCard(client, msg.cardRef.id);
+      handlePlayCard(client, msg.cardRef.id, msg.targetPlayerId);
+      break;
+    case "defend":
+      handleDefend(client, msg.cardRef?.id);
       break;
     case "end_turn":
       handleEndTurn(client);

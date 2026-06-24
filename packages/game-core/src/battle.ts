@@ -41,6 +41,7 @@ export function createGame(
     turn: 1,
     activePlayerIndex: 0,
     phase: "play",
+    pendingAttack: null,
     log: [
       {
         turn: 1,
@@ -326,10 +327,12 @@ export function playCard(
   state: GameState,
   playerId: PlayerId,
   cardRef: CardRef,
+  targetPlayerId?: PlayerId,
 ): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
   const idx = active.hand.findIndex((c) => c.id === cardRef.id);
   if (idx === -1) return { ok: false, reason: "card not in hand" };
   const card = findCard(cardRef.id);
@@ -340,8 +343,64 @@ export function playCard(
 
   let self: PlayerState = { ...active, hand: newHand };
   let opponent =
-    state.players.find((p) => p.id !== playerId) ?? state.players[0]!;
+    state.players.find((p) => p.id === targetPlayerId && p.id !== playerId) ??
+    state.players.find((p) => p.id !== playerId) ??
+    state.players[0]!;
   const logs: BattleLogEntry[] = [];
+  const pendingDamage = card.effects
+    .filter((effect) => effect.kind === "damage" && effect.target === "opponent")
+    .reduce((total, effect) => total + (effect.amount ?? 0), 0);
+
+  if (pendingDamage > 0) {
+    for (const effect of card.effects.filter(
+      (effect) => !(effect.kind === "damage" && effect.target === "opponent"),
+    )) {
+      const result = applyEffect(
+        self,
+        opponent,
+        effect,
+        card.id,
+        card.name,
+        state.turn,
+        playerId,
+      );
+      self = result.self;
+      opponent = result.opponent;
+      logs.push(...result.log);
+    }
+
+    const finalPlayers = state.players.map((p) => {
+      if (p.id === playerId) return self;
+      return opponent;
+    });
+
+    return {
+      ok: true,
+      state: {
+        ...state,
+        players: finalPlayers,
+        phase: "defense",
+        pendingAttack: {
+          attackerId: playerId,
+          defenderId: opponent.id,
+          card: { id: card.id },
+          cardName: card.name,
+          amount: pendingDamage,
+        },
+        log: [
+          ...state.log,
+          ...logs,
+          {
+            turn: state.turn,
+            playerId,
+            message: `${self.name}が${card.name}で攻撃`,
+            kind: "attack",
+          },
+        ],
+      },
+      deck: [],
+    };
+  }
 
   for (const effect of card.effects) {
     const result = applyEffect(
@@ -375,6 +434,8 @@ export function playCard(
   const newState: GameState = {
     ...state,
     players: finalPlayers,
+    phase: "play",
+    pendingAttack: null,
     log: [...state.log, ...logs],
     winner,
   };
@@ -391,6 +452,84 @@ export function playCard(
   return { ok: true, state: newState, deck: [] };
 }
 
+export function defendAttack(
+  state: GameState,
+  playerId: PlayerId,
+  cardRef?: CardRef,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const pending = state.pendingAttack;
+  if (!pending || state.phase !== "defense") {
+    return { ok: false, reason: "no attack to defend" };
+  }
+  if (pending.defenderId !== playerId) return { ok: false, reason: "not defending player" };
+
+  let attacker = state.players.find((p) => p.id === pending.attackerId);
+  let defender = state.players.find((p) => p.id === pending.defenderId);
+  if (!attacker || !defender) return { ok: false, reason: "player not found" };
+
+  const logs: BattleLogEntry[] = [];
+  let defensePower = 0;
+  let nextHand = defender.hand;
+
+  if (cardRef) {
+    const idx = defender.hand.findIndex((c) => c.id === cardRef.id);
+    if (idx === -1) return { ok: false, reason: "card not in hand" };
+    const card = findCard(cardRef.id);
+    const shieldEffect = card?.effects.find((effect) => effect.kind === "equip_shield");
+    if (!card || !shieldEffect) return { ok: false, reason: "not a defense card" };
+    defensePower = shieldEffect.amount ?? 0;
+    nextHand = [...defender.hand];
+    nextHand.splice(idx, 1);
+    defender = { ...defender, hand: nextHand };
+    logs.push({
+      turn: state.turn,
+      playerId,
+      message: `${defender.name}が${card.name}で防御`,
+      kind: "equip",
+    });
+  }
+
+  const { target: damaged, log } = resolveDamage(
+    defender,
+    Math.max(0, pending.amount - defensePower),
+    pending.card.id,
+    pending.cardName,
+    pending.attackerId,
+    state.turn,
+  );
+  defender = damaged;
+  logs.push(...log);
+
+  let winner: PlayerId | null = null;
+  if (defender.hp <= 0) winner = attacker.id;
+
+  const finalPlayers = state.players.map((p) => {
+    if (p.id === attacker!.id) return attacker!;
+    if (p.id === defender!.id) return defender!;
+    return p;
+  });
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    phase: "play",
+    pendingAttack: null,
+    log: [...state.log, ...logs],
+    winner,
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: state.turn,
+      playerId: winner,
+      message: `${attacker.name}の勝利!`,
+      kind: "system",
+    });
+  }
+
+  return { ok: true, state: newState };
+}
+
 export function endTurn(
   state: GameState,
   playerId: PlayerId,
@@ -399,6 +538,7 @@ export function endTurn(
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
 
   let self = active;
   let opponent =
@@ -458,6 +598,8 @@ export function endTurn(
     activePlayerIndex: nextIdx,
     turn: newTurn,
     deckSize: newDeck.length,
+    phase: "play",
+    pendingAttack: null,
     log: [...state.log, ...logs],
     winner,
   };

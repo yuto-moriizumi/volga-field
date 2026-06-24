@@ -13,6 +13,7 @@ export type ClientMessage =
   | { type: "leave_room" }
   | { type: "ready" }
   | { type: "play_card"; cardRef: CardRef; targetPlayerId?: PlayerId }
+  | { type: "defend"; cardRef?: CardRef }
   | { type: "end_turn" }
   | { type: "list_rooms" }
   | { type: "ping" };
@@ -38,6 +39,7 @@ export const CLIENT_MESSAGE_TYPES: ClientMessage["type"][] = [
   "leave_room",
   "ready",
   "play_card",
+  "defend",
   "end_turn",
   "list_rooms",
   "ping",

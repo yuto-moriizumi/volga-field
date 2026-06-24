@@ -33,7 +33,15 @@ export interface PlayerState {
   ready: boolean;
 }
 
-export type TurnPhase = "draw" | "play" | "resolved";
+export type TurnPhase = "draw" | "play" | "defense" | "resolved";
+
+export interface PendingAttack {
+  attackerId: PlayerId;
+  defenderId: PlayerId;
+  card: CardRef;
+  cardName: string;
+  amount: number;
+}
 
 export interface BattleLogEntry {
   turn: number;
@@ -50,6 +58,7 @@ export interface GameState {
   turn: number;
   activePlayerIndex: number;
   phase: TurnPhase;
+  pendingAttack: PendingAttack | null;
   log: BattleLogEntry[];
   winner: PlayerId | null;
   startedAt: number;

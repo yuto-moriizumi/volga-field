@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
+import { findCard } from "@volga/game-core";
 import type { GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -22,6 +23,9 @@ export function GameRoom({
     return null;
   });
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [selectedDefenseIdx, setSelectedDefenseIdx] = useState<number | null>(null);
+  const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [joinRequested, setJoinRequested] = useState(
@@ -81,13 +85,44 @@ export function GameRoom({
 
   const isMyTurn =
     gameState?.players[gameState.activePlayerIndex]?.id === playerId;
+  const isDefending = gameState?.phase === "defense" && gameState.pendingAttack?.defenderId === playerId;
+
+  useEffect(() => {
+    if (opponent && !selectedTargetId) setSelectedTargetId(opponent.id);
+  }, [opponent, selectedTargetId]);
+
+  useEffect(() => {
+    if (!lastMessage || lastMessage.type !== "game_state") return;
+    const latest = lastMessage.gameState.log.at(-1);
+    if (latest?.kind === "attack" && latest.damage) {
+      setHitFlash({ amount: latest.damage, key: Date.now() });
+    }
+  }, [lastMessage]);
 
   function playCard(idx: number) {
     if (!me || !isMyTurn) return;
     const card = me.hand[idx];
     if (!card) return;
     setSelectedCardIdx(idx);
-    send({ type: "play_card", cardRef: { id: card.id } });
+  }
+
+  function executeSelectedCard() {
+    if (!me || !isMyTurn || selectedCardIdx === null) return;
+    const card = me.hand[selectedCardIdx];
+    if (!card) return;
+    send({
+      type: "play_card",
+      cardRef: { id: card.id },
+      targetPlayerId: selectedTargetId ?? opponent?.id,
+    });
+    setSelectedCardIdx(null);
+  }
+
+  function defend(cardIdx?: number) {
+    if (!me || !isDefending) return;
+    const card = typeof cardIdx === "number" ? me.hand[cardIdx] : undefined;
+    send({ type: "defend", cardRef: card ? { id: card.id } : undefined });
+    setSelectedDefenseIdx(null);
   }
 
   function endTurn() {
@@ -228,16 +263,30 @@ export function GameRoom({
         {gameStarted && (
           <>
             <OpponentArea opponent={opponent} />
-            <BattleArea
-              isMyTurn={isMyTurn}
+            <BattleBoard
+              me={me}
+              opponent={opponent}
               gameState={gameState}
+              playerId={playerId}
+              isMyTurn={isMyTurn}
+              selectedCardIdx={selectedCardIdx}
+              selectedTargetId={selectedTargetId}
+              selectedDefenseIdx={selectedDefenseIdx}
+              hitFlash={hitFlash}
+              onSelectTarget={setSelectedTargetId}
+              onExecute={executeSelectedCard}
+              onPassDefense={() => defend()}
               onEndTurn={endTurn}
             />
             <MyArea
               me={me}
               isMyTurn={isMyTurn}
+              isDefending={isDefending}
               selectedCardIdx={selectedCardIdx}
+              selectedDefenseIdx={selectedDefenseIdx}
               onPlayCard={playCard}
+              onSelectDefense={setSelectedDefenseIdx}
+              onDefend={defend}
             />
             <BattleLog entries={gameState.log} />
           </>
@@ -344,13 +393,21 @@ function OpponentArea({ opponent }: { opponent: PlayerState | null }) {
 function MyArea({
   me,
   isMyTurn,
+  isDefending,
   selectedCardIdx,
+  selectedDefenseIdx,
   onPlayCard,
+  onSelectDefense,
+  onDefend,
 }: {
   me: PlayerState | null;
   isMyTurn: boolean;
+  isDefending: boolean;
   selectedCardIdx: number | null;
+  selectedDefenseIdx: number | null;
   onPlayCard: (idx: number) => void;
+  onSelectDefense: (idx: number | null) => void;
+  onDefend: (idx?: number) => void;
 }) {
   if (!me) return <div />;
   return (
@@ -405,9 +462,16 @@ function MyArea({
           <CardView
             key={`${card.id}-${idx}`}
             cardRef={card}
-            selected={selectedCardIdx === idx}
-            playable={isMyTurn}
-            onClick={() => onPlayCard(idx)}
+            selected={selectedCardIdx === idx || selectedDefenseIdx === idx}
+            playable={isDefending ? isDefenseCard(card.id) : isMyTurn}
+            onClick={() => {
+              if (isDefending) {
+                onSelectDefense(idx);
+                onDefend(idx);
+              } else {
+                onPlayCard(idx);
+              }
+            }}
           />
         ))}
       </div>
@@ -415,49 +479,192 @@ function MyArea({
   );
 }
 
-function BattleArea({
-  isMyTurn,
+function BattleBoard({
+  me,
+  opponent,
   gameState,
+  playerId,
+  isMyTurn,
+  selectedCardIdx,
+  selectedTargetId,
+  selectedDefenseIdx,
+  hitFlash,
+  onSelectTarget,
+  onExecute,
+  onPassDefense,
   onEndTurn,
 }: {
-  isMyTurn: boolean;
+  me: PlayerState | null;
+  opponent: PlayerState | null;
   gameState: GameState;
+  playerId: string | null;
+  isMyTurn: boolean;
+  selectedCardIdx: number | null;
+  selectedTargetId: string | null;
+  selectedDefenseIdx: number | null;
+  hitFlash: { amount: number; key: number } | null;
+  onSelectTarget: (playerId: string) => void;
+  onExecute: () => void;
+  onPassDefense: () => void;
   onEndTurn: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
+  const selectedCard = selectedCardIdx !== null ? me?.hand[selectedCardIdx] : null;
+  const defenseCard = selectedDefenseIdx !== null ? me?.hand[selectedDefenseIdx] : null;
+  const pending = gameState.pendingAttack;
+  const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
+  const leftCard = isDefending ? pending?.card : selectedCard;
+  const actionLabel = isDefending
+    ? defenseCard
+      ? `${findCard(defenseCard.id)?.name ?? "防御"}で受ける`
+      : "防御なしで受ける"
+    : selectedCard
+      ? "アクション実行"
+      : isMyTurn
+        ? "カードを選択"
+        : "相手のターン";
+
   return (
     <section
-      className="gf-card"
+      className="gf-card gf-battle-board"
       style={{
-        padding: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        alignItems: "center",
+        minHeight: 270,
+        padding: 16,
+        alignItems: "stretch",
       }}
     >
-      <div
+      <button
+        onClick={onExecute}
+        disabled={!selectedCard || !isMyTurn || isDefending}
         style={{
-          fontSize: 18,
-          fontWeight: 900,
-          color: isMyTurn ? "var(--bar-teal-dark)" : "var(--text-dark-soft)",
+          background: "var(--panel-cream-soft)",
+          border: "3px solid var(--bar-teal)",
+          borderRadius: 8,
+          padding: 0,
+          minHeight: 150,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        {gameState.winner
-          ? "ゲーム終了"
-          : isMyTurn
-            ? "あなたのターン"
-            : `${activePlayer?.name ?? "?"}のターン`}
-      </div>
-      <button
-        className="gf-btn"
-        onClick={onEndTurn}
-        disabled={!isMyTurn || gameState.winner !== null}
-      >
-        ターン終了
+        {leftCard ? (
+          <LargeCard cardRef={leftCard} />
+        ) : (
+          <span style={{ color: "var(--text-dark-soft)" }}>カード</span>
+        )}
       </button>
+
+      <button
+        onClick={isDefending ? onPassDefense : undefined}
+        style={{
+          position: "relative",
+          background: "linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08))",
+          border: "none",
+          borderRadius: 8,
+          minHeight: 190,
+          color: "var(--text-dark)",
+          cursor: isDefending ? "pointer" : "default",
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 20 }}>
+          {gameState.winner
+            ? "ゲーム終了"
+            : isDefending
+              ? "防御カードを選択"
+              : isMyTurn
+                ? "あなたのターン"
+                : `${activePlayer?.name ?? "?"}のターン`}
+        </div>
+        {hitFlash && (
+          <div
+            key={hitFlash.key}
+            className="gf-hit-flash"
+          >
+            <strong>{hitFlash.amount}</strong>
+            <span>ダメージ</span>
+          </div>
+        )}
+        <div
+          style={{
+            width: "min(260px, 90%)",
+            margin: "0 auto",
+            padding: "8px 14px",
+            borderRadius: 8,
+            background: isDefending ? "#bd4646" : "#d9ffd0",
+            border: "3px solid #4f5554",
+            color: isDefending ? "#fff" : "var(--text-dark)",
+            fontSize: 24,
+            fontWeight: 900,
+          }}
+        >
+          {actionLabel}
+        </div>
+        <button
+          className="gf-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEndTurn();
+          }}
+          disabled={!isMyTurn || gameState.winner !== null || isDefending}
+          style={{ marginTop: 18 }}
+        >
+          ターン終了
+        </button>
+      </button>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center" }}>
+        {[me, opponent].filter(Boolean).map((p) => (
+          <button
+            key={p!.id}
+            onClick={() => onSelectTarget(p!.id)}
+            disabled={!isMyTurn || isDefending}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 8,
+              alignItems: "center",
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: `3px solid ${selectedTargetId === p!.id ? "#ff6aa2" : "#b9aaa5"}`,
+              background: "#f2f2ef",
+              color: p!.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
+              boxShadow: selectedTargetId === p!.id ? "0 0 0 4px rgba(255,106,162,.22)" : "none",
+            }}
+          >
+            <span style={{ fontSize: 22, fontWeight: 900 }}>{p!.name}</span>
+            <span style={{ color: "var(--text-dark)", fontSize: 18, fontWeight: 900 }}>
+              HP {p!.hp}
+            </span>
+          </button>
+        ))}
+      </div>
     </section>
   );
+}
+
+function LargeCard({ cardRef }: { cardRef: { id: string } }) {
+  const card = findCard(cardRef.id);
+  if (!card) return null;
+  const power = card.effects.find((effect) => typeof effect.amount === "number")?.amount;
+  return (
+    <div style={{ width: "100%", height: "100%", display: "grid", gridTemplateColumns: "88px 1fr" }}>
+      <div style={{ fontSize: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {card.emoji}
+      </div>
+      <div style={{ padding: 8, textAlign: "left" }}>
+        <div style={{ fontSize: 20, borderBottom: "2px solid #8ccf80" }}>{card.name}</div>
+        <div style={{ fontSize: 24, marginTop: 8 }}>
+          {card.category === "shield" ? "守" : "攻"}
+          {power ?? ""}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-dark-soft)" }}>{card.description}</div>
+      </div>
+    </div>
+  );
+}
+
+function isDefenseCard(cardId: string): boolean {
+  return findCard(cardId)?.effects.some((effect) => effect.kind === "equip_shield") ?? false;
 }
 
 function HpBar({
