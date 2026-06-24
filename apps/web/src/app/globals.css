@@ -432,6 +432,12 @@ a {
   border-color: #4d381a;
 }
 
+.gf-btn-modal-secondary {
+  background: var(--panel-light-teal);
+  border-color: var(--bar-teal-dark);
+  color: var(--text-dark);
+}
+
 .gf-btn-row {
   display: flex;
   gap: 12px;
