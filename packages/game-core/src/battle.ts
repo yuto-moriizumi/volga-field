@@ -13,7 +13,7 @@ import { damagePlayer, healPlayer } from "./player.js";
 
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
-export const MAX_PLAYERS = 2;
+export const MAX_PLAYERS = 9;
 const DOOMSDAY_EVENT_RATE = 0.25;
 
 const DOOMSDAY_EVENTS = [
@@ -123,6 +123,11 @@ function applyDoomsdayEvent(
       kind: "system",
     },
   };
+}
+
+function determineWinner(players: PlayerState[]): PlayerId | null {
+  const alive = players.filter((p) => p.hp > 0);
+  return alive.length === 1 ? alive[0]!.id : null;
 }
 
 interface PairResult {
@@ -488,17 +493,10 @@ export function playCard(
 
   const finalPlayers = state.players.map((p) => {
     if (p.id === playerId) return self;
-    return opponent;
+    if (p.id === opponent.id) return opponent;
+    return p;
   });
-
-  let winner: PlayerId | null = null;
-  if (self.hp <= 0 && opponent.hp <= 0) {
-    winner = null;
-  } else if (opponent.hp <= 0) {
-    winner = playerId;
-  } else if (self.hp <= 0) {
-    winner = opponent.id;
-  }
+  const winner = determineWinner(finalPlayers);
 
   const newState: GameState = {
     ...state,
@@ -569,14 +567,12 @@ export function defendAttack(
   defender = damaged;
   logs.push(...log);
 
-  let winner: PlayerId | null = null;
-  if (defender.hp <= 0) winner = attacker.id;
-
   const finalPlayers = state.players.map((p) => {
     if (p.id === attacker!.id) return attacker!;
     if (p.id === defender!.id) return defender!;
     return p;
   });
+  const winner = determineWinner(finalPlayers);
 
   const newState: GameState = {
     ...state,
@@ -637,15 +633,6 @@ export function endTurn(
     });
   }
 
-  let winner: PlayerId | null = null;
-  if (opponent.hp <= 0 && self.hp <= 0) {
-    winner = null;
-  } else if (opponent.hp <= 0) {
-    winner = playerId;
-  } else if (self.hp <= 0) {
-    winner = opponent.id;
-  }
-
   const nextIdx = (state.activePlayerIndex + 1) % state.players.length;
   const newTurn = nextIdx === 0 ? state.turn + 1 : state.turn;
   const newActionTurn = state.actionTurn + 1;
@@ -664,8 +651,10 @@ export function endTurn(
 
   const finalPlayers = state.players.map((p) => {
     if (p.id === playerId) return self;
-    return opponent;
+    if (p.id === opponent.id) return opponent;
+    return p;
   });
+  const winner = determineWinner(finalPlayers);
 
   const newState: GameState = {
     ...state,

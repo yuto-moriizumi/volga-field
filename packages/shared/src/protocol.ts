@@ -6,6 +6,7 @@ import type {
   PlayerState,
   RoomId,
   RoomSummary,
+  TrainingPlayerCount,
 } from "./types.js";
 
 export type ClientMessage =
@@ -14,7 +15,8 @@ export type ClientMessage =
       playerName: string;
       roomId?: RoomId;
       mode?: "training" | "versus";
-      doomsdayTurn?: DoomsdayTurn;
+      doomsdayTurn?: DoomsdayTurn | null;
+      trainingPlayerCount?: TrainingPlayerCount;
     }
   | { type: "join_room"; roomId: RoomId; playerName: string }
   | { type: "leave_room" }
