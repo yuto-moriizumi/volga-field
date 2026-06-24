@@ -2,7 +2,7 @@ export type PlayerId = string;
 export type RoomId = string;
 export type CardId = string;
 
-export type CardCategory = "weapon" | "shield" | "potion" | "magic" | "special";
+export type CardCategory = "weapon" | "shield" | "potion" | "miracle" | "special";
 
 export interface CardRef {
   id: CardId;
@@ -47,7 +47,7 @@ export interface BattleLogEntry {
   turn: number;
   playerId: PlayerId;
   message: string;
-  kind: "attack" | "heal" | "equip" | "magic" | "system" | "special";
+  kind: "attack" | "heal" | "equip" | "miracle" | "system" | "special";
   damage?: number;
 }
 

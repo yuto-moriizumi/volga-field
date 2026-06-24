@@ -76,7 +76,7 @@ function resolveDamage(
       turn,
       playerId,
       message: `${fromCardName}はバリアに阻まれた`,
-      kind: "magic",
+      kind: "miracle",
     });
     return {
       target: {
@@ -212,7 +212,7 @@ function applyEffect(
         turn,
         playerId: actorId,
         message: `${self.id === actorId ? self.name : opponent.name}がバリアを纏った`,
-        kind: "magic",
+        kind: "miracle",
       });
       if (self.id === actorId) {
         return {
