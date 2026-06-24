@@ -119,13 +119,23 @@ function log(msg: string): void {
   console.log(`[volga-field] ${msg}`);
 }
 
-function handleCreateRoom(client: Client, name: string): void {
+function normalizeRoomId(roomId?: RoomId): RoomId | null {
+  const trimmed = roomId?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function handleCreateRoom(client: Client, name: string, requestedRoomId?: RoomId): void {
   if (client.roomId) {
     log(`create_room rejected (already in room ${client.roomId}) from ${client.id}`);
     send(client.ws, { type: "error", message: "既にルームに参加しています" });
     return;
   }
-  const id = genId("room");
+  const id = normalizeRoomId(requestedRoomId) ?? genId("room");
+  const existingRoom = rooms.get(id);
+  if (existingRoom) {
+    handleJoinRoom(client, id, name);
+    return;
+  }
   const roomPlayer: RoomPlayer = {
     id: client.id,
     ws: client.ws,
@@ -174,6 +184,12 @@ function placeholderState(roomId: RoomId, players: RoomPlayer[]): GameState {
 }
 
 function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
+  const normalizedRoomId = normalizeRoomId(roomId);
+  if (!normalizedRoomId) {
+    send(client.ws, { type: "error", message: "部屋の合言葉を入力してください" });
+    return;
+  }
+  roomId = normalizedRoomId;
   if (client.roomId && client.roomId !== roomId) {
     log(`join_room rejected (${client.id} already in ${client.roomId}, requested ${roomId})`);
     send(client.ws, { type: "error", message: "既にルームに参加しています" });
@@ -323,7 +339,7 @@ function handlePing(client: Client): void {
 function dispatch(client: Client, msg: ClientMessage): void {
   switch (msg.type) {
     case "create_room":
-      handleCreateRoom(client, msg.playerName);
+      handleCreateRoom(client, msg.playerName, msg.roomId);
       break;
     case "join_room":
       handleJoinRoom(client, msg.roomId, msg.playerName);
