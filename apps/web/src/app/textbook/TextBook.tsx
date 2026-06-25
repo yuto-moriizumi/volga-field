@@ -118,7 +118,7 @@ function WeaponGridView({ cards }: { cards: WeaponCard[] }) {
         <div className="gf-textbook-weapon-info">
           <div className="gf-textbook-weapon-name">{selected.name}</div>
           <div className="gf-textbook-weapon-stats">
-            <span>攻{selected.attack}</span>
+            <span>{selected.isAttackPower ? `+${selected.attack}` : `攻${selected.attack}`}</span>
             {selected.note && (
               <span className="gf-textbook-weapon-note">{selected.note}</span>
             )}

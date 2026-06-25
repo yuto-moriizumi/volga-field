@@ -21,7 +21,7 @@ export type ClientMessage =
   | { type: "join_room"; roomId: RoomId; playerName: string }
   | { type: "leave_room" }
   | { type: "ready" }
-  | { type: "play_card"; cardRef: CardRef; targetPlayerId?: PlayerId }
+  | { type: "play_card"; cardRef?: CardRef; cardRefs?: CardRef[]; targetPlayerId?: PlayerId }
   | { type: "defend"; cardRef?: CardRef; cardRefs?: CardRef[] }
   | { type: "discard_cards"; cardRefs: CardRef[] }
   | { type: "buy_card"; cardRef: CardRef; targetPlayerId: PlayerId }

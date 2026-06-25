@@ -25,6 +25,9 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
       : card.effects.find((effect) => typeof effect.amount === "number")?.amount;
   const isMpRecover = card.effects.some((effect) => effect.kind === "mpRecover");
   const isHeal = card.effects.some((effect) => effect.kind === "heal");
+  const isAttackPower = card.effects.every(
+    (effect) => effect.kind === "attack_power",
+  );
   return (
     <div className="gf-large-card">
       <div className="gf-large-card-art">
@@ -41,7 +44,9 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
                 ? "MP+"
                 : isHeal
                   ? "HP+"
-                  : "攻"}
+                  : isAttackPower
+                    ? "+"
+                    : "攻"}
           {power ?? ""}
           {typeof card.price === "number" && card.price > 0 && (
             <span className="gf-large-card-price"> ￥{card.price}</span>

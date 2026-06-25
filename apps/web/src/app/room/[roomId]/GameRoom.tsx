@@ -26,7 +26,7 @@ export function GameRoom({
     }
     return null;
   });
-  const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
+  const [selectedCardIdxes, setSelectedCardIdxes] = useState<number[]>([]);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
   const [discardMode, setDiscardMode] = useState(false);
@@ -119,47 +119,73 @@ export function GameRoom({
     setExchangeDraft(null);
     setSelectedDiscardIdxes([]);
     setSelectedSellIdxes([]);
+    setSelectedCardIdxes([]);
+    setSelectedTargetId(null);
   }, [canAct]);
 
   function playCard(idx: number) {
     if (!me || !canAct || discardMode || sellMode) return;
     const card = playableCards(me)[idx];
     if (!card) return;
-    const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
-    setSelectedCardIdx(nextSelectedIdx);
-    if (nextSelectedIdx === null) {
-      setSelectedTargetId(null);
+    const definition = findCard(card.id);
+    if (!definition) return;
+
+    const category = definition.category;
+
+    if (category === "trade") {
+      setSelectedCardIdxes([idx]);
+      setSelectedTargetId(opponent?.id ?? null);
       return;
     }
+
     if (card.id === "exchange") {
       setExchangeMode(true);
       setExchangeDraft({ hp: me.hp, mp: me.mp, money: me.money });
       setSelectedTargetId(null);
       return;
     }
-    const isTrade = findCard(card.id)?.category === "trade";
-    if (isTrade) {
-      setSelectedTargetId(opponent?.id ?? null);
-    } else {
-      setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
+
+    if (category === "weapon") {
+      setSelectedCardIdxes((current) => {
+        if (current.includes(idx)) {
+          return current.filter((i) => i !== idx);
+        }
+        const onlyWeapons = current.filter((i) => {
+          const other = playableCards(me)[i];
+          return other ? findCard(other.id)?.category === "weapon" : false;
+        });
+        return [...onlyWeapons, idx];
+      });
+      if (selectedCardIdxes.length === 0) {
+        setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
+      } else if (!selectedTargetId) {
+        setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
+      }
+      return;
     }
+
+    setSelectedCardIdxes([idx]);
+    setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || discardMode || sellMode || selectedCardIdx === null) return;
-    const card = playableCards(me)[selectedCardIdx];
-    if (!card) return;
-    const definition = findCard(card.id);
-    const target = selectedTargetId ?? defaultTargetId(card.id, me.id, opponent?.id ?? null);
+    if (!me || !canAct || discardMode || sellMode || selectedCardIdxes.length === 0) return;
+    const cards = selectedCardIdxes
+      .map((idx) => playableCards(me)[idx])
+      .filter((c): c is { id: string } => Boolean(c));
+    if (cards.length === 0) return;
+    const firstCard = cards[0]!;
+    const definition = findCard(firstCard.id);
+    const target = selectedTargetId ?? defaultTargetId(firstCard.id, me.id, opponent?.id ?? null);
     if (definition?.category === "trade") {
       if (!target) return;
-      if (card.id === "buy") {
+      if (firstCard.id === "buy") {
         send({
           type: "buy_card",
-          cardRef: { id: card.id },
+          cardRef: { id: firstCard.id },
           targetPlayerId: target,
         });
-      } else if (card.id === "sell") {
+      } else if (firstCard.id === "sell") {
         if (sellMode && selectedSellIdxes.length > 0) {
           const cardRefs = selectedSellIdxes
             .map((i) => me.hand[i])
@@ -178,13 +204,13 @@ export function GameRoom({
           setSellMode(true);
           setSelectedSellIdxes([]);
         }
-      } else if (card.id === "exchange") {
+      } else if (firstCard.id === "exchange") {
         setExchangeMode(true);
         setExchangeDraft({ hp: me.hp, mp: me.mp, money: me.money });
       }
     } else if (sellMode) {
-      if (card.id !== "sell" && target) {
-        const cardRefs = [{ id: card.id }];
+      if (firstCard.id !== "sell" && target) {
+        const cardRefs = cards.map((c) => ({ id: c.id }));
         send({
           type: "sell_cards",
           cardRefs,
@@ -193,14 +219,18 @@ export function GameRoom({
         setSellMode(false);
         setSelectedSellIdxes([]);
       }
+    } else if (firstCard.id === "exchange") {
+      setExchangeMode(true);
+      setExchangeDraft({ hp: me.hp, mp: me.mp, money: me.money });
     } else {
+      const cardRefs = cards.map((c) => ({ id: c.id }));
       send({
         type: "play_card",
-        cardRef: { id: card.id },
+        cardRefs,
         targetPlayerId: target,
       });
     }
-    setSelectedCardIdx(null);
+    setSelectedCardIdxes([]);
     setSelectedTargetId(null);
   }
 
@@ -224,7 +254,7 @@ export function GameRoom({
     send({ type: "exchange_stats", mpDelta, moneyDelta });
     setExchangeMode(false);
     setExchangeDraft(null);
-    setSelectedCardIdx(null);
+    setSelectedCardIdxes([]);
     setSelectedTargetId(null);
   }
 
@@ -258,7 +288,7 @@ export function GameRoom({
         setExchangeMode(false);
         setExchangeDraft(null);
         setSelectedSellIdxes([]);
-        setSelectedCardIdx(null);
+        setSelectedCardIdxes([]);
         setSelectedTargetId(null);
       } else {
         setSelectedDiscardIdxes([]);
@@ -450,7 +480,7 @@ export function GameRoom({
                 gameState={gameState}
                 playerId={playerId}
                 canAct={canAct}
-                selectedCardIdx={selectedCardIdx}
+                selectedCardIdxes={selectedCardIdxes}
                 selectedTargetId={selectedTargetId}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
@@ -480,7 +510,7 @@ export function GameRoom({
                 me={me}
                 canAct={canAct}
                 isDefending={isDefending}
-                selectedCardIdx={selectedCardIdx}
+                selectedCardIdxes={selectedCardIdxes}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
                 sellMode={sellMode}
@@ -598,7 +628,7 @@ function BattleField({
   gameState,
   playerId,
   canAct,
-  selectedCardIdx,
+  selectedCardIdxes,
   selectedTargetId,
   selectedDefenseIdxes,
   discardMode,
@@ -627,7 +657,7 @@ function BattleField({
   gameState: GameState;
   playerId: string | null;
   canAct: boolean;
-  selectedCardIdx: number | null;
+  selectedCardIdxes: number[];
   selectedTargetId: string | null;
   selectedDefenseIdxes: number[];
   discardMode: boolean;
@@ -652,7 +682,11 @@ function BattleField({
   onConfirmExchange: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
-  const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
+  const selectedCards = me
+    ? selectedCardIdxes
+        .map((idx) => playableCards(me)[idx])
+        .filter((card): card is { id: string } => Boolean(card))
+    : [];
   const defenseCards = me
     ? selectedDefenseIdxes
         .map((idx) => me.hand[idx])
@@ -669,7 +703,11 @@ function BattleField({
     ? players.find((p) => p.id === targetPlayerId)
     : null;
   const defensePower = defenseCards.reduce((total, card) => total + getDefensePower(card.id), 0);
-  const selectedCards = isDefending ? defenseCards : selectedCard ? [selectedCard] : [];
+  const displayedCards = isDefending ? defenseCards : selectedCards;
+  const combinedAttackPower = selectedCards.reduce(
+    (total, card) => total + getAttackPower(card.id) + getDirectDamage(card.id),
+    0,
+  );
   const canPassDefense = isDefending && defenseCards.length === 0;
   const canEndTurn = canAct && !gameState.winner && !isDefending;
   const canSelectTarget =
@@ -677,14 +715,14 @@ function BattleField({
   const canConfirmSelection =
     (isDefending && defenseCards.length > 0) ||
     (!isDefending &&
-      Boolean(selectedCard) &&
+      selectedCards.length > 0 &&
       canAct &&
       !discardMode &&
       !pendingBuy &&
       !pendingSell) ||
     (discardMode && selectedDiscardCount > 0);
   const canConfirmEmpty =
-    canPassDefense || (canEndTurn && selectedCards.length === 0 && !discardMode);
+    canPassDefense || (canEndTurn && displayedCards.length === 0 && !discardMode);
   const confirmDisabled = gameState.winner
     ? true
     : exchangeMode
@@ -704,9 +742,11 @@ function BattleField({
         ? selectedSellCount > 0
           ? `${selectedSellCount}枚 ￥${sellTotalPrice} で売る`
           : "売るカードを選択"
-        : selectedCards.length === 0
+        : displayedCards.length === 0
           ? "ターン終了"
-          : "確定";
+          : combinedAttackPower > 0
+            ? `攻${combinedAttackPower}`
+            : "確定";
 
   function confirmAction() {
     if (gameState.winner) return;
@@ -722,7 +762,7 @@ function BattleField({
       onConfirmDiscard();
       return;
     }
-    if (selectedCard) {
+    if (selectedCards.length > 0) {
       onExecute();
       return;
     }
@@ -789,6 +829,22 @@ function defaultTargetId(
 
 function getDefensePower(cardId: string): number {
   return findCard(cardId)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0;
+}
+
+function getDirectDamage(cardId: string): number {
+  const card = findCard(cardId);
+  if (!card) return 0;
+  return card.effects
+    .filter((effect) => effect.kind === "damage" && effect.target === "opponent")
+    .reduce((sum, effect) => sum + (effect.amount ?? 0), 0);
+}
+
+function getAttackPower(cardId: string): number {
+  const card = findCard(cardId);
+  if (!card) return 0;
+  return card.effects
+    .filter((effect) => effect.kind === "attack_power")
+    .reduce((sum, effect) => sum + (effect.amount ?? 0), 0);
 }
 
 function sellTotalPrice(

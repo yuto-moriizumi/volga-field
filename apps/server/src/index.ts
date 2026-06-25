@@ -433,13 +433,23 @@ function handleReady(client: Client): void {
 
 function handlePlayCard(
   client: Client,
-  cardId: string,
+  cardIds: string[],
   targetPlayerId?: PlayerId,
 ): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
-  const result = playCard(room.gameState, client.id, { id: cardId }, targetPlayerId, room.deck);
+  if (cardIds.length === 0) {
+    send(client.ws, { type: "error", message: "no card to play" });
+    return;
+  }
+  const result = playCard(
+    room.gameState,
+    client.id,
+    cardIds.map((id) => ({ id })),
+    targetPlayerId,
+    room.deck,
+  );
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
     return;
@@ -450,7 +460,7 @@ function handlePlayCard(
   broadcastRoom(room, {
     type: "card_played",
     playerId: client.id,
-    cardRef: { id: cardId },
+    cardRef: { id: cardIds[0]! },
   });
   if (resolveAiDefense(room) && room.gameState && !room.gameState.winner) {
     const ended = endTurn(room.gameState, client.id, room.deck);
@@ -631,7 +641,12 @@ function dispatch(client: Client, msg: ClientMessage): void {
       handleReady(client);
       break;
     case "play_card":
-      handlePlayCard(client, msg.cardRef.id, msg.targetPlayerId);
+      handlePlayCard(
+        client,
+        msg.cardRefs?.map((cardRef) => cardRef.id) ??
+          (msg.cardRef ? [msg.cardRef.id] : []),
+        msg.targetPlayerId,
+      );
       break;
     case "defend":
       handleDefend(
