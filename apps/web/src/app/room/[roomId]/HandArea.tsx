@@ -11,12 +11,16 @@ interface HandAreaProps {
   selectedCardIdx: number | null;
   selectedDefenseIdxes: number[];
   discardMode: boolean;
+  sellMode: boolean;
+  selectedSellIdxes: number[];
   selectedDiscardIdxes: number[];
   onPlayCard: (idx: number) => void;
   onHoverCard: (card: CardRef) => void;
   onSelectDefense: (idx: number) => void;
   onSelectDiscard: (idx: number) => void;
+  onSelectSell: (idx: number) => void;
   onToggleDiscardMode: () => void;
+  onToggleSellMode: () => void;
 }
 
 export function HandArea({
@@ -26,12 +30,16 @@ export function HandArea({
   selectedCardIdx,
   selectedDefenseIdxes,
   discardMode,
+  sellMode,
+  selectedSellIdxes,
   selectedDiscardIdxes,
   onPlayCard,
   onHoverCard,
   onSelectDefense,
   onSelectDiscard,
+  onSelectSell,
   onToggleDiscardMode,
+  onToggleSellMode,
 }: HandAreaProps) {
   if (!me) return <div />;
   const cards = playableCards(me);
@@ -44,7 +52,9 @@ export function HandArea({
           const isLearned = idx >= me.hand.length;
           const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
           const canPlayCard = canAct && hasEnoughMp && !isDefenseOnlyCard(card.id);
-          const canDiscardCard = discardMode && !isLearned;
+          const canDiscardCard = discardMode && !isLearned && !isTradeCard(card.id);
+          const canSellCard =
+            sellMode && !isLearned && !isSellCardItself(card.id) && !isBuyCardItself(card.id);
           return (
             <CardView
               key={`${card.id}-${idx}`}
@@ -52,20 +62,25 @@ export function HandArea({
               selected={
                 selectedCardIdx === idx ||
                 selectedDefenseIdxes.includes(idx) ||
-                selectedDiscardIdxes.includes(idx)
+                selectedDiscardIdxes.includes(idx) ||
+                selectedSellIdxes.includes(idx)
               }
               playable={
                 discardMode
                   ? canDiscardCard
-                  : isDefending
-                    ? !isLearned && isDefenseCard(card.id)
-                    : canPlayCard
+                  : sellMode
+                    ? canSellCard
+                    : isDefending
+                      ? !isLearned && isDefenseCard(card.id)
+                      : canPlayCard
               }
               learned={isLearned}
               onHover={() => onHoverCard(card)}
               onClick={() => {
                 if (discardMode) {
                   if (canDiscardCard) onSelectDiscard(idx);
+                } else if (sellMode) {
+                  if (canSellCard) onSelectSell(idx);
                 } else if (isDefending) {
                   if (!isLearned) onSelectDefense(idx);
                 } else if (canPlayCard) {
@@ -77,13 +92,26 @@ export function HandArea({
         })}
       </div>
       {canAct && !isDefending && (
-        <button
-          type="button"
-          className="gf-btn gf-discard-mode-btn"
-          onClick={onToggleDiscardMode}
-        >
-          {discardMode ? "キャンセル" : "カードを捨てる"}
-        </button>
+        <div className="gf-hand-buttons">
+          <button
+            type="button"
+            className={`gf-btn gf-discard-mode-btn${discardMode ? " is-active" : ""}`}
+            onClick={onToggleDiscardMode}
+            disabled={sellMode}
+          >
+            {discardMode ? "キャンセル" : "カードを捨てる"}
+          </button>
+          {hasSellCard(me) && (
+            <button
+              type="button"
+              className={`gf-btn gf-sell-mode-btn${sellMode ? " is-active" : ""}`}
+              onClick={onToggleSellMode}
+              disabled={discardMode}
+            >
+              {sellMode ? "キャンセル" : "カードを売る"}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
@@ -96,6 +124,22 @@ function isDefenseCard(cardId: string): boolean {
 function isDefenseOnlyCard(cardId: string): boolean {
   const card = findCard(cardId);
   return card ? card.effects.every((effect) => effect.kind === "defense") : false;
+}
+
+function isTradeCard(cardId: string): boolean {
+  return cardId === "buy" || cardId === "sell";
+}
+
+function isSellCardItself(cardId: string): boolean {
+  return cardId === "sell";
+}
+
+function isBuyCardItself(cardId: string): boolean {
+  return cardId === "buy";
+}
+
+function hasSellCard(player: PlayerState): boolean {
+  return player.hand.some((c) => c.id === "sell");
 }
 
 function playableCards(player: PlayerState): { id: string }[] {

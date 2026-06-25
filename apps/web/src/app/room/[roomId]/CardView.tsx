@@ -19,6 +19,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; ink: string; chip: string }>
   potion: { bg: "#dff3df", ink: "#1d5a32", chip: "#3a9b59" },
   miracle: { bg: "#e8dffa", ink: "#4a2e87", chip: "#8b5cf6" },
   special: { bg: "#fbeac9", ink: "#7a4d10", chip: "#e0a93e" },
+  trade: { bg: "#fde7f1", ink: "#7a1d4d", chip: "#c66b8a" },
 };
 
 export function CardView({
@@ -73,11 +74,15 @@ export function CardView({
         <span>{shortPower(card)}</span>
         {learned && <small>習</small>}
       </div>
+      {typeof card.price === "number" && card.price > 0 && (
+        <div className="gf-hand-card-price">￥{card.price}</div>
+      )}
     </button>
   );
 }
 
 function shortPower(card: NonNullable<ReturnType<typeof findCard>>): string {
+  if (card.category === "trade") return card.name;
   const amount = card.effects.find((effect) => typeof effect.amount === "number")?.amount;
   if (card.category === "shield") return `守${amount ?? ""}`;
   if (card.category === "miracle") return `MP${card.mpCost ?? 0}`;

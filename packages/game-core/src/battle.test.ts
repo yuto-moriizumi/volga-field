@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameState } from "@volga/shared";
-import { defendAttack, discardCards, playCard } from "./battle.js";
+import {
+  confirmBuy,
+  defendAttack,
+  discardCards,
+  playCard,
+  sellCards,
+  startBuy,
+} from "./battle.js";
 
 function defenseState(): GameState {
   return {
@@ -14,6 +21,7 @@ function defenseState(): GameState {
         maxHp: 20,
         mp: 0,
         maxMp: 10,
+        money: 20,
         hand: [],
         learnedMiracles: [],
         ready: true,
@@ -25,6 +33,7 @@ function defenseState(): GameState {
         maxHp: 20,
         mp: 0,
         maxMp: 10,
+        money: 20,
         hand: [{ id: "shield" }, { id: "leaf_shield" }, { id: "potion" }],
         learnedMiracles: [],
         ready: true,
@@ -44,6 +53,8 @@ function defenseState(): GameState {
       cardName: "斧",
       amount: 4,
     },
+    pendingBuy: null,
+    pendingSell: null,
     log: [],
     winner: null,
     startedAt: 0,
@@ -130,4 +141,136 @@ test("discardCards removes selected cards during the active player's turn", () =
   const attacker = result.state.players.find((p) => p.id === "attacker");
   assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
   assert.equal(result.state.log.at(-1)?.kind, "system");
+});
+
+test("startBuy picks a random card from the target and consumes the buy card", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "buy" }, { id: "potion" }],
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "axe" }, { id: "shield" }],
+  };
+
+  const result = startBuy(state, "attacker", "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.equal(result.state.pendingBuy?.sourceId, "attacker");
+  assert.equal(result.state.pendingBuy?.targetId, "defender");
+  assert.equal(defender?.hand.length, 2);
+});
+
+test("confirmBuy moves the card and money when accepted", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "buy" }, { id: "potion" }],
+    money: 20,
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "axe" }],
+    money: 20,
+  };
+
+  const started = startBuy(state, "attacker", "defender");
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const price = started.state.pendingBuy?.price ?? 0;
+  assert.ok(price > 0);
+
+  const confirmed = confirmBuy(started.state, "attacker", true);
+  assert.equal(confirmed.ok, true);
+  if (!confirmed.ok) return;
+  const attacker = confirmed.state.players.find((p) => p.id === "attacker");
+  const defender = confirmed.state.players.find((p) => p.id === "defender");
+  assert.equal(attacker?.money, 20 - price);
+  assert.equal(defender?.money, 20 + price);
+  assert.equal(confirmed.state.pendingBuy, null);
+  assert.ok(attacker?.hand.some((c) => c.id === "axe"));
+});
+
+test("confirmBuy cancels when buyer declines", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "buy" }, { id: "potion" }],
+    money: 20,
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "axe" }],
+    money: 20,
+  };
+
+  const started = startBuy(state, "attacker", "defender");
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+
+  const declined = confirmBuy(started.state, "attacker", false);
+  assert.equal(declined.ok, true);
+  if (!declined.ok) return;
+  const attacker = declined.state.players.find((p) => p.id === "attacker");
+  const defender = declined.state.players.find((p) => p.id === "defender");
+  assert.equal(attacker?.money, 20);
+  assert.equal(defender?.money, 20);
+  assert.deepEqual(defender?.hand, [{ id: "axe" }]);
+  assert.equal(declined.state.pendingBuy, null);
+});
+
+test("sellCards transfers selected cards and money to the target", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "sell" }, { id: "potion" }, { id: "axe" }],
+    money: 0,
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [],
+    money: 20,
+  };
+
+  const result = sellCards(state, "attacker", [{ id: "potion" }, { id: "axe" }], "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(attacker?.money, 9);
+  assert.equal(defender?.money, 20 - 9);
+  assert.equal(attacker?.hand.length, 0);
+  assert.equal(defender?.hand.length, 2);
+});
+
+test("sellCards drains money, then MP, then HP when target cannot pay", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "sell" }, { id: "hi_potion" }],
+    money: 0,
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [],
+    money: 2,
+    mp: 3,
+    hp: 20,
+  };
+
+  const result = sellCards(state, "attacker", [{ id: "hi_potion" }], "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.money, 0);
+  assert.equal(defender?.mp, 0);
+  assert.equal(defender?.hp, 17);
+  assert.ok(defender?.hand.some((c) => c.id === "hi_potion"));
 });

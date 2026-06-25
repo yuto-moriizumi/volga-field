@@ -9,6 +9,7 @@ const KIND_ICON: Record<BattleLogEntry["kind"], string> = {
   miracle: "✦",
   system: "i",
   special: "✪",
+  trade: "￥",
 };
 
 export function BattleLog({ entries }: { entries: BattleLogEntry[] }) {

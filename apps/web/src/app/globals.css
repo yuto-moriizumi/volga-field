@@ -1260,6 +1260,155 @@ a {
   box-shadow: none;
 }
 
+.gf-hand-buttons {
+  align-self: flex-end;
+  display: flex;
+  gap: 8px;
+}
+
+.gf-sell-mode-btn {
+  align-self: flex-end;
+  min-width: 160px;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  font-size: 20px;
+  letter-spacing: 0;
+  line-height: 38px;
+  background: #fde7f1;
+  color: #7a1d4d;
+}
+
+.gf-sell-mode-btn:hover:not(:disabled),
+.gf-sell-mode-btn:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.gf-discard-mode-btn.is-active,
+.gf-sell-mode-btn.is-active {
+  background: #ff9c8a;
+  color: #2f1010;
+}
+
+.gf-buy-status {
+  background: #fde7f1;
+  color: #7a1d4d;
+  font-weight: 900;
+  font-size: 18px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 2px solid #c66b8a;
+}
+
+.gf-buy-decision {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+  min-height: 120px;
+  padding: 8px;
+}
+
+.gf-buy-accept,
+.gf-buy-decline {
+  border: 3px solid transparent;
+  border-radius: 12px;
+  font-size: 28px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0;
+}
+
+.gf-buy-accept {
+  background: linear-gradient(180deg, #f7c8b3, #d96b3e);
+  color: #fff;
+  box-shadow: none;
+}
+
+.gf-buy-accept:hover:not(:disabled),
+.gf-buy-accept:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  filter: brightness(1.05);
+}
+
+.gf-buy-accept.is-default {
+  outline: 4px solid #ffdf4f;
+}
+
+.gf-buy-decline {
+  background: linear-gradient(180deg, #c2c2c2, #6a6a6a);
+  color: #fff;
+  box-shadow: none;
+}
+
+.gf-buy-decline.is-default {
+  outline: 4px solid #ffdf4f;
+}
+
+.gf-buy-decline:hover:not(:disabled),
+.gf-buy-decline:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  filter: brightness(1.05);
+}
+
+.gf-buy-accept:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gf-target-buy-card,
+.gf-target-sell-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+}
+
+.gf-buy-card-price,
+.gf-sell-card-price {
+  font-weight: 900;
+  font-size: 22px;
+  color: #c66b8a;
+  background: #fde7f1;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 2px solid #c66b8a;
+}
+
+.gf-hand-card-price {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #c66b8a;
+  background: #fff;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1.5px solid #c66b8a;
+  line-height: 1;
+}
+
+.gf-large-card-price {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #c66b8a;
+  background: #fde7f1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1.5px solid #c66b8a;
+}
+
 .gf-name-list {
   display: flex;
   flex-direction: column;
