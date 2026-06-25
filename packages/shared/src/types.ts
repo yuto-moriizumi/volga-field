@@ -9,7 +9,8 @@ export type CardCategory =
   | "miracle"
   | "special"
   | "trade"
-  | "colorless";
+  | "colorless"
+  | "misc";
 
 export interface CardRef {
   id: CardId;
@@ -67,7 +68,7 @@ export interface BattleLogEntry {
   turn: number;
   playerId: PlayerId;
   message: string;
-  kind: "attack" | "heal" | "defense" | "miracle" | "system" | "special" | "trade";
+  kind: "attack" | "heal" | "defense" | "miracle" | "system" | "special" | "trade" | "mpRecover";
   damage?: number;
 }
 

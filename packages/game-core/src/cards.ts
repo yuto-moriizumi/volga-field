@@ -3,7 +3,7 @@ import type { CardCategory } from "@volga/shared";
 export type Target = "self" | "opponent" | "either";
 
 export interface CardEffect {
-  kind: "damage" | "heal" | "defense";
+  kind: "damage" | "heal" | "defense" | "mpRecover";
   amount?: number;
   target: Target;
   description: string;
@@ -312,6 +312,70 @@ export const BASE_CARDS: CardDefinition[] = [
     emoji: "🔄",
     description: "HPをMPやお金に交換する",
     effects: [],
+  },
+  {
+    id: "local_campaign",
+    name: "地方遊説",
+    category: "misc",
+    emoji: "🎤",
+    description: "MP+1",
+    price: 3,
+    effects: [
+      {
+        kind: "mpRecover",
+        amount: 1,
+        target: "self",
+        description: "MP+1",
+      },
+    ],
+  },
+  {
+    id: "supporter_rally",
+    name: "支持者集会",
+    category: "misc",
+    emoji: "📣",
+    description: "MP+2",
+    price: 5,
+    effects: [
+      {
+        kind: "mpRecover",
+        amount: 2,
+        target: "self",
+        description: "MP+2",
+      },
+    ],
+  },
+  {
+    id: "national_campaign",
+    name: "全国遊説",
+    category: "misc",
+    emoji: "🗣️",
+    description: "MP+3",
+    price: 7,
+    effects: [
+      {
+        kind: "mpRecover",
+        amount: 3,
+        target: "self",
+        description: "MP+3",
+      },
+    ],
+  },
+  {
+    id: "un_speech",
+    name: "国連総会演説",
+    category: "misc",
+    emoji: "🌐",
+    description: "MP+5",
+    price: 10,
+    effects: [
+      {
+        kind: "mpRecover",
+        amount: 5,
+        target: "self",
+        description: "MP+5",
+      },
+    ],
   },
   {
     id: "concern_expressed",

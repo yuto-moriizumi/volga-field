@@ -386,3 +386,61 @@ test("exchangeStats rejects when no changes are requested", () => {
   if (result.ok) return;
   assert.equal(result.reason, "no change");
 });
+
+test("playCard recovers MP when the player uses a misc MP-recovery card", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 2,
+    hand: [{ id: "supporter_rally" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "supporter_rally" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(attacker?.mp, 4);
+  assert.equal(defender?.mp, 0);
+  const mpRecoverLog = result.state.log.find((entry) => entry.kind === "mpRecover");
+  assert.ok(mpRecoverLog);
+  assert.equal(mpRecoverLog?.message, "AttackerのMPが2回復 (支持者集会)");
+});
+
+test("playCard caps MP recovery at the player's maxMp", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 8,
+    maxMp: 10,
+    hand: [{ id: "un_speech" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "un_speech" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.mp, 10);
+});
+
+test("playCard consumes the misc card from hand after use", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 0,
+    hand: [{ id: "local_campaign" }, { id: "potion" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "local_campaign" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.mp, 1);
+  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+});
