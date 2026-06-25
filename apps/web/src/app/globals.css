@@ -368,12 +368,6 @@ a {
   font-size: 18px;
 }
 
-.gf-match-player-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 @media (max-width: 860px) {
   .gf-battle-status-grid {
     grid-template-columns: 1fr;
