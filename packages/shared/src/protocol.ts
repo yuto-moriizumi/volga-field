@@ -22,7 +22,7 @@ export type ClientMessage =
   | { type: "leave_room" }
   | { type: "ready" }
   | { type: "play_card"; cardRef: CardRef; targetPlayerId?: PlayerId }
-  | { type: "defend"; cardRef?: CardRef }
+  | { type: "defend"; cardRef?: CardRef; cardRefs?: CardRef[] }
   | { type: "end_turn" }
   | { type: "list_rooms" }
   | { type: "ping" };

@@ -389,7 +389,7 @@ export function playCard(
 export function defendAttack(
   state: GameState,
   playerId: PlayerId,
-  cardRef?: CardRef,
+  cardRefs: CardRef | CardRef[] = [],
 ): { ok: true; state: GameState } | { ok: false; reason: string } {
   const pending = state.pendingAttack;
   if (!pending || state.phase !== "defense") {
@@ -404,17 +404,20 @@ export function defendAttack(
   const logs: BattleLogEntry[] = [];
   let defensePower = 0;
   let nextHand = defender.hand;
+  const selectedCardRefs = Array.isArray(cardRefs) ? cardRefs : [cardRefs];
 
-  if (cardRef) {
-    const idx = defender.hand.findIndex((c) => c.id === cardRef.id);
+  if (selectedCardRefs.length > 0) {
+    nextHand = [...defender.hand];
+  }
+
+  for (const cardRef of selectedCardRefs) {
+    const idx = nextHand.findIndex((c) => c.id === cardRef.id);
     if (idx === -1) return { ok: false, reason: "card not in hand" };
     const card = findCard(cardRef.id);
     const defenseEffect = card?.effects.find((effect) => effect.kind === "defense");
     if (!card || !defenseEffect) return { ok: false, reason: "not a defense card" };
-    defensePower = defenseEffect.amount ?? 0;
-    nextHand = [...defender.hand];
+    defensePower += defenseEffect.amount ?? 0;
     nextHand.splice(idx, 1);
-    defender = { ...defender, hand: nextHand };
     logs.push({
       turn: state.turn,
       playerId,
@@ -422,6 +425,7 @@ export function defendAttack(
       kind: "defense",
     });
   }
+  defender = { ...defender, hand: nextHand };
 
   const { target: damaged, log } = resolveDamage(
     defender,
