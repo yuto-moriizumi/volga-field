@@ -267,7 +267,7 @@ export function GameRoom({
 
   return (
     <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
-      <Header actionTurn={displayedActionTurn} onLeave={leaveRoom} />
+      <Header actionTurn={displayedActionTurn} onBack={leaveRoom} />
 
       <main
         className={`gf-main${gameStarted ? " gf-battle-main" : ""}`}
