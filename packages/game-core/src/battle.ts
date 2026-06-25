@@ -227,6 +227,9 @@ export function playCard(
   if (state.phase === "defense") return { ok: false, reason: "defense pending" };
   const card = findCard(cardRef.id);
   if (!card) return { ok: false, reason: "unknown card" };
+  if (card.effects.every((effect) => effect.kind === "defense")) {
+    return { ok: false, reason: "defense card can only be used while defending" };
+  }
   const idx = active.hand.findIndex((c) => c.id === cardRef.id);
   const learnedMiracle = active.learnedMiracles.some((c) => c.id === cardRef.id);
   const isMiracle = card.category === "miracle";

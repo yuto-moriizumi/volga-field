@@ -496,17 +496,18 @@ function MyArea({
           const definition = findCard(card.id);
           const isLearned = idx >= me.hand.length;
           const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
+          const canPlayCard = canAct && hasEnoughMp && !isDefenseOnlyCard(card.id);
           return (
           <CardView
             key={`${card.id}-${idx}`}
             cardRef={card}
             selected={selectedCardIdx === idx || selectedDefenseIdxes.includes(idx)}
-            playable={isDefending ? !isLearned && isDefenseCard(card.id) : canAct && hasEnoughMp}
+            playable={isDefending ? !isLearned && isDefenseCard(card.id) : canPlayCard}
             learned={isLearned}
             onClick={() => {
               if (isDefending) {
                 if (!isLearned) onSelectDefense(idx);
-              } else if (canAct) {
+              } else if (canPlayCard) {
                 onPlayCard(idx);
               }
             }}
@@ -726,6 +727,11 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
 
 function isDefenseCard(cardId: string): boolean {
   return findCard(cardId)?.effects.some((effect) => effect.kind === "defense") ?? false;
+}
+
+function isDefenseOnlyCard(cardId: string): boolean {
+  const card = findCard(cardId);
+  return card ? card.effects.every((effect) => effect.kind === "defense") : false;
 }
 
 function getDefensePower(cardId: string): number {
