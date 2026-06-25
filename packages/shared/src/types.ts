@@ -8,7 +8,8 @@ export type CardCategory =
   | "potion"
   | "miracle"
   | "special"
-  | "trade";
+  | "trade"
+  | "colorless";
 
 export interface CardRef {
   id: CardId;
