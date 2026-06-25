@@ -10,7 +10,16 @@ export type CardCategory =
   | "special"
   | "trade"
   | "colorless"
-  | "misc";
+  | "misc"
+  | "party";
+
+export type PartyId =
+  | "communist_party"
+  | "ldp"
+  | "democratic_party"
+  | "constitutional_imperial_party"
+  | "green_party"
+  | "anarchist_party";
 
 export interface CardRef {
   id: CardId;
@@ -27,6 +36,7 @@ export interface PlayerState {
   money: number;
   hand: CardRef[];
   learnedMiracles: CardRef[];
+  party: PartyId | null;
   ready: boolean;
 }
 

@@ -1,4 +1,4 @@
-import type { CardCategory } from "@volga/shared";
+import type { CardCategory, PartyId } from "@volga/shared";
 
 export type Target = "self" | "opponent" | "either";
 
@@ -1573,6 +1573,60 @@ export const BASE_CARDS: CardDefinition[] = [
       },
     ],
   },
+  {
+    id: "communist_party",
+    name: "共産党",
+    category: "party",
+    emoji: "🚩",
+    description: "使用すると社会主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
+  {
+    id: "ldp",
+    name: "自民党",
+    category: "party",
+    emoji: "🏛️",
+    description: "使用すると資本主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
+  {
+    id: "democratic_party",
+    name: "民主党",
+    category: "party",
+    emoji: "🗳️",
+    description: "使用すると共和主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
+  {
+    id: "constitutional_imperial_party",
+    name: "立憲帝政党",
+    category: "party",
+    emoji: "👑",
+    description: "使用すると封建主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
+  {
+    id: "green_party",
+    name: "緑の党",
+    category: "party",
+    emoji: "🌿",
+    description: "使用すると環境主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
+  {
+    id: "anarchist_party",
+    name: "無政府党",
+    category: "party",
+    emoji: "🪬",
+    description: "使用すると無政府主義の政党に所属する",
+    price: 5,
+    effects: [],
+  },
 ];
 
 export function findCard(id: string): CardDefinition | undefined {
@@ -1606,3 +1660,38 @@ export function isSellCard(id: string): boolean {
 export function isExchangeCard(id: string): boolean {
   return id === "exchange";
 }
+
+const PARTY_IDS: PartyId[] = [
+  "communist_party",
+  "ldp",
+  "democratic_party",
+  "constitutional_imperial_party",
+  "green_party",
+  "anarchist_party",
+];
+
+export function isPartyCard(id: string): boolean {
+  return (PARTY_IDS as string[]).includes(id);
+}
+
+export function getPartyId(id: string): PartyId | null {
+  return (PARTY_IDS as string[]).includes(id) ? (id as PartyId) : null;
+}
+
+export const PARTY_LABELS: Record<PartyId, string> = {
+  communist_party: "共産党",
+  ldp: "自民党",
+  democratic_party: "民主党",
+  constitutional_imperial_party: "立憲帝政党",
+  green_party: "緑の党",
+  anarchist_party: "無政府党",
+};
+
+export const PARTY_IDEOLOGIES: Record<PartyId, string> = {
+  communist_party: "社会主義",
+  ldp: "資本主義",
+  democratic_party: "共和主義",
+  constitutional_imperial_party: "封建主義",
+  green_party: "環境主義",
+  anarchist_party: "無政府主義",
+};

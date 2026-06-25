@@ -304,6 +304,7 @@ function placeholderState(
       money: 20,
       hand: [],
       learnedMiracles: [],
+      party: null,
       ready: p.ready,
     })),
     deckSize: 0,
@@ -394,6 +395,7 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       money: 20,
       hand: [],
       learnedMiracles: [],
+      party: null,
       ready: false,
     },
   });

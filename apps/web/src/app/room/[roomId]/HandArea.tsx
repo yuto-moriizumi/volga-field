@@ -123,7 +123,9 @@ function isDefenseCard(cardId: string): boolean {
 
 function isDefenseOnlyCard(cardId: string): boolean {
   const card = findCard(cardId);
-  return card ? card.effects.every((effect) => effect.kind === "defense") : false;
+  if (!card) return false;
+  if (card.effects.length === 0) return false;
+  return card.effects.every((effect) => effect.kind === "defense");
 }
 
 function isTradeCard(cardId: string): boolean {

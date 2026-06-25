@@ -6,6 +6,7 @@ import {
   defendAttack,
   discardCards,
   exchangeStats,
+  joinParty,
   playCard,
   sellCards,
   startBuy,
@@ -25,6 +26,7 @@ function defenseState(): GameState {
         money: 20,
         hand: [],
         learnedMiracles: [],
+        party: null,
         ready: true,
       },
       {
@@ -37,6 +39,7 @@ function defenseState(): GameState {
         money: 20,
         hand: [{ id: "shield" }, { id: "leaf_shield" }, { id: "potion" }],
         learnedMiracles: [],
+        party: null,
         ready: true,
       },
     ],
@@ -463,6 +466,7 @@ function attributeWeaponState(): GameState {
           { id: "socialist_power_3" },
         ],
         learnedMiracles: [],
+        party: null,
         ready: true,
       },
       {
@@ -475,6 +479,7 @@ function attributeWeaponState(): GameState {
         money: 20,
         hand: [],
         learnedMiracles: [],
+        party: null,
         ready: true,
       },
     ],
@@ -596,4 +601,44 @@ test("defendAttack reduces damage from combined multi-card attack", () => {
   if (!defended.ok) return;
   const defender = defended.state.players.find((p) => p.id === "defender");
   assert.equal(defender?.hp, 18);
+});
+
+test("playCard joins the player's party when a party card is used", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "communist_party" }, { id: "potion" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "communist_party" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.party, "communist_party");
+  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  const joinLog = result.state.log.at(-1);
+  assert.equal(joinLog?.kind, "special");
+  assert.ok(joinLog?.message.includes("共産党"));
+});
+
+test("joinParty replaces the previous party affiliation", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    party: "ldp",
+    hand: [{ id: "anarchist_party" }],
+  };
+
+  const result = joinParty(state, "attacker", { id: "anarchist_party" });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.party, "anarchist_party");
+  assert.deepEqual(attacker?.hand, []);
+  const joinLog = result.state.log.at(-1);
+  assert.equal(joinLog?.kind, "special");
+  assert.ok(joinLog?.message.includes("自民党"));
+  assert.ok(joinLog?.message.includes("無政府党"));
 });

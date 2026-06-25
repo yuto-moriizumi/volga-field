@@ -10,9 +10,9 @@ import {
   type AttributeKey,
   type CalamityCard,
   type DevilCard,
-  type GuardianCard,
   type ItemCard,
   type MiracleCard,
+  type PartyCard,
   type PhenomenonCard,
   type Token,
   type WeaponCard,
@@ -77,8 +77,8 @@ function CategoryView({
       return <MiracleListView cards={category.cards as MiracleCard[]} />;
     case "devil-list":
       return <DevilListView cards={category.cards as DevilCard[]} />;
-    case "guardian-list":
-      return <GuardianListView cards={category.cards as GuardianCard[]} />;
+    case "party-list":
+      return <PartyListView cards={category.cards as PartyCard[]} />;
     case "phenomenon-list":
       return <PhenomenonListView cards={category.cards as PhenomenonCard[]} />;
     case "trade-list":
@@ -373,28 +373,41 @@ function DevilListView({ cards }: { cards: DevilCard[] }) {
   );
 }
 
-function GuardianListView({ cards }: { cards: GuardianCard[] }) {
+function PartyListView({ cards }: { cards: PartyCard[] }) {
   return (
     <div className="gf-textbook-calamity">
       <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => (
-          <div
-            key={card.id}
-            className="gf-textbook-item-card"
-            style={{ background: "#fbeec3", borderColor: "#e5b431" }}
-          >
-            <div className="gf-textbook-calamity-icon">{card.emoji}</div>
-            <div className="gf-textbook-calamity-body">
-              <div
-                className="gf-textbook-item-name"
-                style={{ color: "#a17a1f" }}
-              >
-                {card.name}
+        {cards.map((card) => {
+          const attr = ATTR_BY_KEY[card.attribute];
+          return (
+            <div
+              key={card.id}
+              className="gf-textbook-item-card"
+              style={{ background: attr.bgColor, borderColor: attr.color }}
+            >
+              <div className="gf-textbook-calamity-icon">{card.emoji}</div>
+              <div className="gf-textbook-calamity-body">
+                <div
+                  className="gf-textbook-item-name"
+                  style={{ color: attr.color }}
+                >
+                  {card.name}
+                  <span
+                    className="gf-textbook-attr-mark"
+                    style={{
+                      background: attr.bgColor,
+                      color: attr.color,
+                      borderColor: attr.color,
+                    }}
+                  >
+                    {attr.icon}
+                  </span>
+                </div>
+                <div className="gf-textbook-calamity-desc">{card.description}</div>
               </div>
-              <div className="gf-textbook-calamity-desc">{card.description}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

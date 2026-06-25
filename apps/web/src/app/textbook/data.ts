@@ -85,11 +85,12 @@ export interface DevilCard {
   description: string;
 }
 
-export interface GuardianCard {
+export interface PartyCard {
   id: string;
   name: string;
   emoji: string;
   description: string;
+  attribute: AttributeKey;
 }
 
 export interface PhenomenonCard {
@@ -125,7 +126,7 @@ export interface TextbookCategory {
     | "miracle-list"
     | "calamity-list"
     | "devil-list"
-    | "guardian-list"
+    | "party-list"
     | "phenomenon-list"
     | "trade-list";
   /** 画像グリッドで表示するカード群 */
@@ -135,7 +136,7 @@ export interface TextbookCategory {
     | ItemCard[]
     | MiracleCard[]
     | DevilCard[]
-    | GuardianCard[]
+    | PartyCard[]
     | PhenomenonCard[]
     | CalamityCard[];
   /** テキスト形式のエントリ */
@@ -406,24 +407,48 @@ export const DEVILS: DevilCard[] = [
   },
 ];
 
-export const GUARDIANS: GuardianCard[] = [
+export const PARTIES: PartyCard[] = [
   {
-    id: "michael",
-    name: "ミカエル",
-    emoji: "👼",
-    description: "無政府主義の攻撃を無効化",
+    id: "communist_party",
+    name: "共産党",
+    emoji: "🚩",
+    description: "使用すると社会主義の政党に所属する",
+    attribute: "fire",
   },
   {
-    id: "raphael",
-    name: "ラファエル",
-    emoji: "🕊️",
-    description: "毎ターンHP+1",
+    id: "ldp",
+    name: "自民党",
+    emoji: "🏛️",
+    description: "使用すると資本主義の政党に所属する",
+    attribute: "water",
   },
   {
-    id: "uriel",
-    name: "ウリエル",
-    emoji: "🔥",
-    description: "炎の加護：社会主義の攻撃を+2",
+    id: "democratic_party",
+    name: "民主党",
+    emoji: "🗳️",
+    description: "使用すると共和主義の政党に所属する",
+    attribute: "wood",
+  },
+  {
+    id: "constitutional_imperial_party",
+    name: "立憲帝政党",
+    emoji: "👑",
+    description: "使用すると封建主義の政党に所属する",
+    attribute: "earth",
+  },
+  {
+    id: "green_party",
+    name: "緑の党",
+    emoji: "🌿",
+    description: "使用すると環境主義の政党に所属する",
+    attribute: "light",
+  },
+  {
+    id: "anarchist_party",
+    name: "無政府党",
+    emoji: "🪬",
+    description: "使用すると無政府主義の政党に所属する",
+    attribute: "dark",
   },
 ];
 
@@ -541,10 +566,10 @@ export const CATEGORIES: TextbookCategory[] = [
     cards: DEVILS,
   },
   {
-    id: "shugoshin",
-    title: "守護神",
-    variant: "guardian-list",
-    cards: GUARDIANS,
+    id: "seitou",
+    title: "政党",
+    variant: "party-list",
+    cards: PARTIES,
   },
   {
     id: "choujougenshou",

@@ -16,6 +16,7 @@ export function createPlayer(
     money: INITIAL_MONEY,
     hand: startingHand,
     learnedMiracles: [],
+    party: null,
     ready: false,
   };
 }
