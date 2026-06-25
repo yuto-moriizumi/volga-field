@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameState } from "@volga/shared";
-import { defendAttack, playCard } from "./battle.js";
+import { defendAttack, discardCards, playCard } from "./battle.js";
 
 function defenseState(): GameState {
   return {
@@ -114,4 +114,20 @@ test("playCard rejects defense cards on the attacker's turn", () => {
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.equal(result.reason, "defense card can only be used while defending");
+});
+
+test("discardCards removes selected cards during the active player's turn", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "potion" }, { id: "potion" }, { id: "axe" }],
+  };
+
+  const result = discardCards(state, "attacker", [{ id: "potion" }, { id: "axe" }]);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.equal(result.state.log.at(-1)?.kind, "system");
 });

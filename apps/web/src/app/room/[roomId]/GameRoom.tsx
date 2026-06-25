@@ -25,6 +25,8 @@ export function GameRoom({
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
+  const [discardMode, setDiscardMode] = useState(false);
+  const [selectedDiscardIdxes, setSelectedDiscardIdxes] = useState<number[]>([]);
   const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
   const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,8 +103,14 @@ export function GameRoom({
     }
   }, [lastMessage]);
 
+  useEffect(() => {
+    if (canAct) return;
+    setDiscardMode(false);
+    setSelectedDiscardIdxes([]);
+  }, [canAct]);
+
   function playCard(idx: number) {
-    if (!me || !canAct) return;
+    if (!me || !canAct || discardMode) return;
     const card = playableCards(me)[idx];
     if (!card) return;
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
@@ -113,7 +121,7 @@ export function GameRoom({
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || selectedCardIdx === null) return;
+    if (!me || !canAct || discardMode || selectedCardIdx === null) return;
     const card = playableCards(me)[selectedCardIdx];
     if (!card) return;
     send({
@@ -136,7 +144,34 @@ export function GameRoom({
 
   function endTurn() {
     if (!canAct) return;
+    setDiscardMode(false);
+    setSelectedDiscardIdxes([]);
     send({ type: "end_turn" });
+  }
+
+  function toggleDiscardMode() {
+    if (!canAct) return;
+    setDiscardMode((current) => {
+      const next = !current;
+      if (next) {
+        setSelectedCardIdx(null);
+        setSelectedTargetId(null);
+      } else {
+        setSelectedDiscardIdxes([]);
+      }
+      return next;
+    });
+  }
+
+  function confirmDiscard() {
+    if (!me || !canAct || !discardMode || selectedDiscardIdxes.length === 0) return;
+    const cardRefs = selectedDiscardIdxes
+      .map((idx) => me.hand[idx])
+      .filter((card): card is { id: string } => Boolean(card))
+      .map((card) => ({ id: card.id }));
+    send({ type: "discard_cards", cardRefs });
+    setDiscardMode(false);
+    setSelectedDiscardIdxes([]);
   }
 
   function leaveRoom() {
@@ -284,9 +319,13 @@ export function GameRoom({
               selectedCardIdx={selectedCardIdx}
               selectedTargetId={selectedTargetId}
               selectedDefenseIdxes={selectedDefenseIdxes}
+              discardMode={discardMode}
+              selectedDiscardCount={selectedDiscardIdxes.length}
               hitFlash={hitFlash}
               onSelectTarget={setSelectedTargetId}
               onExecute={executeSelectedCard}
+              onToggleDiscardMode={toggleDiscardMode}
+              onConfirmDiscard={confirmDiscard}
               onPassDefense={() => defend(selectedDefenseIdxes)}
               onEndTurn={endTurn}
             />
@@ -296,10 +335,19 @@ export function GameRoom({
               isDefending={isDefending}
               selectedCardIdx={selectedCardIdx}
               selectedDefenseIdxes={selectedDefenseIdxes}
+              discardMode={discardMode}
+              selectedDiscardIdxes={selectedDiscardIdxes}
               onPlayCard={playCard}
               onHoverCard={setLastHoveredCard}
               onSelectDefense={(idx) =>
                 setSelectedDefenseIdxes((current) =>
+                  current.includes(idx)
+                    ? current.filter((selectedIdx) => selectedIdx !== idx)
+                    : [...current, idx],
+                )
+              }
+              onSelectDiscard={(idx) =>
+                setSelectedDiscardIdxes((current) =>
                   current.includes(idx)
                     ? current.filter((selectedIdx) => selectedIdx !== idx)
                     : [...current, idx],
@@ -394,18 +442,24 @@ function MyArea({
   isDefending,
   selectedCardIdx,
   selectedDefenseIdxes,
+  discardMode,
+  selectedDiscardIdxes,
   onPlayCard,
   onHoverCard,
   onSelectDefense,
+  onSelectDiscard,
 }: {
   me: PlayerState | null;
   canAct: boolean;
   isDefending: boolean;
   selectedCardIdx: number | null;
   selectedDefenseIdxes: number[];
+  discardMode: boolean;
+  selectedDiscardIdxes: number[];
   onPlayCard: (idx: number) => void;
   onHoverCard: (card: CardRef) => void;
   onSelectDefense: (idx: number) => void;
+  onSelectDiscard: (idx: number) => void;
 }) {
   if (!me) return <div />;
   const cards = playableCards(me);
@@ -422,16 +476,29 @@ function MyArea({
           const isLearned = idx >= me.hand.length;
           const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
           const canPlayCard = canAct && hasEnoughMp && !isDefenseOnlyCard(card.id);
+          const canDiscardCard = discardMode && !isLearned;
           return (
           <CardView
             key={`${card.id}-${idx}`}
             cardRef={card}
-            selected={selectedCardIdx === idx || selectedDefenseIdxes.includes(idx)}
-            playable={isDefending ? !isLearned && isDefenseCard(card.id) : canPlayCard}
+            selected={
+              selectedCardIdx === idx ||
+              selectedDefenseIdxes.includes(idx) ||
+              selectedDiscardIdxes.includes(idx)
+            }
+            playable={
+              discardMode
+                ? canDiscardCard
+                : isDefending
+                  ? !isLearned && isDefenseCard(card.id)
+                  : canPlayCard
+            }
             learned={isLearned}
             onHover={() => onHoverCard(card)}
             onClick={() => {
-              if (isDefending) {
+              if (discardMode) {
+                if (canDiscardCard) onSelectDiscard(idx);
+              } else if (isDefending) {
                 if (!isLearned) onSelectDefense(idx);
               } else if (canPlayCard) {
                 onPlayCard(idx);
@@ -454,9 +521,13 @@ function BattleBoard({
   selectedCardIdx,
   selectedTargetId,
   selectedDefenseIdxes,
+  discardMode,
+  selectedDiscardCount,
   hitFlash,
   onSelectTarget,
   onExecute,
+  onToggleDiscardMode,
+  onConfirmDiscard,
   onPassDefense,
   onEndTurn,
 }: {
@@ -468,9 +539,13 @@ function BattleBoard({
   selectedCardIdx: number | null;
   selectedTargetId: string | null;
   selectedDefenseIdxes: number[];
+  discardMode: boolean;
+  selectedDiscardCount: number;
   hitFlash: { amount: number; key: number } | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
+  onToggleDiscardMode: () => void;
+  onConfirmDiscard: () => void;
   onPassDefense: () => void;
   onEndTurn: () => void;
 }) {
@@ -491,14 +566,22 @@ function BattleBoard({
   const selectedCards = isDefending ? defenseCards : selectedCard ? [selectedCard] : [];
   const canPassDefense = isDefending && defenseCards.length === 0;
   const canEndTurn = canAct && !gameState.winner && !isDefending;
+  const canUseDiscard = canAct && !isDefending;
   const canConfirmSelection =
-    (isDefending && defenseCards.length > 0) || (!isDefending && Boolean(selectedCard) && canAct);
-  const canConfirmEmpty = canPassDefense || (canEndTurn && selectedCards.length === 0);
+    (isDefending && defenseCards.length > 0) ||
+    (!isDefending && Boolean(selectedCard) && canAct && !discardMode) ||
+    (discardMode && selectedDiscardCount > 0);
+  const canConfirmEmpty =
+    canPassDefense || (canEndTurn && selectedCards.length === 0 && !discardMode);
   const confirmDisabled = gameState.winner ? true : !(canConfirmSelection || canConfirmEmpty);
   const confirmLabel = isDefending
     ? defenseCards.length > 0
       ? `${defenseCards.length}枚 防${defensePower}`
       : "許す"
+    : discardMode
+      ? selectedDiscardCount > 0
+        ? `${selectedDiscardCount}枚 捨てる`
+        : "捨てるカードを選択"
     : selectedCards.length === 0
       ? "ターン終了"
       : "確定";
@@ -507,6 +590,10 @@ function BattleBoard({
     if (gameState.winner) return;
     if (isDefending) {
       onPassDefense();
+      return;
+    }
+    if (discardMode) {
+      onConfirmDiscard();
       return;
     }
     if (selectedCard) {
@@ -521,7 +608,10 @@ function BattleBoard({
   return (
     <section className="gf-battle-board" aria-label="戦闘">
       <div className="gf-battle-status-grid" aria-label="プレイヤー状況">
-        <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
+        <div className="gf-status-stack">
+          <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
+          {discardMode && <div className="gf-discard-status">カードを捨てる</div>}
+        </div>
         <NamePlate
           label={pending ? "攻撃対象" : "ターゲット"}
           name={targetPlayer?.name ?? "未選択"}
@@ -542,6 +632,8 @@ function BattleBoard({
               <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
             ))}
           </div>
+        ) : discardMode ? (
+          <span className="gf-confirm-empty-action is-danger">{confirmLabel}</span>
         ) : canEndTurn ? (
           <span className="gf-confirm-empty-action">ターン終了</span>
         ) : canPassDefense ? (
@@ -561,6 +653,17 @@ function BattleBoard({
             <span>ダメージ</span>
           </div>
         )}
+        {canUseDiscard && (
+          <button
+            className="gf-btn gf-discard-mode-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleDiscardMode();
+            }}
+          >
+            {discardMode ? "キャンセル" : "カードを捨てる"}
+          </button>
+        )}
       </div>
 
       <div className="gf-target-list">
@@ -569,7 +672,7 @@ function BattleBoard({
             className="gf-target-pill"
             key={p.id}
             onClick={() => onSelectTarget(p.id)}
-            disabled={!canAct || isDefending}
+            disabled={!canAct || isDefending || discardMode}
             style={{
               color: p.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
             }}

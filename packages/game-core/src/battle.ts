@@ -469,6 +469,49 @@ export function defendAttack(
   return { ok: true, state: newState };
 }
 
+export function discardCards(
+  state: GameState,
+  playerId: PlayerId,
+  cardRefs: CardRef[],
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+  if (cardRefs.length === 0) return { ok: false, reason: "no cards selected" };
+
+  const nextHand = [...active.hand];
+  const discardedNames: string[] = [];
+  for (const cardRef of cardRefs) {
+    const idx = nextHand.findIndex((c) => c.id === cardRef.id);
+    if (idx === -1) return { ok: false, reason: "card not in hand" };
+    const [removed] = nextHand.splice(idx, 1);
+    const card = removed ? findCard(removed.id) : null;
+    discardedNames.push(card?.name ?? removed?.id ?? "?");
+  }
+
+  const finalPlayers = state.players.map((p) =>
+    p.id === playerId ? { ...active, hand: nextHand } : p,
+  );
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players: finalPlayers,
+      log: [
+        ...state.log,
+        {
+          turn: state.turn,
+          playerId,
+          message: `${active.name}が${discardedNames.length}枚捨てた (${discardedNames.join("、")})`,
+          kind: "system",
+        },
+      ],
+    },
+  };
+}
+
 export function endTurn(
   state: GameState,
   playerId: PlayerId,

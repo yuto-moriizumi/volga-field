@@ -15,6 +15,7 @@ import {
 import {
   createGame,
   defendAttack,
+  discardCards,
   endTurn,
   findCard,
   playCard,
@@ -473,6 +474,23 @@ function handleDefend(client: Client, cardIds: string[] = []): void {
   }
 }
 
+function handleDiscardCards(client: Client, cardIds: string[] = []): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = discardCards(
+    room.gameState,
+    client.id,
+    cardIds.map((id) => ({ id })),
+  );
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
 function handleEndTurn(client: Client): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
@@ -538,6 +556,9 @@ function dispatch(client: Client, msg: ClientMessage): void {
         client,
         msg.cardRefs?.map((cardRef) => cardRef.id) ?? (msg.cardRef ? [msg.cardRef.id] : []),
       );
+      break;
+    case "discard_cards":
+      handleDiscardCards(client, msg.cardRefs.map((cardRef) => cardRef.id));
       break;
     case "end_turn":
       handleEndTurn(client);
