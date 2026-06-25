@@ -473,6 +473,10 @@ function BattleBoard({
     : [];
   const pending = gameState.pendingAttack;
   const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
+  const targetPlayerId = pending?.defenderId ?? selectedTargetId;
+  const targetPlayer = targetPlayerId
+    ? players.find((p) => p.id === targetPlayerId)
+    : null;
   const leftCard = isDefending ? pending?.card : selectedCard;
   const defensePower = defenseCards.reduce((total, card) => total + getDefensePower(card.id), 0);
   const canPassDefense = isDefending && defenseCards.length === 0;
@@ -491,6 +495,26 @@ function BattleBoard({
 
   return (
     <section className="gf-battle-board" aria-label="戦闘">
+      <div className="gf-battle-status-grid" aria-label="プレイヤー状況">
+        <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
+        <NamePlate
+          label={pending ? "攻撃対象" : "ターゲット"}
+          name={targetPlayer?.name ?? "未選択"}
+          tone="blue"
+        />
+        <div className="gf-match-player-list" aria-label="参加プレイヤー">
+          {players.map((p) => (
+            <NamePlate
+              key={p.id}
+              label={p.id === playerId ? "あなた" : "参加者"}
+              name={p.name}
+              tone={p.id === playerId ? "teal" : "blue"}
+              compact
+            />
+          ))}
+        </div>
+      </div>
+
       <button
         className="gf-active-card"
         onClick={onExecute}
@@ -580,6 +604,26 @@ function BattleBoard({
         ))}
       </div>
     </section>
+  );
+}
+
+function NamePlate({
+  label,
+  name,
+  tone,
+  compact = false,
+}: {
+  label: string;
+  name: string;
+  tone: "teal" | "blue";
+  compact?: boolean;
+}) {
+  return (
+    <div className={`gf-name-plate tone-${tone}${compact ? " is-compact" : ""}`}>
+      <span className="gf-name-dot" />
+      <span className="gf-name-label">{label}</span>
+      <span className="gf-name-text">{name}</span>
+    </div>
   );
 }
 
