@@ -1211,6 +1211,51 @@ a {
   cursor: default;
 }
 
+.gf-status-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gf-discard-status {
+  align-self: flex-start;
+  min-width: 180px;
+  height: 30px;
+  padding: 0 12px;
+  border: 2px solid #535353;
+  border-radius: 8px;
+  background: #fff2b5;
+  color: #5c3b12;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 26px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.gf-discard-mode-btn {
+  position: absolute;
+  right: 16px;
+  top: 72px;
+  min-width: 180px;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  font-size: 21px;
+  letter-spacing: 0;
+  line-height: 38px;
+  background: #fff2b5;
+  color: #5c3b12;
+}
+
+.gf-discard-mode-btn:hover:not(:disabled),
+.gf-discard-mode-btn:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
 .gf-target-list {
   display: flex;
   flex-direction: column;
@@ -1401,6 +1446,18 @@ a {
 
   .gf-action-stage {
     min-height: 220px;
+  }
+
+  .gf-discard-mode-btn {
+    right: 50%;
+    transform: translateX(50%);
+    min-width: 220px;
+    top: 92px;
+  }
+
+  .gf-discard-mode-btn:hover:not(:disabled),
+  .gf-discard-mode-btn:active:not(:disabled) {
+    transform: translateX(50%);
   }
 
   .gf-hand-dock {
