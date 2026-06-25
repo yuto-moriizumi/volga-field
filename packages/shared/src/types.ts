@@ -13,9 +13,7 @@ export interface PlayerState {
   id: PlayerId;
   name: string;
   hp: number;
-  maxHp: number;
   mp: number;
-  maxMp: number;
   hand: CardRef[];
   learnedMiracles: CardRef[];
   ready: boolean;

@@ -10,9 +10,7 @@ export function createPlayer(
     id,
     name,
     hp: INITIAL_HP,
-    maxHp: INITIAL_HP,
     mp: INITIAL_MP,
-    maxMp: INITIAL_MP,
     hand: startingHand,
     learnedMiracles: [],
     ready: false,
@@ -37,7 +35,7 @@ export function damagePlayer(p: PlayerState, amount: number): PlayerState {
 }
 
 export function healPlayer(p: PlayerState, amount: number): PlayerState {
-  const newHp = Math.min(p.maxHp, p.hp + amount);
+  const newHp = p.hp + amount;
   return { ...p, hp: newHp };
 }
 
