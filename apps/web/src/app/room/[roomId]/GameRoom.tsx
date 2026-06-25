@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { findCard } from "@volga/game-core";
-import type { GameState, PlayerState } from "@volga/shared";
+import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
 import { BattleLog } from "./BattleLog";
@@ -25,6 +25,7 @@ export function GameRoom({
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
+  const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
   const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -296,6 +297,7 @@ export function GameRoom({
               selectedCardIdx={selectedCardIdx}
               selectedDefenseIdxes={selectedDefenseIdxes}
               onPlayCard={playCard}
+              onHoverCard={setLastHoveredCard}
               onSelectDefense={(idx) =>
                 setSelectedDefenseIdxes((current) =>
                   current.includes(idx)
@@ -307,6 +309,11 @@ export function GameRoom({
             <div className="gf-battle-log-dock">
               <BattleLog entries={gameState.log} />
             </div>
+            {lastHoveredCard && (
+              <aside className="gf-hover-card-preview" aria-label="最後にホバーしたカード">
+                <LargeCard cardRef={lastHoveredCard} />
+              </aside>
+            )}
           </>
         )}
 
@@ -388,6 +395,7 @@ function MyArea({
   selectedCardIdx,
   selectedDefenseIdxes,
   onPlayCard,
+  onHoverCard,
   onSelectDefense,
 }: {
   me: PlayerState | null;
@@ -396,6 +404,7 @@ function MyArea({
   selectedCardIdx: number | null;
   selectedDefenseIdxes: number[];
   onPlayCard: (idx: number) => void;
+  onHoverCard: (card: CardRef) => void;
   onSelectDefense: (idx: number) => void;
 }) {
   if (!me) return <div />;
@@ -420,6 +429,7 @@ function MyArea({
             selected={selectedCardIdx === idx || selectedDefenseIdxes.includes(idx)}
             playable={isDefending ? !isLearned && isDefenseCard(card.id) : canPlayCard}
             learned={isLearned}
+            onHover={() => onHoverCard(card)}
             onClick={() => {
               if (isDefending) {
                 if (!isLearned) onSelectDefense(idx);

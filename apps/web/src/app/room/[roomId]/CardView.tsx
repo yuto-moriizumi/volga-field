@@ -10,6 +10,7 @@ interface CardViewProps {
   hidden?: boolean;
   learned?: boolean;
   onClick?: () => void;
+  onHover?: () => void;
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; ink: string; chip: string }> = {
@@ -27,6 +28,7 @@ export function CardView({
   hidden,
   learned,
   onClick,
+  onHover,
 }: CardViewProps) {
   if (hidden || cardRef.id === "hidden") {
     return (
@@ -52,9 +54,12 @@ export function CardView({
 
   return (
     <button
+      type="button"
       className="gf-hand-card"
-      onClick={onClick}
-      disabled={!playable}
+      onClick={playable ? onClick : undefined}
+      onFocus={onHover}
+      onPointerEnter={onHover}
+      aria-disabled={!playable}
       data-selected={selected}
       style={{
         background: playable ? tone.bg : "#d6d6c8",
