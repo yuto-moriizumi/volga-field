@@ -1092,25 +1092,67 @@ a {
   z-index: -1;
 }
 
-.gf-active-card {
+.gf-confirm-zone {
   width: 300px;
-  height: 90px;
+  min-height: 246px;
   align-self: start;
-  padding: 0;
-  background: #d9ffd0;
-  border: 4px solid #58bd9b;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 22px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 2px solid transparent;
   border-radius: 4px;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
-.gf-active-card:disabled {
+.gf-confirm-zone:disabled {
+  cursor: default;
   opacity: 1;
 }
 
-.gf-active-card-placeholder {
-  color: var(--text-dark-soft);
-  font-size: 18px;
+.gf-confirm-zone:not(:disabled):hover {
+  border-color: rgba(47, 117, 104, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gf-confirm-card-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gf-confirm-card-stack .gf-large-card {
+  height: 90px;
+  border: 4px solid #58bd9b;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gf-confirm-empty-action {
+  width: 260px;
+  height: 40px;
+  border: 4px solid #535353;
+  border-radius: 10px;
+  background: #d9ffd0;
+  color: #474747;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 32px;
+  text-align: center;
+}
+
+.gf-confirm-empty-action.is-danger {
+  border-color: transparent;
+  background: #bd4646;
+  color: #fff;
+}
+
+.gf-confirm-placeholder {
+  width: 100%;
+  height: 40px;
 }
 
 .gf-large-card {
@@ -1167,68 +1209,6 @@ a {
   color: var(--text-dark);
   text-align: center;
   cursor: default;
-}
-
-.gf-turn-ribbon {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  min-width: 260px;
-  height: 40px;
-  padding: 0 18px;
-  border: 4px solid #535353;
-  border-radius: 10px;
-  background: #d9ffd0;
-  color: #474747;
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 32px;
-}
-
-.gf-action-label {
-  position: absolute;
-  left: 50%;
-  top: 146px;
-  transform: translateX(-50%);
-  min-width: 260px;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 8px;
-  background: #d9ffd0;
-  border: 0;
-  color: #3f4a47;
-  font-size: 26px;
-  font-weight: 900;
-  line-height: 40px;
-}
-
-.gf-action-label.is-danger,
-.gf-end-turn-btn {
-  background: #bd4646;
-  color: #fff;
-}
-
-.gf-end-turn-btn {
-  position: absolute;
-  left: 50%;
-  bottom: 82px;
-  transform: translateX(-50%);
-  min-width: 260px;
-  height: 40px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 9px;
-  box-shadow: none;
-  font-size: 26px;
-  letter-spacing: 0;
-  line-height: 40px;
-}
-
-.gf-end-turn-btn:hover:not(:disabled),
-.gf-end-turn-btn:active:not(:disabled) {
-  transform: translateX(-50%);
-  box-shadow: none;
 }
 
 .gf-target-list {
@@ -1408,8 +1388,10 @@ a {
     width: 72px;
   }
 
-  .gf-active-card {
+  .gf-confirm-zone {
     width: min(300px, 100%);
+    min-height: 180px;
+    padding-bottom: 12px;
   }
 
   .gf-target-list {
@@ -1419,14 +1401,6 @@ a {
 
   .gf-action-stage {
     min-height: 220px;
-  }
-
-  .gf-action-label {
-    top: 42px;
-  }
-
-  .gf-end-turn-btn {
-    bottom: 26px;
   }
 
   .gf-hand-dock {

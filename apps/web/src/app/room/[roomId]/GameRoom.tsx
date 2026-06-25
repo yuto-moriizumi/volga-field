@@ -487,21 +487,36 @@ function BattleBoard({
   const targetPlayer = targetPlayerId
     ? players.find((p) => p.id === targetPlayerId)
     : null;
-  const leftCard = isDefending ? pending?.card : selectedCard;
   const defensePower = defenseCards.reduce((total, card) => total + getDefensePower(card.id), 0);
+  const selectedCards = isDefending ? defenseCards : selectedCard ? [selectedCard] : [];
   const canPassDefense = isDefending && defenseCards.length === 0;
   const canEndTurn = canAct && !gameState.winner && !isDefending;
-  const actionLabel = isDefending
+  const canConfirmSelection =
+    (isDefending && defenseCards.length > 0) || (!isDefending && Boolean(selectedCard) && canAct);
+  const canConfirmEmpty = canPassDefense || (canEndTurn && selectedCards.length === 0);
+  const confirmDisabled = gameState.winner ? true : !(canConfirmSelection || canConfirmEmpty);
+  const confirmLabel = isDefending
     ? defenseCards.length > 0
-      ? `${defenseCards.length}枚 防${defensePower}で受ける`
-      : "防御なしで受ける"
-    : selectedCard
-      ? "アクション実行"
-      : canAct
-        ? "カードを選択"
-        : gameState.phase === "defense"
-          ? "相手の防御待ち"
-        : "相手のターン";
+      ? `${defenseCards.length}枚 防${defensePower}`
+      : "許す"
+    : selectedCards.length === 0
+      ? "ターン終了"
+      : "確定";
+
+  function confirmAction() {
+    if (gameState.winner) return;
+    if (isDefending) {
+      onPassDefense();
+      return;
+    }
+    if (selectedCard) {
+      onExecute();
+      return;
+    }
+    if (canEndTurn) {
+      onEndTurn();
+    }
+  }
 
   return (
     <section className="gf-battle-board" aria-label="戦闘">
@@ -515,42 +530,28 @@ function BattleBoard({
       </div>
 
       <button
-        className="gf-active-card"
-        onClick={onExecute}
-        disabled={!selectedCard || !canAct || isDefending}
+        type="button"
+        className="gf-confirm-zone"
+        onClick={confirmAction}
+        disabled={confirmDisabled}
+        aria-label={confirmLabel}
       >
-        {leftCard ? (
-          <LargeCard cardRef={leftCard} />
+        {selectedCards.length > 0 ? (
+          <div className="gf-confirm-card-stack">
+            {selectedCards.map((card, idx) => (
+              <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
+            ))}
+          </div>
+        ) : canEndTurn ? (
+          <span className="gf-confirm-empty-action">ターン終了</span>
+        ) : canPassDefense ? (
+          <span className="gf-confirm-empty-action is-danger">許す</span>
         ) : (
-          <span className="gf-active-card-placeholder">カード</span>
+          <span className="gf-confirm-placeholder" />
         )}
       </button>
 
-      <div
-        className="gf-action-stage"
-        role={isDefending ? "button" : undefined}
-        tabIndex={isDefending ? 0 : undefined}
-        aria-disabled={!isDefending}
-        onClick={isDefending ? onPassDefense : undefined}
-        onKeyDown={(e) => {
-          if (!isDefending) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onPassDefense();
-          }
-        }}
-      >
-        <div className="gf-turn-ribbon">
-          {gameState.winner
-            ? "ゲーム終了"
-            : isDefending
-              ? "防御カードを選択"
-              : canAct
-                ? "あなたのターン"
-                : gameState.phase === "defense"
-                  ? "防御待ち"
-                : `${activePlayer?.name ?? "?"}のターン`}
-        </div>
+      <div className="gf-action-stage">
         {hitFlash && (
           <div
             key={hitFlash.key}
@@ -559,26 +560,6 @@ function BattleBoard({
             <strong>{hitFlash.amount}</strong>
             <span>ダメージ</span>
           </div>
-        )}
-        <div
-          className={`gf-action-label${isDefending ? " is-danger" : ""}`}
-        >
-          {actionLabel}
-        </div>
-        {(canPassDefense || canEndTurn) && (
-          <button
-            className="gf-btn gf-end-turn-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (canPassDefense) {
-                onPassDefense();
-              } else {
-                onEndTurn();
-              }
-            }}
-          >
-            {canPassDefense ? "許す" : "ターン終了"}
-          </button>
         )}
       </div>
 
