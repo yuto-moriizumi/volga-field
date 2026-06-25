@@ -11,5 +11,6 @@ export {
   startBuy,
   confirmBuy,
   sellCards,
+  exchangeStats,
   MAX_PLAYERS,
 } from "./battle.js";

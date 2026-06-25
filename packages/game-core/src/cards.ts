@@ -306,6 +306,14 @@ export const BASE_CARDS: CardDefinition[] = [
     effects: [],
   },
   {
+    id: "exchange",
+    name: "両替",
+    category: "trade",
+    emoji: "🔄",
+    description: "HPをMPやお金に交換する",
+    effects: [],
+  },
+  {
     id: "concern_expressed",
     name: "懸念を表明する",
     category: "colorless",
@@ -509,4 +517,8 @@ export function isBuyCard(id: string): boolean {
 
 export function isSellCard(id: string): boolean {
   return id === "sell";
+}
+
+export function isExchangeCard(id: string): boolean {
+  return id === "exchange";
 }

@@ -5,6 +5,7 @@ import {
   confirmBuy,
   defendAttack,
   discardCards,
+  exchangeStats,
   playCard,
   sellCards,
   startBuy,
@@ -55,6 +56,7 @@ function defenseState(): GameState {
     },
     pendingBuy: null,
     pendingSell: null,
+    pendingExchange: null,
     log: [],
     winner: null,
     startedAt: 0,
@@ -273,4 +275,114 @@ test("sellCards drains money, then MP, then HP when target cannot pay", () => {
   assert.equal(defender?.mp, 0);
   assert.equal(defender?.hp, 17);
   assert.ok(defender?.hand.some((c) => c.id === "hi_potion"));
+});
+
+test("exchangeStats converts HP into MP and money", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 0,
+    money: 5,
+    hand: [{ id: "exchange" }, { id: "potion" }],
+  };
+
+  const result = exchangeStats(state, "attacker", 3, 7);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.hp, 10);
+  assert.equal(attacker?.mp, 3);
+  assert.equal(attacker?.money, 12);
+  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.equal(result.state.log.at(-1)?.kind, "trade");
+});
+
+test("exchangeStats rejects when HP would go negative", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 5,
+    mp: 0,
+    money: 0,
+    hand: [{ id: "exchange" }],
+  };
+
+  const result = exchangeStats(state, "attacker", 3, 3);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "not enough HP");
+  const attacker = state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.hp, 5);
+  assert.equal(attacker?.hand.length, 1);
+});
+
+test("exchangeStats rejects when MP would go negative", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 2,
+    money: 0,
+    hand: [{ id: "exchange" }],
+  };
+
+  const result = exchangeStats(state, "attacker", -3, 0);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "not enough MP");
+});
+
+test("exchangeStats rejects when money would go negative", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 0,
+    money: 2,
+    hand: [{ id: "exchange" }],
+  };
+
+  const result = exchangeStats(state, "attacker", 0, -3);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "not enough money");
+});
+
+test("exchangeStats rejects when exchange card is not in hand", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 0,
+    money: 0,
+    hand: [{ id: "potion" }],
+  };
+
+  const result = exchangeStats(state, "attacker", 1, 0);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "exchange card not in hand");
+});
+
+test("exchangeStats rejects when no changes are requested", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    mp: 0,
+    money: 0,
+    hand: [{ id: "exchange" }],
+  };
+
+  const result = exchangeStats(state, "attacker", 0, 0);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "no change");
 });

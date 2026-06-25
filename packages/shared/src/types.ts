@@ -57,6 +57,12 @@ export interface PendingSell {
   price: number;
 }
 
+export interface PendingExchange {
+  sourceId: PlayerId;
+  mpDelta: number;
+  moneyDelta: number;
+}
+
 export interface BattleLogEntry {
   turn: number;
   playerId: PlayerId;
@@ -78,6 +84,7 @@ export interface GameState {
   pendingAttack: PendingAttack | null;
   pendingBuy: PendingBuy | null;
   pendingSell: PendingSell | null;
+  pendingExchange: PendingExchange | null;
   log: BattleLogEntry[];
   winner: PlayerId | null;
   startedAt: number;

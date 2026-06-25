@@ -439,6 +439,11 @@ function TradeListView() {
       emoji: "🏷️",
       description: "手札を選んで相手に売りつける",
     },
+    {
+      name: "両替",
+      emoji: "🔄",
+      description: "HPを削ってMPやお金に換える",
+    },
   ];
   return (
     <div className="gf-textbook-trade">
