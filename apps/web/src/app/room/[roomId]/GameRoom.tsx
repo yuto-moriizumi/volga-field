@@ -585,8 +585,18 @@ function BattleBoard({
         )}
       </button>
 
-      <button
+      <div
+        role={isDefending ? "button" : undefined}
+        tabIndex={isDefending ? 0 : undefined}
+        aria-disabled={!isDefending}
         onClick={isDefending ? onPassDefense : undefined}
+        onKeyDown={(e) => {
+          if (!isDefending) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onPassDefense();
+          }
+        }}
         style={{
           position: "relative",
           background: "linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08))",
@@ -641,7 +651,7 @@ function BattleBoard({
         >
           ターン終了
         </button>
-      </button>
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center" }}>
         {players.map((p) => (
