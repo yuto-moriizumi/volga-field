@@ -10,7 +10,7 @@ import { HandArea } from "./HandArea";
 import { Header } from "./Header";
 import { InfoArea } from "./InfoArea";
 import { NameList } from "./NameList";
-import { SourceArea } from "./SourceArea";
+import { SourceArea, type ExchangeDraft } from "./SourceArea";
 import { TargetArea } from "./TargetArea";
 
 export function GameRoom({
@@ -31,6 +31,8 @@ export function GameRoom({
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
   const [discardMode, setDiscardMode] = useState(false);
   const [sellMode, setSellMode] = useState(false);
+  const [exchangeMode, setExchangeMode] = useState(false);
+  const [exchangeDraft, setExchangeDraft] = useState<ExchangeDraft | null>(null);
   const [selectedSellIdxes, setSelectedSellIdxes] = useState<number[]>([]);
   const [selectedDiscardIdxes, setSelectedDiscardIdxes] = useState<number[]>([]);
   const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
@@ -113,6 +115,8 @@ export function GameRoom({
     if (canAct) return;
     setDiscardMode(false);
     setSellMode(false);
+    setExchangeMode(false);
+    setExchangeDraft(null);
     setSelectedDiscardIdxes([]);
     setSelectedSellIdxes([]);
   }, [canAct]);
@@ -124,6 +128,12 @@ export function GameRoom({
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
     setSelectedCardIdx(nextSelectedIdx);
     if (nextSelectedIdx === null) {
+      setSelectedTargetId(null);
+      return;
+    }
+    if (card.id === "exchange") {
+      setExchangeMode(true);
+      setExchangeDraft({ hp: me.hp, mp: me.mp, money: me.money });
       setSelectedTargetId(null);
       return;
     }
@@ -168,6 +178,9 @@ export function GameRoom({
           setSellMode(true);
           setSelectedSellIdxes([]);
         }
+      } else if (card.id === "exchange") {
+        setExchangeMode(true);
+        setExchangeDraft({ hp: me.hp, mp: me.mp, money: me.money });
       }
     } else if (sellMode) {
       if (card.id !== "sell" && target) {
@@ -191,6 +204,30 @@ export function GameRoom({
     setSelectedTargetId(null);
   }
 
+  function adjustExchange(stat: "mp" | "money", delta: number) {
+    setExchangeDraft((current) => {
+      if (!current || !me) return current;
+      const nextValue = Math.max(0, current[stat] + delta);
+      const updated: ExchangeDraft = { ...current, [stat]: nextValue };
+      const consumed =
+        (updated.mp - me.mp) + (updated.money - me.money);
+      updated.hp = Math.max(0, me.hp - consumed);
+      return updated;
+    });
+  }
+
+  function confirmExchange() {
+    if (!me || !exchangeDraft) return;
+    const mpDelta = exchangeDraft.mp - me.mp;
+    const moneyDelta = exchangeDraft.money - me.money;
+    if (mpDelta === 0 && moneyDelta === 0) return;
+    send({ type: "exchange_stats", mpDelta, moneyDelta });
+    setExchangeMode(false);
+    setExchangeDraft(null);
+    setSelectedCardIdx(null);
+    setSelectedTargetId(null);
+  }
+
   function defend(cardIdxes: number[] = []) {
     if (!me || !isDefending) return;
     const cardRefs = cardIdxes
@@ -205,6 +242,8 @@ export function GameRoom({
     if (!canAct) return;
     setDiscardMode(false);
     setSellMode(false);
+    setExchangeMode(false);
+    setExchangeDraft(null);
     setSelectedDiscardIdxes([]);
     setSelectedSellIdxes([]);
     send({ type: "end_turn" });
@@ -216,6 +255,8 @@ export function GameRoom({
       const next = !current;
       if (next) {
         setSellMode(false);
+        setExchangeMode(false);
+        setExchangeDraft(null);
         setSelectedSellIdxes([]);
         setSelectedCardIdx(null);
         setSelectedTargetId(null);
@@ -232,6 +273,8 @@ export function GameRoom({
       const next = !current;
       if (next) {
         setDiscardMode(false);
+        setExchangeMode(false);
+        setExchangeDraft(null);
         setSelectedDiscardIdxes([]);
       } else {
         setSelectedSellIdxes([]);
@@ -412,6 +455,8 @@ export function GameRoom({
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
                 sellMode={sellMode}
+                exchangeMode={exchangeMode}
+                exchangeDraft={exchangeDraft}
                 selectedDiscardCount={selectedDiscardIdxes.length}
                 selectedSellCount={selectedSellIdxes.length}
                 sellTotalPrice={sellTotalPrice(me, selectedSellIdxes)}
@@ -426,6 +471,8 @@ export function GameRoom({
                 onPassDefense={() => defend(selectedDefenseIdxes)}
                 onEndTurn={endTurn}
                 onConfirmDiscard={confirmDiscard}
+                onAdjustExchange={adjustExchange}
+                onConfirmExchange={confirmExchange}
               />
             </div>
             <div className="gf-battle-row gf-battle-row-split">
@@ -556,6 +603,8 @@ function BattleField({
   selectedDefenseIdxes,
   discardMode,
   sellMode,
+  exchangeMode,
+  exchangeDraft,
   selectedDiscardCount,
   selectedSellCount,
   sellTotalPrice,
@@ -570,6 +619,8 @@ function BattleField({
   onPassDefense,
   onEndTurn,
   onConfirmDiscard,
+  onAdjustExchange,
+  onConfirmExchange,
 }: {
   me: PlayerState | null;
   players: PlayerState[];
@@ -581,6 +632,8 @@ function BattleField({
   selectedDefenseIdxes: number[];
   discardMode: boolean;
   sellMode: boolean;
+  exchangeMode: boolean;
+  exchangeDraft: ExchangeDraft | null;
   selectedDiscardCount: number;
   selectedSellCount: number;
   sellTotalPrice: number;
@@ -595,6 +648,8 @@ function BattleField({
   onPassDefense: () => void;
   onEndTurn: () => void;
   onConfirmDiscard: () => void;
+  onAdjustExchange: (stat: "mp" | "money", delta: number) => void;
+  onConfirmExchange: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
@@ -630,7 +685,13 @@ function BattleField({
     (discardMode && selectedDiscardCount > 0);
   const canConfirmEmpty =
     canPassDefense || (canEndTurn && selectedCards.length === 0 && !discardMode);
-  const confirmDisabled = gameState.winner ? true : !(canConfirmSelection || canConfirmEmpty);
+  const confirmDisabled = gameState.winner
+    ? true
+    : exchangeMode
+      ? !exchangeDraft ||
+        (exchangeDraft.mp - (me?.mp ?? 0) === 0 &&
+          exchangeDraft.money - (me?.money ?? 0) === 0)
+      : !(canConfirmSelection || canConfirmEmpty);
   const confirmLabel = isDefending
     ? defenseCards.length > 0
       ? `${defenseCards.length}枚 防${defensePower}`
@@ -649,6 +710,10 @@ function BattleField({
 
   function confirmAction() {
     if (gameState.winner) return;
+    if (exchangeMode) {
+      onConfirmExchange();
+      return;
+    }
     if (isDefending) {
       onPassDefense();
       return;
@@ -673,6 +738,8 @@ function BattleField({
         selectedCards={selectedCards}
         discardMode={discardMode}
         sellMode={sellMode}
+        exchangeMode={exchangeMode}
+        exchangeDraft={exchangeDraft}
         confirmLabel={confirmLabel}
         confirmDisabled={confirmDisabled}
         canEndTurn={canEndTurn}
@@ -682,6 +749,7 @@ function BattleField({
         onConfirm={confirmAction}
         onAcceptBuy={onAcceptBuy}
         onDeclineBuy={onDeclineBuy}
+        onAdjustExchange={onAdjustExchange}
       />
       <TargetArea
         pending={pending}

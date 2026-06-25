@@ -18,6 +18,7 @@ import {
   defendAttack,
   discardCards,
   endTurn,
+  exchangeStats,
   findCard,
   playCard,
   sellCards,
@@ -315,6 +316,7 @@ function placeholderState(
     pendingAttack: null,
     pendingBuy: null,
     pendingSell: null,
+    pendingExchange: null,
     log: [
       {
         turn: 0,
@@ -554,6 +556,23 @@ function handleSellCards(
   broadcastStateToAll(room);
 }
 
+function handleExchangeStats(
+  client: Client,
+  mpDelta: number,
+  moneyDelta: number,
+): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = exchangeStats(room.gameState, client.id, mpDelta, moneyDelta);
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
 function handleEndTurn(client: Client): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
@@ -635,6 +654,9 @@ function dispatch(client: Client, msg: ClientMessage): void {
         msg.cardRefs.map((cardRef) => cardRef.id),
         msg.targetPlayerId,
       );
+      break;
+    case "exchange_stats":
+      handleExchangeStats(client, msg.mpDelta, msg.moneyDelta);
       break;
     case "end_turn":
       handleEndTurn(client);

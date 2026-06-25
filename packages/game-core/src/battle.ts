@@ -73,6 +73,7 @@ export function createGame(
     pendingAttack: null,
     pendingBuy: null,
     pendingSell: null,
+    pendingExchange: null,
     log: [
       {
         turn: 1,
@@ -853,6 +854,90 @@ export function sellCards(
   }
 
   void updatedSeller;
+
+  return { ok: true, state: newState };
+}
+
+export function exchangeStats(
+  state: GameState,
+  playerId: PlayerId,
+  mpDelta: number,
+  moneyDelta: number,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+  if (state.pendingBuy) return { ok: false, reason: "buy pending" };
+  if (state.pendingSell) return { ok: false, reason: "sell pending" };
+  if (state.pendingExchange) return { ok: false, reason: "exchange pending" };
+  if (!Number.isFinite(mpDelta) || !Number.isFinite(moneyDelta)) {
+    return { ok: false, reason: "invalid delta" };
+  }
+  const roundedMp = Math.trunc(mpDelta);
+  const roundedMoney = Math.trunc(moneyDelta);
+  if (roundedMp === 0 && roundedMoney === 0) {
+    return { ok: false, reason: "no change" };
+  }
+
+  const exchangeIdx = active.hand.findIndex((c) => c.id === "exchange");
+  if (exchangeIdx === -1) return { ok: false, reason: "exchange card not in hand" };
+
+  const newHp = active.hp - roundedMp - roundedMoney;
+  const newMp = active.mp + roundedMp;
+  const newMoney = active.money + roundedMoney;
+  if (newHp < 0) return { ok: false, reason: "not enough HP" };
+  if (newMp < 0) return { ok: false, reason: "not enough MP" };
+  if (newMoney < 0) return { ok: false, reason: "not enough money" };
+
+  const newHand = [...active.hand];
+  newHand.splice(exchangeIdx, 1);
+
+  const updatedActive: PlayerState = {
+    ...active,
+    hp: newHp,
+    mp: newMp,
+    money: newMoney,
+    hand: newHand,
+  };
+
+  const finalPlayers = state.players.map((p) =>
+    p.id === playerId ? updatedActive : p,
+  );
+  const winner = determineWinner(finalPlayers);
+
+  const logs: BattleLogEntry[] = [];
+  const parts: string[] = [];
+  if (roundedMp !== 0) {
+    parts.push(`MP${roundedMp >= 0 ? "+" : ""}${roundedMp}`);
+  }
+  if (roundedMoney !== 0) {
+    parts.push(`￥${roundedMoney >= 0 ? "+" : ""}${roundedMoney}`);
+  }
+  parts.push(`HP${-(roundedMp + roundedMoney) >= 0 ? "+" : ""}${-(roundedMp + roundedMoney)}`);
+  logs.push({
+    turn: state.turn,
+    playerId,
+    message: `${active.name}が両替した (${parts.join(" / ")})`,
+    kind: "trade",
+  });
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    pendingExchange: null,
+    winner,
+    log: [...state.log, ...logs],
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: newState.turn,
+      playerId: winner,
+      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+      kind: "system",
+    });
+  }
 
   return { ok: true, state: newState };
 }

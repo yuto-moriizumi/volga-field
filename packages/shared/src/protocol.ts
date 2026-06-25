@@ -27,6 +27,7 @@ export type ClientMessage =
   | { type: "buy_card"; cardRef: CardRef; targetPlayerId: PlayerId }
   | { type: "confirm_buy"; accept: boolean }
   | { type: "sell_cards"; cardRefs: CardRef[]; targetPlayerId: PlayerId }
+  | { type: "exchange_stats"; mpDelta: number; moneyDelta: number }
   | { type: "end_turn" }
   | { type: "list_rooms" }
   | { type: "ping" };
@@ -57,6 +58,7 @@ export const CLIENT_MESSAGE_TYPES: ClientMessage["type"][] = [
   "buy_card",
   "confirm_buy",
   "sell_cards",
+  "exchange_stats",
   "end_turn",
   "list_rooms",
   "ping",
