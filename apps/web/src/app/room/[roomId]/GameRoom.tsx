@@ -90,6 +90,7 @@ export function GameRoom({
   const isMyTurn =
     gameState?.players[gameState.activePlayerIndex]?.id === playerId;
   const isDefending = gameState?.phase === "defense" && gameState.pendingAttack?.defenderId === playerId;
+  const canAct = Boolean(isMyTurn && gameState?.phase !== "defense" && !gameState.winner);
 
   useEffect(() => {
     if (!lastMessage || lastMessage.type !== "game_state") return;
@@ -100,7 +101,7 @@ export function GameRoom({
   }, [lastMessage]);
 
   function playCard(idx: number) {
-    if (!me || !isMyTurn) return;
+    if (!me || !canAct) return;
     const card = playableCards(me)[idx];
     if (!card) return;
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
@@ -111,7 +112,7 @@ export function GameRoom({
   }
 
   function executeSelectedCard() {
-    if (!me || !isMyTurn || selectedCardIdx === null) return;
+    if (!me || !canAct || selectedCardIdx === null) return;
     const card = playableCards(me)[selectedCardIdx];
     if (!card) return;
     send({
@@ -133,7 +134,7 @@ export function GameRoom({
   }
 
   function endTurn() {
-    if (!isMyTurn) return;
+    if (!canAct) return;
     send({ type: "end_turn" });
   }
 
@@ -279,7 +280,7 @@ export function GameRoom({
               players={gameState.players}
               gameState={gameState}
               playerId={playerId}
-              isMyTurn={isMyTurn}
+              canAct={canAct}
               selectedCardIdx={selectedCardIdx}
               selectedTargetId={selectedTargetId}
               selectedDefenseIdxes={selectedDefenseIdxes}
@@ -291,7 +292,7 @@ export function GameRoom({
             />
             <MyArea
               me={me}
-              isMyTurn={isMyTurn}
+              canAct={canAct}
               isDefending={isDefending}
               selectedCardIdx={selectedCardIdx}
               selectedDefenseIdxes={selectedDefenseIdxes}
@@ -426,7 +427,7 @@ function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
 
 function MyArea({
   me,
-  isMyTurn,
+  canAct,
   isDefending,
   selectedCardIdx,
   selectedDefenseIdxes,
@@ -434,7 +435,7 @@ function MyArea({
   onSelectDefense,
 }: {
   me: PlayerState | null;
-  isMyTurn: boolean;
+  canAct: boolean;
   isDefending: boolean;
   selectedCardIdx: number | null;
   selectedDefenseIdxes: number[];
@@ -500,12 +501,12 @@ function MyArea({
             key={`${card.id}-${idx}`}
             cardRef={card}
             selected={selectedCardIdx === idx || selectedDefenseIdxes.includes(idx)}
-            playable={isDefending ? !isLearned && isDefenseCard(card.id) : isMyTurn && hasEnoughMp}
+            playable={isDefending ? !isLearned && isDefenseCard(card.id) : canAct && hasEnoughMp}
             learned={isLearned}
             onClick={() => {
               if (isDefending) {
                 if (!isLearned) onSelectDefense(idx);
-              } else {
+              } else if (canAct) {
                 onPlayCard(idx);
               }
             }}
@@ -522,7 +523,7 @@ function BattleBoard({
   players,
   gameState,
   playerId,
-  isMyTurn,
+  canAct,
   selectedCardIdx,
   selectedTargetId,
   selectedDefenseIdxes,
@@ -536,7 +537,7 @@ function BattleBoard({
   players: PlayerState[];
   gameState: GameState;
   playerId: string | null;
-  isMyTurn: boolean;
+  canAct: boolean;
   selectedCardIdx: number | null;
   selectedTargetId: string | null;
   selectedDefenseIdxes: number[];
@@ -563,8 +564,10 @@ function BattleBoard({
       : "防御なしで受ける"
     : selectedCard
       ? "アクション実行"
-      : isMyTurn
+      : canAct
         ? "カードを選択"
+        : gameState.phase === "defense"
+          ? "相手の防御待ち"
         : "相手のターン";
 
   return (
@@ -578,7 +581,7 @@ function BattleBoard({
     >
       <button
         onClick={onExecute}
-        disabled={!selectedCard || !isMyTurn || isDefending}
+        disabled={!selectedCard || !canAct || isDefending}
         style={{
           background: "var(--panel-cream-soft)",
           border: "3px solid var(--bar-teal)",
@@ -624,8 +627,10 @@ function BattleBoard({
             ? "ゲーム終了"
             : isDefending
               ? "防御カードを選択"
-              : isMyTurn
+              : canAct
                 ? "あなたのターン"
+                : gameState.phase === "defense"
+                  ? "防御待ち"
                 : `${activePlayer?.name ?? "?"}のターン`}
         </div>
         {hitFlash && (
@@ -658,7 +663,7 @@ function BattleBoard({
             e.stopPropagation();
             onEndTurn();
           }}
-          disabled={!isMyTurn || gameState.winner !== null || isDefending}
+          disabled={!canAct || gameState.winner !== null || isDefending}
           style={{ marginTop: 18 }}
         >
           ターン終了
@@ -670,7 +675,7 @@ function BattleBoard({
           <button
             key={p.id}
             onClick={() => onSelectTarget(p.id)}
-            disabled={!isMyTurn || isDefending}
+            disabled={!canAct || isDefending}
             style={{
               display: "grid",
               gridTemplateColumns: "1fr auto",
