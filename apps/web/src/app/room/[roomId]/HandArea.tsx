@@ -8,7 +8,7 @@ interface HandAreaProps {
   me: PlayerState | null;
   canAct: boolean;
   isDefending: boolean;
-  selectedCardIdx: number | null;
+  selectedCardIdxes: number[];
   selectedDefenseIdxes: number[];
   discardMode: boolean;
   sellMode: boolean;
@@ -27,7 +27,7 @@ export function HandArea({
   me,
   canAct,
   isDefending,
-  selectedCardIdx,
+  selectedCardIdxes,
   selectedDefenseIdxes,
   discardMode,
   sellMode,
@@ -60,7 +60,7 @@ export function HandArea({
               key={`${card.id}-${idx}`}
               cardRef={card}
               selected={
-                selectedCardIdx === idx ||
+                selectedCardIdxes.includes(idx) ||
                 selectedDefenseIdxes.includes(idx) ||
                 selectedDiscardIdxes.includes(idx) ||
                 selectedSellIdxes.includes(idx)
