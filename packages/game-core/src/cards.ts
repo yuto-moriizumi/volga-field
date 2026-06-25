@@ -305,6 +305,182 @@ export const BASE_CARDS: CardDefinition[] = [
     description: "手札を選んで相手に売りつける",
     effects: [],
   },
+  {
+    id: "concern_expressed",
+    name: "懸念を表明する",
+    category: "colorless",
+    emoji: "🕊️",
+    description: "相手-1",
+    price: 1,
+    effects: [
+      {
+        kind: "damage",
+        amount: 1,
+        target: "opponent",
+        description: "相手-1",
+      },
+    ],
+  },
+  {
+    id: "strong_concern",
+    name: "強い懸念を表明する",
+    category: "colorless",
+    emoji: "📢",
+    description: "相手-2",
+    price: 2,
+    effects: [
+      {
+        kind: "damage",
+        amount: 2,
+        target: "opponent",
+        description: "相手-2",
+      },
+    ],
+  },
+  {
+    id: "deeply_concerned",
+    name: "憂慮している",
+    category: "colorless",
+    emoji: "😟",
+    description: "相手-3",
+    price: 3,
+    effects: [
+      {
+        kind: "damage",
+        amount: 3,
+        target: "opponent",
+        description: "相手-3",
+      },
+    ],
+  },
+  {
+    id: "gravely_concerned",
+    name: "深く憂慮している",
+    category: "colorless",
+    emoji: "😰",
+    description: "相手-4",
+    price: 4,
+    effects: [
+      {
+        kind: "damage",
+        amount: 4,
+        target: "opponent",
+        description: "相手-4",
+      },
+    ],
+  },
+  {
+    id: "regrettable",
+    name: "遺憾である",
+    category: "colorless",
+    emoji: "😔",
+    description: "相手-5",
+    price: 5,
+    effects: [
+      {
+        kind: "damage",
+        amount: 5,
+        target: "opponent",
+        description: "相手-5",
+      },
+    ],
+  },
+  {
+    id: "extremely_regrettable",
+    name: "極めて遺憾である",
+    category: "colorless",
+    emoji: "😠",
+    description: "相手-6",
+    price: 6,
+    effects: [
+      {
+        kind: "damage",
+        amount: 6,
+        target: "opponent",
+        description: "相手-6",
+      },
+    ],
+  },
+  {
+    id: "strongly_protest",
+    name: "強く抗議する",
+    category: "colorless",
+    emoji: "📣",
+    description: "相手-7",
+    price: 7,
+    effects: [
+      {
+        kind: "damage",
+        amount: 7,
+        target: "opponent",
+        description: "相手-7",
+      },
+    ],
+  },
+  {
+    id: "sternly_protest",
+    name: "厳重に抗議する",
+    category: "colorless",
+    emoji: "🚨",
+    description: "相手-8",
+    price: 8,
+    effects: [
+      {
+        kind: "damage",
+        amount: 8,
+        target: "opponent",
+        description: "相手-8",
+      },
+    ],
+  },
+  {
+    id: "unacceptable",
+    name: "断じて受け入れられない",
+    category: "colorless",
+    emoji: "⛔",
+    description: "相手-9",
+    price: 9,
+    effects: [
+      {
+        kind: "damage",
+        amount: 9,
+        target: "opponent",
+        description: "相手-9",
+      },
+    ],
+  },
+  {
+    id: "strongly_condemn",
+    name: "強く非難する",
+    category: "colorless",
+    emoji: "👊",
+    description: "相手-10",
+    price: 10,
+    effects: [
+      {
+        kind: "damage",
+        amount: 10,
+        target: "opponent",
+        description: "相手-10",
+      },
+    ],
+  },
+  {
+    id: "condemn_strongest_terms",
+    name: "最も強い言葉で非難する",
+    category: "colorless",
+    emoji: "🔥",
+    description: "相手-11",
+    price: 11,
+    effects: [
+      {
+        kind: "damage",
+        amount: 11,
+        target: "opponent",
+        description: "相手-11",
+      },
+    ],
+  },
 ];
 
 export function findCard(id: string): CardDefinition | undefined {
