@@ -8,7 +8,7 @@ interface HandAreaProps {
   me: PlayerState | null;
   canAct: boolean;
   isDefending: boolean;
-  selectedCardId: string | null;
+  selectedCardIdxes: number[];
   selectedDefenseIdxes: number[];
   discardMode: boolean;
   sellMode: boolean;
@@ -27,7 +27,7 @@ export function HandArea({
   me,
   canAct,
   isDefending,
-  selectedCardId,
+  selectedCardIdxes,
   selectedDefenseIdxes,
   discardMode,
   sellMode,
@@ -55,16 +55,16 @@ export function HandArea({
           const canDiscardCard = discardMode && !isLearned && !isTradeCard(card.id);
           const canSellCard =
             sellMode && !isLearned && !isSellCardItself(card.id) && !isBuyCardItself(card.id);
-          const isSelected =
-            card.id === selectedCardId ||
-            selectedDefenseIdxes.includes(idx) ||
-            selectedDiscardIdxes.includes(idx) ||
-            selectedSellIdxes.includes(idx);
           return (
             <CardView
               key={`${card.id}-${idx}`}
               cardRef={card}
-              selected={isSelected}
+              selected={
+                selectedCardIdxes.includes(idx) ||
+                selectedDefenseIdxes.includes(idx) ||
+                selectedDiscardIdxes.includes(idx) ||
+                selectedSellIdxes.includes(idx)
+              }
               playable={
                 discardMode
                   ? canDiscardCard

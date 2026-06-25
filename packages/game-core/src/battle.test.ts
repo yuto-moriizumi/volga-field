@@ -448,6 +448,161 @@ test("playCard consumes the misc card from hand after use", () => {
   assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
 });
 
+function attributeWeaponState(): GameState {
+  return {
+    roomId: "room",
+    players: [
+      {
+        id: "attacker",
+        name: "Attacker",
+        hp: 20,
+        maxHp: 20,
+        mp: 10,
+        maxMp: 10,
+        money: 20,
+        hand: [
+          { id: "socialist_strike_3" },
+          { id: "socialist_power_2" },
+          { id: "socialist_power_3" },
+        ],
+        learnedMiracles: [],
+        party: null,
+        ready: true,
+      },
+      {
+        id: "defender",
+        name: "Defender",
+        hp: 20,
+        maxHp: 20,
+        mp: 0,
+        maxMp: 10,
+        money: 20,
+        hand: [],
+        learnedMiracles: [],
+        party: null,
+        ready: true,
+      },
+    ],
+    deckSize: 0,
+    turn: 1,
+    actionTurn: 1,
+    doomsdayTurn: null,
+    doomsdayActive: false,
+    activePlayerIndex: 0,
+    phase: "play",
+    pendingAttack: null,
+    pendingBuy: null,
+    pendingSell: null,
+    pendingExchange: null,
+    log: [],
+    winner: null,
+    startedAt: 0,
+  };
+}
+
+test("playCard with a single attribute weapon deals its damage", () => {
+  const result = playCard(
+    attributeWeaponState(),
+    "attacker",
+    { id: "socialist_strike_3" },
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.amount, 3);
+  assert.equal(result.state.pendingAttack?.cardName, "国有化攻勢");
+  assert.equal(result.state.phase, "defense");
+});
+
+test("playCard combines multiple cards into a single attack", () => {
+  const result = playCard(
+    attributeWeaponState(),
+    "attacker",
+    [
+      { id: "socialist_strike_3" },
+      { id: "socialist_power_2" },
+    ],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.amount, 5);
+  assert.equal(result.state.pendingAttack?.cardName, "国有化攻勢+計画経済");
+  assert.equal(result.state.phase, "defense");
+});
+
+test("playCard combines multiple attack_power cards together", () => {
+  const result = playCard(
+    attributeWeaponState(),
+    "attacker",
+    [
+      { id: "socialist_power_2" },
+      { id: "socialist_power_3" },
+    ],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.amount, 5);
+  assert.equal(result.state.pendingAttack?.cardName, "計画経済+労働動員");
+});
+
+test("playCard rejects when any selected card is missing from hand", () => {
+  const state = attributeWeaponState();
+  const result = playCard(state, "attacker", [
+    { id: "socialist_strike_3" },
+    { id: "socialist_strike_5" },
+  ]);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "card not in hand");
+});
+
+test("playCard removes all played cards from hand", () => {
+  const result = playCard(
+    attributeWeaponState(),
+    "attacker",
+    [
+      { id: "socialist_strike_3" },
+      { id: "socialist_power_2" },
+    ],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.deepEqual(attacker?.hand, [{ id: "socialist_power_3" }]);
+});
+
+test("defendAttack reduces damage from combined multi-card attack", () => {
+  const state = attributeWeaponState();
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "shield" }],
+  };
+  const play = playCard(
+    state,
+    "attacker",
+    [
+      { id: "socialist_strike_3" },
+      { id: "socialist_power_2" },
+    ],
+    "defender",
+  );
+  assert.equal(play.ok, true);
+  if (!play.ok) return;
+  const defended = defendAttack(play.state, "defender", [{ id: "shield" }]);
+  assert.equal(defended.ok, true);
+  if (!defended.ok) return;
+  const defender = defended.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 18);
+});
+
 test("playCard joins the player's party when a party card is used", () => {
   const state = playState();
   state.players[0] = {

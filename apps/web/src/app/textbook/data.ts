@@ -46,6 +46,8 @@ export interface WeaponCard {
   rate: string;
   attribute?: AttributeKey;
   note?: string;
+  /** 攻撃力を追加するカード (trueなら他の攻撃カードや攻撃力追加カードと同時に使用可能) */
+  isAttackPower?: boolean;
 }
 
 export interface ArmorCard {
@@ -171,7 +173,114 @@ export const WEAPONS: WeaponCard[] = [
   { id: "light_spear", name: "光の槍", emoji: "✨", attack: 4, price: 5, rate: "3/500", attribute: "light" },
   { id: "dark_blade", name: "闇の刃", emoji: "🌑", attack: 5, price: 6, rate: "3/500", attribute: "dark" },
   { id: "god_slayer", name: "神殺し", emoji: "💀", attack: 8, price: 10, rate: "1/500", note: "自分も-3" },
+  ...attributeWeapons("socialist_strike", "socialism", "fire", [
+    { name: "労働者の一撃", emoji: "🔨" },
+    { name: "階級闘争", emoji: "✊" },
+    { name: "国有化攻勢", emoji: "🏭" },
+    { name: "革命の波", emoji: "🌊" },
+    { name: "赤い総攻撃", emoji: "🚩" },
+  ]),
+  ...attributeWeapons("socialist_power", "socialism", "fire", [
+    { name: "団結", emoji: "🤝" },
+    { name: "計画経済", emoji: "📊" },
+    { name: "労働動員", emoji: "👷" },
+    { name: "革命熱", emoji: "🔥" },
+    { name: "前衛党指導", emoji: "⭐" },
+  ], { isAttackPower: true }),
+  ...attributeWeapons("capitalist_strike", "capitalist", "water", [
+    { name: "市場の一撃", emoji: "💵" },
+    { name: "価格競争", emoji: "🏷️" },
+    { name: "企業買収", emoji: "🏢" },
+    { name: "投資攻勢", emoji: "💰" },
+    { name: "独占支配", emoji: "👑" },
+  ]),
+  ...attributeWeapons("capitalist_power", "capitalist", "water", [
+    { name: "利益追求", emoji: "📈" },
+    { name: "資本注入", emoji: "💸" },
+    { name: "株価高騰", emoji: "📊" },
+    { name: "大量生産", emoji: "🏭" },
+    { name: "市場独占", emoji: "🔒" },
+  ], { isAttackPower: true }),
+  ...attributeWeapons("republican_strike", "republican", "wood", [
+    { name: "市民の一撃", emoji: "👤" },
+    { name: "議会追及", emoji: "🏛️" },
+    { name: "世論攻勢", emoji: "📢" },
+    { name: "共和の剣", emoji: "⚔️" },
+    { name: "民意の鉄槌", emoji: "🔨" },
+  ]),
+  ...attributeWeapons("republican_power", "republican", "wood", [
+    { name: "市民支持", emoji: "👍" },
+    { name: "議会承認", emoji: "✅" },
+    { name: "憲法精神", emoji: "📜" },
+    { name: "連帯演説", emoji: "🎤" },
+    { name: "国民主権", emoji: "🗽" },
+  ], { isAttackPower: true }),
+  ...attributeWeapons("feudal_strike", "feudal", "earth", [
+    { name: "従士の一撃", emoji: "🛡️" },
+    { name: "年貢徴収", emoji: "💴" },
+    { name: "騎士突撃", emoji: "🐎" },
+    { name: "領主命令", emoji: "👑" },
+    { name: "王権制圧", emoji: "🏰" },
+  ]),
+  ...attributeWeapons("feudal_power", "feudal", "earth", [
+    { name: "忠誠", emoji: "💯" },
+    { name: "家臣団", emoji: "👥" },
+    { name: "城塞支援", emoji: "🏰" },
+    { name: "血統の威光", emoji: "👑" },
+    { name: "王命絶対", emoji: "🫅" },
+  ], { isAttackPower: true }),
+  ...attributeWeapons("environmentalist_strike", "environmentalist", "light", [
+    { name: "蔦の一撃", emoji: "🌱" },
+    { name: "抗議活動", emoji: "✊" },
+    { name: "自然の反撃", emoji: "🐻" },
+    { name: "緑の包囲網", emoji: "🌿" },
+    { name: "大地の怒り", emoji: "🌍" },
+  ]),
+  ...attributeWeapons("environmentalist_power", "environmentalist", "light", [
+    { name: "再生力", emoji: "💚" },
+    { name: "森林保護", emoji: "🌳" },
+    { name: "エコ連携", emoji: "♻️" },
+    { name: "自然共鳴", emoji: "🌸" },
+    { name: "地球の加護", emoji: "☀️" },
+  ], { isAttackPower: true }),
+  ...attributeWeapons("anarchist_strike", "anarchist", "dark", [
+    { name: "投石", emoji: "🪨" },
+    { name: "直接行動", emoji: "👊" },
+    { name: "バリケード突破", emoji: "🚧" },
+    { name: "権威破壊", emoji: "💥" },
+    { name: "完全蜂起", emoji: "🔥" },
+  ]),
+  ...attributeWeapons("anarchist_power", "anarchist", "dark", [
+    { name: "自律行動", emoji: "🌀" },
+    { name: "分散戦術", emoji: "⚡" },
+    { name: "反権威精神", emoji: "✊" },
+    { name: "自由連帯", emoji: "🤝" },
+    { name: "秩序崩壊", emoji: "💣" },
+  ], { isAttackPower: true }),
 ];
+
+function attributeWeapons(
+  idPrefix: string,
+  _tag: string,
+  attribute: AttributeKey,
+  cards: { name: string; emoji: string }[],
+  options: { isAttackPower?: boolean } = {},
+): WeaponCard[] {
+  return cards.map((card, idx) => {
+    const level = idx + 1;
+    return {
+      id: `${idPrefix}_${level}`,
+      name: card.name,
+      emoji: card.emoji,
+      attack: level,
+      price: level,
+      rate: level <= 2 ? "3/500" : level <= 4 ? "4/500" : "2/500",
+      attribute,
+      isAttackPower: options.isAttackPower,
+      note: options.isAttackPower ? "他の攻撃カードや攻撃力追加カードと同時に使える" : undefined,
+    };
+  });
+}
 
 export const ARMORS: ArmorCard[] = [
   { id: "leaf_shield", name: "木の葉盾", emoji: "🍃", defense: 1, price: 1 },

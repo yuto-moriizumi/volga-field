@@ -7,7 +7,7 @@ import type {
   PlayerState,
 } from "@volga/shared";
 import { findCard } from "./cards.js";
-import type { CardEffect } from "./cards.js";
+import type { CardDefinition, CardEffect } from "./cards.js";
 import {
   MAX_LEARNED_MIRACLES,
   INITIAL_MONEY,
@@ -249,13 +249,15 @@ function applyEffect(
     }
     case "defense":
       return { self, opponent, log: logs };
+    case "attack_power":
+      return { self, opponent, log: logs };
   }
 }
 
 export function playCard(
   state: GameState,
   playerId: PlayerId,
-  cardRef: CardRef,
+  cardRef: CardRef | CardRef[],
   targetPlayerId?: PlayerId,
   deck: CardRef[] = [],
 ): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
@@ -263,68 +265,99 @@ export function playCard(
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
   if (state.phase === "defense") return { ok: false, reason: "defense pending" };
-  const card = findCard(cardRef.id);
-  if (!card) return { ok: false, reason: "unknown card" };
-  if (card.category === "trade") {
-    return { ok: false, reason: "trade card needs special handler" };
-  }
-  if (card.category === "party") {
-    const joined = joinParty(state, playerId, cardRef);
+
+  const cardRefs = (Array.isArray(cardRef) ? cardRef : [cardRef]).filter(
+    (ref) => ref && typeof ref.id === "string" && ref.id.length > 0,
+  );
+  if (cardRefs.length === 0) return { ok: false, reason: "no card to play" };
+
+  if (cardRefs.length === 1 && isPartyCard(cardRefs[0]!.id)) {
+    const joined = joinParty(state, playerId, cardRefs[0]!);
     if (!joined.ok) return joined;
     return { ok: true, state: joined.state, deck };
   }
-  if (card.effects.every((effect) => effect.kind === "defense")) {
-    return { ok: false, reason: "defense card can only be used while defending" };
-  }
-  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
-  const learnedMiracle = active.learnedMiracles.some((c) => c.id === cardRef.id);
-  const isMiracle = card.category === "miracle";
-  if (idx === -1 && !(isMiracle && learnedMiracle)) {
-    return { ok: false, reason: "card not in hand" };
-  }
-  const mpCost = isMiracle ? (card.mpCost ?? 0) : 0;
-  if (mpCost > active.mp) return { ok: false, reason: "not enough MP" };
 
-  const newHand = [...active.hand];
-  if (idx !== -1) newHand.splice(idx, 1);
+  const cards: CardDefinition[] = [];
+  for (const ref of cardRefs) {
+    const card = findCard(ref.id);
+    if (!card) return { ok: false, reason: "unknown card" };
+    if (card.category === "trade") {
+      return { ok: false, reason: "trade card needs special handler" };
+    }
+    if (card.category === "party") {
+      return { ok: false, reason: "party card must be played alone" };
+    }
+    if (card.effects.every((effect) => effect.kind === "defense")) {
+      return { ok: false, reason: "defense card can only be used while defending" };
+    }
+    cards.push(card);
+  }
 
-  const nextLearnedMiracles =
-    isMiracle && !learnedMiracle
-      ? [...active.learnedMiracles, { id: card.id }].slice(-MAX_LEARNED_MIRACLES)
-      : active.learnedMiracles;
+  let newHand = [...active.hand];
+  let totalMpCost = 0;
+  for (const card of cards) {
+    const idx = newHand.findIndex((c) => c.id === card.id);
+    const learnedMiracle = active.learnedMiracles.some((c) => c.id === card.id);
+    const isMiracle = card.category === "miracle";
+    if (idx === -1 && !(isMiracle && learnedMiracle)) {
+      return { ok: false, reason: "card not in hand" };
+    }
+    if (idx !== -1) {
+      newHand.splice(idx, 1);
+    }
+    if (isMiracle) {
+      totalMpCost += card.mpCost ?? 0;
+    }
+  }
+  if (totalMpCost > active.mp) return { ok: false, reason: "not enough MP" };
+
+  let nextLearnedMiracles = active.learnedMiracles;
+  for (const card of cards) {
+    if (card.category === "miracle") {
+      const learned = nextLearnedMiracles.some((c) => c.id === card.id);
+      if (!learned) {
+        nextLearnedMiracles = [...nextLearnedMiracles, { id: card.id }].slice(
+          -MAX_LEARNED_MIRACLES,
+        );
+      }
+    }
+  }
   let self: PlayerState = spendMp(
     { ...active, hand: newHand, learnedMiracles: nextLearnedMiracles },
-    mpCost,
+    totalMpCost,
   );
   let newDeck = deck;
   const miracleLogs: BattleLogEntry[] = [];
-  if (isMiracle) {
-    if (!learnedMiracle) {
-      miracleLogs.push({
-        turn: state.turn,
-        playerId,
-        message: `${active.name}が${card.name}を習得`,
-        kind: "miracle",
-      });
-    }
-    if (mpCost > 0) {
-      miracleLogs.push({
-        turn: state.turn,
-        playerId,
-        message: `${active.name}がMP${mpCost}を消費 (${card.name})`,
-        kind: "miracle",
-      });
-    }
-    if (newDeck.length > 0 && self.hand.length < HAND_SIZE) {
-      const result = drawCards(newDeck, 1);
-      newDeck = result.deck;
-      self = { ...self, hand: [...self.hand, ...result.drawn] };
-      miracleLogs.push({
-        turn: state.turn,
-        playerId,
-        message: `${active.name}が奇跡の効果で神器を1枚授かった`,
-        kind: "miracle",
-      });
+  for (const card of cards) {
+    const learned = active.learnedMiracles.some((c) => c.id === card.id);
+    if (card.category === "miracle") {
+      if (!learned) {
+        miracleLogs.push({
+          turn: state.turn,
+          playerId,
+          message: `${active.name}が${card.name}を習得`,
+          kind: "miracle",
+        });
+      }
+      if ((card.mpCost ?? 0) > 0) {
+        miracleLogs.push({
+          turn: state.turn,
+          playerId,
+          message: `${active.name}がMP${card.mpCost}を消費 (${card.name})`,
+          kind: "miracle",
+        });
+      }
+      if (newDeck.length > 0 && self.hand.length < HAND_SIZE) {
+        const result = drawCards(newDeck, 1);
+        newDeck = result.deck;
+        self = { ...self, hand: [...self.hand, ...result.drawn] };
+        miracleLogs.push({
+          turn: state.turn,
+          playerId,
+          message: `${active.name}が奇跡の効果で神器を1枚授かった`,
+          kind: "miracle",
+        });
+      }
     }
   }
   let opponent =
@@ -332,13 +365,82 @@ export function playCard(
     state.players.find((p) => p.id !== playerId) ??
     state.players[0]!;
   const logs: BattleLogEntry[] = [...miracleLogs];
-  const pendingDamage = card.effects
-    .filter((effect) => effect.kind === "damage" && effect.target === "opponent")
-    .reduce((total, effect) => total + (effect.amount ?? 0), 0);
+  const pendingDamage = cards.reduce((total, card) => {
+    const direct = card.effects
+      .filter((effect) => effect.kind === "damage" && effect.target === "opponent")
+      .reduce((sum, effect) => sum + (effect.amount ?? 0), 0);
+    const power = card.effects
+      .filter((effect) => effect.kind === "attack_power")
+      .reduce((sum, effect) => sum + (effect.amount ?? 0), 0);
+    return total + direct + power;
+  }, 0);
 
   if (pendingDamage > 0) {
+    for (const card of cards) {
+      for (const effect of card.effects.filter(
+        (effect) =>
+          !(effect.kind === "damage" && effect.target === "opponent") &&
+          effect.kind !== "attack_power",
+      )) {
+        const result = applyEffect(
+          self,
+          opponent,
+          effect,
+          card.id,
+          card.name,
+          state.turn,
+          playerId,
+        );
+        self = result.self;
+        opponent = result.opponent;
+        logs.push(...result.log);
+      }
+    }
+
+    const finalPlayers = state.players.map((p) => {
+      if (p.id === playerId) return self;
+      if (p.id === opponent.id) return opponent;
+      return p;
+    });
+
+    const combinedName =
+      cards.length === 1 ? cards[0]!.name : cards.map((c) => c.name).join("+");
+    const primaryCard = cards[0]!;
+
+    return {
+      ok: true,
+      state: {
+        ...state,
+        players: finalPlayers,
+        deckSize: newDeck.length,
+        phase: "defense",
+        pendingAttack: {
+          attackerId: playerId,
+          defenderId: opponent.id,
+          card: { id: primaryCard.id },
+          cardName: combinedName,
+          amount: pendingDamage,
+        },
+        log: [
+          ...state.log,
+          ...logs,
+          {
+            turn: state.turn,
+            playerId,
+            message: `${self.name}が${combinedName}で攻撃`,
+            kind: "attack",
+          },
+        ],
+      },
+      deck: newDeck,
+    };
+  }
+
+  for (const card of cards) {
     for (const effect of card.effects.filter(
-      (effect) => !(effect.kind === "damage" && effect.target === "opponent"),
+      (effect) =>
+        !(effect.kind === "damage" && effect.target === "opponent") &&
+        effect.kind !== "attack_power",
     )) {
       const result = applyEffect(
         self,
@@ -353,55 +455,6 @@ export function playCard(
       opponent = result.opponent;
       logs.push(...result.log);
     }
-
-    const finalPlayers = state.players.map((p) => {
-      if (p.id === playerId) return self;
-      if (p.id === opponent.id) return opponent;
-      return p;
-    });
-
-    return {
-      ok: true,
-      state: {
-        ...state,
-        players: finalPlayers,
-        deckSize: newDeck.length,
-        phase: "defense",
-        pendingAttack: {
-          attackerId: playerId,
-          defenderId: opponent.id,
-          card: { id: card.id },
-          cardName: card.name,
-          amount: pendingDamage,
-        },
-        log: [
-          ...state.log,
-          ...logs,
-          {
-            turn: state.turn,
-            playerId,
-            message: `${self.name}が${card.name}で攻撃`,
-            kind: "attack",
-          },
-        ],
-      },
-      deck: newDeck,
-    };
-  }
-
-  for (const effect of card.effects) {
-    const result = applyEffect(
-      self,
-      opponent,
-      effect,
-      card.id,
-      card.name,
-      state.turn,
-      playerId,
-    );
-    self = result.self;
-    opponent = result.opponent;
-    logs.push(...result.log);
   }
 
   const finalPlayers = state.players.map((p) => {
@@ -782,69 +835,6 @@ export function confirmBuy(
   return { ok: true, state: newState };
 }
 
-export function joinParty(
-  state: GameState,
-  playerId: PlayerId,
-  cardRef: CardRef,
-): { ok: true; state: GameState } | { ok: false; reason: string } {
-  const active = state.players[state.activePlayerIndex];
-  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
-  if (state.winner) return { ok: false, reason: "game already finished" };
-  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
-
-  const card = findCard(cardRef.id);
-  if (!card) return { ok: false, reason: "unknown card" };
-  if (!isPartyCard(cardRef.id)) return { ok: false, reason: "not a party card" };
-
-  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
-  if (idx === -1) return { ok: false, reason: "card not in hand" };
-
-  const newHand = [...active.hand];
-  newHand.splice(idx, 1);
-
-  const partyId = getPartyId(cardRef.id);
-  const previousParty = active.party;
-  const updatedActive: PlayerState = { ...active, hand: newHand, party: partyId };
-
-  const finalPlayers = state.players.map((p) =>
-    p.id === playerId ? updatedActive : p,
-  );
-  const winner = determineWinner(finalPlayers);
-
-  const message = previousParty
-    ? `${active.name}が${PARTY_LABELS[previousParty]}から${card.name}へ所属を変更した`
-    : `${active.name}が${card.name}に入党した`;
-
-  const logs: BattleLogEntry[] = [
-    {
-      turn: state.turn,
-      playerId,
-      message,
-      kind: "special",
-    },
-  ];
-
-  const newState: GameState = {
-    ...state,
-    players: finalPlayers,
-    phase: "play",
-    pendingAttack: null,
-    winner,
-    log: [...state.log, ...logs],
-  };
-
-  if (winner) {
-    newState.log.push({
-      turn: newState.turn,
-      playerId: winner,
-      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
-      kind: "system",
-    });
-  }
-
-  return { ok: true, state: newState };
-}
-
 export function sellCards(
   state: GameState,
   playerId: PlayerId,
@@ -1031,3 +1021,65 @@ export function exchangeStats(
   return { ok: true, state: newState };
 }
 
+export function joinParty(
+  state: GameState,
+  playerId: PlayerId,
+  cardRef: CardRef,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+
+  const card = findCard(cardRef.id);
+  if (!card) return { ok: false, reason: "unknown card" };
+  if (!isPartyCard(cardRef.id)) return { ok: false, reason: "not a party card" };
+
+  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
+  if (idx === -1) return { ok: false, reason: "card not in hand" };
+
+  const newHand = [...active.hand];
+  newHand.splice(idx, 1);
+
+  const partyId = getPartyId(cardRef.id);
+  const previousParty = active.party;
+  const updatedActive: PlayerState = { ...active, hand: newHand, party: partyId };
+
+  const finalPlayers = state.players.map((p) =>
+    p.id === playerId ? updatedActive : p,
+  );
+  const winner = determineWinner(finalPlayers);
+
+  const message = previousParty
+    ? `${active.name}が${PARTY_LABELS[previousParty]}から${card.name}へ所属を変更した`
+    : `${active.name}が${card.name}に入党した`;
+
+  const logs: BattleLogEntry[] = [
+    {
+      turn: state.turn,
+      playerId,
+      message,
+      kind: "special",
+    },
+  ];
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    phase: "play",
+    pendingAttack: null,
+    winner,
+    log: [...state.log, ...logs],
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: state.turn,
+      playerId: winner,
+      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+      kind: "system",
+    });
+  }
+
+  return { ok: true, state: newState };
+}
