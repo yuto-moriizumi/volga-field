@@ -111,12 +111,27 @@ function activePlayer(room: Room): RoomPlayer | null {
   return room.players.find((p) => p.id === activeState.id) ?? null;
 }
 
-function pickAiDefenseCard(room: Room, aiId: PlayerId): CardRef | undefined {
-  const aiState = room.gameState?.players.find((p) => p.id === aiId);
-  const card = aiState?.hand.find((cardRef) =>
-    findCard(cardRef.id)?.effects.some((effect) => effect.kind === "defense"),
+function defensePower(cardRef: CardRef): number {
+  return (
+    findCard(cardRef.id)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0
   );
-  return card ? { id: card.id } : undefined;
+}
+
+function pickAiDefenseCards(room: Room, aiId: PlayerId): CardRef[] {
+  const aiState = room.gameState?.players.find((p) => p.id === aiId);
+  const pendingAmount = room.gameState?.pendingAttack?.amount ?? 0;
+  const cards =
+    aiState?.hand
+      .filter((cardRef) => defensePower(cardRef) > 0)
+      .sort((a, b) => defensePower(b) - defensePower(a)) ?? [];
+  const selected: CardRef[] = [];
+  let total = 0;
+  for (const card of cards) {
+    selected.push({ id: card.id });
+    total += defensePower(card);
+    if (total >= pendingAmount) break;
+  }
+  return selected;
 }
 
 function finishActiveAiTurn(room: Room): boolean {
@@ -139,7 +154,7 @@ function resolveAiDefense(room: Room): boolean {
   const defender = room.players.find((p) => p.id === pending.defenderId);
   if (!defender?.ai) return false;
 
-  const defended = defendAttack(room.gameState, defender.id, pickAiDefenseCard(room, defender.id));
+  const defended = defendAttack(room.gameState, defender.id, pickAiDefenseCards(room, defender.id));
   if (!defended.ok) return false;
   room.gameState = defended.state;
   broadcastStateToAll(room);
@@ -438,14 +453,14 @@ function handlePlayCard(
   }
 }
 
-function handleDefend(client: Client, cardId?: string): void {
+function handleDefend(client: Client, cardIds: string[] = []): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
   const result = defendAttack(
     room.gameState,
     client.id,
-    cardId ? { id: cardId } : undefined,
+    cardIds.map((id) => ({ id })),
   );
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
@@ -519,7 +534,10 @@ function dispatch(client: Client, msg: ClientMessage): void {
       handlePlayCard(client, msg.cardRef.id, msg.targetPlayerId);
       break;
     case "defend":
-      handleDefend(client, msg.cardRef?.id);
+      handleDefend(
+        client,
+        msg.cardRefs?.map((cardRef) => cardRef.id) ?? (msg.cardRef ? [msg.cardRef.id] : []),
+      );
       break;
     case "end_turn":
       handleEndTurn(client);

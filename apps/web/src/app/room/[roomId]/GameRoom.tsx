@@ -24,7 +24,7 @@ export function GameRoom({
   });
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
-  const [selectedDefenseIdx, setSelectedDefenseIdx] = useState<number | null>(null);
+  const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
   const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -122,11 +122,14 @@ export function GameRoom({
     setSelectedCardIdx(null);
   }
 
-  function defend(cardIdx?: number) {
+  function defend(cardIdxes: number[] = []) {
     if (!me || !isDefending) return;
-    const card = typeof cardIdx === "number" ? me.hand[cardIdx] : undefined;
-    send({ type: "defend", cardRef: card ? { id: card.id } : undefined });
-    setSelectedDefenseIdx(null);
+    const cardRefs = cardIdxes
+      .map((idx) => me.hand[idx])
+      .filter((card): card is { id: string } => Boolean(card))
+      .map((card) => ({ id: card.id }));
+    send({ type: "defend", cardRefs });
+    setSelectedDefenseIdxes([]);
   }
 
   function endTurn() {
@@ -279,11 +282,11 @@ export function GameRoom({
               isMyTurn={isMyTurn}
               selectedCardIdx={selectedCardIdx}
               selectedTargetId={selectedTargetId}
-              selectedDefenseIdx={selectedDefenseIdx}
+              selectedDefenseIdxes={selectedDefenseIdxes}
               hitFlash={hitFlash}
               onSelectTarget={setSelectedTargetId}
               onExecute={executeSelectedCard}
-              onPassDefense={() => defend(selectedDefenseIdx ?? undefined)}
+              onPassDefense={() => defend(selectedDefenseIdxes)}
               onEndTurn={endTurn}
             />
             <MyArea
@@ -291,10 +294,14 @@ export function GameRoom({
               isMyTurn={isMyTurn}
               isDefending={isDefending}
               selectedCardIdx={selectedCardIdx}
-              selectedDefenseIdx={selectedDefenseIdx}
+              selectedDefenseIdxes={selectedDefenseIdxes}
               onPlayCard={playCard}
               onSelectDefense={(idx) =>
-                setSelectedDefenseIdx((current) => (current === idx ? null : idx))
+                setSelectedDefenseIdxes((current) =>
+                  current.includes(idx)
+                    ? current.filter((selectedIdx) => selectedIdx !== idx)
+                    : [...current, idx],
+                )
               }
             />
             <BattleLog entries={gameState.log} />
@@ -422,7 +429,7 @@ function MyArea({
   isMyTurn,
   isDefending,
   selectedCardIdx,
-  selectedDefenseIdx,
+  selectedDefenseIdxes,
   onPlayCard,
   onSelectDefense,
 }: {
@@ -430,7 +437,7 @@ function MyArea({
   isMyTurn: boolean;
   isDefending: boolean;
   selectedCardIdx: number | null;
-  selectedDefenseIdx: number | null;
+  selectedDefenseIdxes: number[];
   onPlayCard: (idx: number) => void;
   onSelectDefense: (idx: number) => void;
 }) {
@@ -492,7 +499,7 @@ function MyArea({
           <CardView
             key={`${card.id}-${idx}`}
             cardRef={card}
-            selected={selectedCardIdx === idx || selectedDefenseIdx === idx}
+            selected={selectedCardIdx === idx || selectedDefenseIdxes.includes(idx)}
             playable={isDefending ? !isLearned && isDefenseCard(card.id) : isMyTurn && hasEnoughMp}
             learned={isLearned}
             onClick={() => {
@@ -518,7 +525,7 @@ function BattleBoard({
   isMyTurn,
   selectedCardIdx,
   selectedTargetId,
-  selectedDefenseIdx,
+  selectedDefenseIdxes,
   hitFlash,
   onSelectTarget,
   onExecute,
@@ -532,7 +539,7 @@ function BattleBoard({
   isMyTurn: boolean;
   selectedCardIdx: number | null;
   selectedTargetId: string | null;
-  selectedDefenseIdx: number | null;
+  selectedDefenseIdxes: number[];
   hitFlash: { amount: number; key: number } | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
@@ -541,13 +548,18 @@ function BattleBoard({
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
-  const defenseCard = selectedDefenseIdx !== null ? me?.hand[selectedDefenseIdx] : null;
+  const defenseCards = me
+    ? selectedDefenseIdxes
+        .map((idx) => me.hand[idx])
+        .filter((card): card is { id: string } => Boolean(card))
+    : [];
   const pending = gameState.pendingAttack;
   const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
   const leftCard = isDefending ? pending?.card : selectedCard;
+  const defensePower = defenseCards.reduce((total, card) => total + getDefensePower(card.id), 0);
   const actionLabel = isDefending
-    ? defenseCard
-      ? `${findCard(defenseCard.id)?.name ?? "防御"}で受ける`
+    ? defenseCards.length > 0
+      ? `${defenseCards.length}枚 防${defensePower}で受ける`
       : "防御なしで受ける"
     : selectedCard
       ? "アクション実行"
@@ -709,6 +721,10 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
 
 function isDefenseCard(cardId: string): boolean {
   return findCard(cardId)?.effects.some((effect) => effect.kind === "defense") ?? false;
+}
+
+function getDefensePower(cardId: string): number {
+  return findCard(cardId)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0;
 }
 
 function isAttackCard(cardId: string): boolean {
