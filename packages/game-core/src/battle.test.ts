@@ -46,6 +46,27 @@ function defenseState(): GameState {
   };
 }
 
+function playState(): GameState {
+  const state = defenseState();
+  return {
+    ...state,
+    phase: "play",
+    pendingAttack: null,
+    players: [
+      {
+        ...state.players[0]!,
+        hp: 12,
+        hand: [{ id: "potion" }],
+      },
+      {
+        ...state.players[1]!,
+        hp: 20,
+        hand: [],
+      },
+    ],
+  };
+}
+
 test("defendAttack can use multiple defense cards at once", () => {
   const result = defendAttack(defenseState(), "defender", [
     { id: "shield" },
@@ -61,6 +82,18 @@ test("defendAttack can use multiple defense cards at once", () => {
   assert.equal(result.state.phase, "play");
   assert.equal(result.state.pendingAttack, null);
   assert.equal(result.state.log.filter((entry) => entry.kind === "defense").length, 2);
+});
+
+test("playCard heals the player who uses a healing potion", () => {
+  const result = playCard(playState(), "attacker", { id: "potion" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(attacker?.hp, 17);
+  assert.equal(defender?.hp, 20);
 });
 
 test("playCard rejects defense cards on the attacker's turn", () => {

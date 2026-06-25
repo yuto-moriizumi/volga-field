@@ -107,7 +107,7 @@ export function GameRoom({
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
     setSelectedCardIdx(nextSelectedIdx);
     setSelectedTargetId(
-      nextSelectedIdx !== null && isAttackCard(card.id) ? opponent?.id ?? null : null,
+      nextSelectedIdx !== null ? (defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null) : null,
     );
   }
 
@@ -118,7 +118,7 @@ export function GameRoom({
     send({
       type: "play_card",
       cardRef: { id: card.id },
-      targetPlayerId: selectedTargetId ?? opponent?.id,
+      targetPlayerId: selectedTargetId ?? defaultTargetId(card.id, me.id, opponent?.id ?? null),
     });
     setSelectedCardIdx(null);
   }
@@ -744,6 +744,14 @@ function isAttackCard(cardId: string): boolean {
       (effect) => effect.kind === "damage" && effect.target === "opponent",
     ) ?? false
   );
+}
+
+function defaultTargetId(
+  cardId: string,
+  selfId: string,
+  opponentId: string | null,
+): string | undefined {
+  return isAttackCard(cardId) ? (opponentId ?? undefined) : selfId;
 }
 
 function playableCards(player: PlayerState): { id: string }[] {
