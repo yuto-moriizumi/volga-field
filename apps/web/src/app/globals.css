@@ -1222,25 +1222,6 @@ a {
   min-height: 100px;
 }
 
-.gf-command-tile {
-  flex: 0 0 82px;
-  width: 82px;
-  height: 80px;
-  border: 8px solid #f39bc9;
-  background: #ffe9f3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.gf-command-tile span {
-  width: 50px;
-  height: 36px;
-  border-left: 30px solid #d982aa;
-  border-top: 14px solid transparent;
-  border-bottom: 14px solid #d982aa;
-}
-
 .gf-hand-strip {
   display: flex;
   align-items: flex-end;

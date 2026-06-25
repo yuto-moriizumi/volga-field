@@ -402,9 +402,6 @@ function MyArea({
   const cards = playableCards(me);
   return (
     <section className="gf-hand-dock" aria-label="手札">
-      <div className="gf-command-tile" aria-hidden>
-        <span />
-      </div>
       <div className="gf-hand-strip">
         {cards.length === 0 && (
           <div className="gf-empty-hand">
