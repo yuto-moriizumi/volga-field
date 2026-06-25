@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { findCard, INITIAL_HP, INITIAL_MP } from "@volga/game-core";
+import { findCard } from "@volga/game-core";
 import type { GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -233,8 +233,8 @@ export function GameRoom({
       />
 
       <main
-        className="gf-main"
-        style={{ gap: 14 }}
+        className={`gf-main${gameStarted ? " gf-battle-main" : ""}`}
+        style={gameStarted ? undefined : { gap: 14 }}
       >
         {!gameStarted && (
           <section
@@ -274,7 +274,6 @@ export function GameRoom({
 
         {gameStarted && (
           <>
-            <OpponentArea opponents={opponents} />
             <BattleBoard
               me={me}
               players={gameState.players}
@@ -305,7 +304,9 @@ export function GameRoom({
                 )
               }
             />
-            <BattleLog entries={gameState.log} />
+            <div className="gf-battle-log-dock">
+              <BattleLog entries={gameState.log} />
+            </div>
           </>
         )}
 
@@ -380,51 +381,6 @@ function PlayerSlot({
   );
 }
 
-function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
-  if (opponents.length === 0) return <div />;
-  return (
-    <section
-      className="gf-card"
-      style={{
-        padding: 14,
-        display: "flex",
-        gap: 14,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      {opponents.map((opponent) => (
-        <div
-          key={opponent.id}
-          style={{
-            display: "flex",
-            gap: 14,
-            alignItems: "center",
-            flex: "1 1 280px",
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ flex: "0 0 auto" }}>
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--text-dark-soft)",
-                fontWeight: 900,
-              }}
-            >
-              対戦相手
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
-          </div>
-          <HpBar hp={opponent.hp} />
-          <MpBar mp={opponent.mp} />
-          <HandCount count={opponent.hand.length} />
-        </div>
-      ))}
-    </section>
-  );
-}
-
 function MyArea({
   me,
   canAct,
@@ -445,50 +401,13 @@ function MyArea({
   if (!me) return <div />;
   const cards = playableCards(me);
   return (
-    <section
-      className="gf-card"
-      style={{
-        padding: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          gap: 14,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ flex: "0 0 auto" }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-dark-soft)",
-              fontWeight: 900,
-            }}
-          >
-            あなた
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 900 }}>{me.name}</div>
-        </div>
-        <HpBar hp={me.hp} self />
-        <MpBar mp={me.mp} />
-        <HandCount count={me.hand.length} />
+    <section className="gf-hand-dock" aria-label="手札">
+      <div className="gf-command-tile" aria-hidden>
+        <span />
       </div>
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-          justifyContent: "center",
-          padding: "8px 4px 0",
-        }}
-      >
+      <div className="gf-hand-strip">
         {cards.length === 0 && (
-          <div style={{ color: "var(--text-dark-soft)", fontWeight: 900 }}>
+          <div className="gf-empty-hand">
             手札がない…
           </div>
         )}
@@ -572,36 +491,21 @@ function BattleBoard({
         : "相手のターン";
 
   return (
-    <section
-      className="gf-card gf-battle-board"
-      style={{
-        minHeight: 270,
-        padding: 16,
-        alignItems: "stretch",
-      }}
-    >
+    <section className="gf-battle-board" aria-label="戦闘">
       <button
+        className="gf-active-card"
         onClick={onExecute}
         disabled={!selectedCard || !canAct || isDefending}
-        style={{
-          background: "var(--panel-cream-soft)",
-          border: "3px solid var(--bar-teal)",
-          borderRadius: 8,
-          padding: 0,
-          minHeight: 150,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
       >
         {leftCard ? (
           <LargeCard cardRef={leftCard} />
         ) : (
-          <span style={{ color: "var(--text-dark-soft)" }}>カード</span>
+          <span className="gf-active-card-placeholder">カード</span>
         )}
       </button>
 
       <div
+        className="gf-action-stage"
         role={isDefending ? "button" : undefined}
         tabIndex={isDefending ? 0 : undefined}
         aria-disabled={!isDefending}
@@ -613,17 +517,8 @@ function BattleBoard({
             onPassDefense();
           }
         }}
-        style={{
-          position: "relative",
-          background: "linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08))",
-          border: "none",
-          borderRadius: 8,
-          minHeight: 190,
-          color: "var(--text-dark)",
-          cursor: isDefending ? "pointer" : "default",
-        }}
       >
-        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 20 }}>
+        <div className="gf-turn-ribbon">
           {gameState.winner
             ? "ゲーム終了"
             : isDefending
@@ -644,55 +539,38 @@ function BattleBoard({
           </div>
         )}
         <div
-          style={{
-            width: "min(260px, 90%)",
-            margin: "0 auto",
-            padding: "8px 14px",
-            borderRadius: 8,
-            background: isDefending ? "#bd4646" : "#d9ffd0",
-            border: "3px solid #4f5554",
-            color: isDefending ? "#fff" : "var(--text-dark)",
-            fontSize: 24,
-            fontWeight: 900,
-          }}
+          className={`gf-action-label${isDefending ? " is-danger" : ""}`}
         >
           {actionLabel}
         </div>
         <button
-          className="gf-btn"
+          className="gf-btn gf-end-turn-btn"
           onClick={(e) => {
             e.stopPropagation();
             onEndTurn();
           }}
           disabled={!canAct || gameState.winner !== null || isDefending}
-          style={{ marginTop: 18 }}
         >
-          ターン終了
+          許す
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center" }}>
+      <div className="gf-target-list">
         {players.map((p) => (
           <button
+            className="gf-target-pill"
             key={p.id}
             onClick={() => onSelectTarget(p.id)}
             disabled={!canAct || isDefending}
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: 8,
-              alignItems: "center",
-              padding: "8px 12px",
-              borderRadius: 999,
-              border: `3px solid ${selectedTargetId === p.id ? "#ff6aa2" : "#b9aaa5"}`,
-              background: "#f2f2ef",
               color: p.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
-              boxShadow: selectedTargetId === p.id ? "0 0 0 4px rgba(255,106,162,.22)" : "none",
             }}
+            data-selected={selectedTargetId === p.id}
           >
-            <span style={{ fontSize: 22, fontWeight: 900 }}>{p.name}</span>
-            <span style={{ color: "var(--text-dark)", fontSize: 18, fontWeight: 900 }}>
-              HP {p.hp} / MP {p.mp}
+            <span className="gf-target-dot" />
+            <span className="gf-target-name">{p.name}</span>
+            <span className="gf-target-stats">
+              <b>HP</b> {p.hp} <b>MP</b> {p.mp} <b>￥</b> 20
             </span>
           </button>
         ))}
@@ -709,17 +587,17 @@ function LargeCard({ cardRef }: { cardRef: { id: string } }) {
       ? card.mpCost
       : card.effects.find((effect) => typeof effect.amount === "number")?.amount;
   return (
-    <div style={{ width: "100%", height: "100%", display: "grid", gridTemplateColumns: "88px 1fr" }}>
-      <div style={{ fontSize: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="gf-large-card">
+      <div className="gf-large-card-art">
         {card.emoji}
       </div>
-      <div style={{ padding: 8, textAlign: "left" }}>
-        <div style={{ fontSize: 20, borderBottom: "2px solid #8ccf80" }}>{card.name}</div>
-        <div style={{ fontSize: 24, marginTop: 8 }}>
+      <div className="gf-large-card-body">
+        <div className="gf-large-card-name">{card.name}</div>
+        <div className="gf-large-card-power">
           {card.category === "miracle" ? "MP" : card.category === "shield" ? "守" : "攻"}
           {power ?? ""}
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-dark-soft)" }}>{card.description}</div>
+        <div className="gf-large-card-desc">{card.description}</div>
       </div>
     </div>
   );
@@ -748,114 +626,4 @@ function isAttackCard(cardId: string): boolean {
 
 function playableCards(player: PlayerState): { id: string }[] {
   return [...player.hand, ...player.learnedMiracles];
-}
-
-function HpBar({
-  hp,
-  self,
-}: {
-  hp: number;
-  self?: boolean;
-}) {
-  const pct = Math.max(0, Math.min(100, (hp / INITIAL_HP) * 100));
-  return (
-    <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--text-dark-soft)",
-          marginBottom: 4,
-          fontWeight: 900,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <span>HP</span>
-        <span>{hp}</span>
-      </div>
-      <div
-        style={{
-          height: 18,
-          background: "#1f5b50",
-          borderRadius: 10,
-          overflow: "hidden",
-          border: "2px solid #1f5b50",
-          boxShadow: "inset 0 2px 0 rgba(0,0,0,0.25)",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${pct}%`,
-            background: self
-              ? "linear-gradient(180deg, #8fd49a, #4ca05a)"
-              : "linear-gradient(180deg, #f29180, #d04a36)",
-            transition: "width 0.3s",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function MpBar({
-  mp,
-}: {
-  mp: number;
-}) {
-  const pct = Math.max(0, Math.min(100, (mp / INITIAL_MP) * 100));
-  return (
-    <div style={{ flex: "1 1 160px", minWidth: 150 }}>
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--text-dark-soft)",
-          marginBottom: 4,
-          fontWeight: 900,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <span>MP</span>
-        <span>{mp}</span>
-      </div>
-      <div
-        style={{
-          height: 18,
-          background: "#2f3475",
-          borderRadius: 10,
-          overflow: "hidden",
-          border: "2px solid #2f3475",
-          boxShadow: "inset 0 2px 0 rgba(0,0,0,0.25)",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${pct}%`,
-            background: "linear-gradient(180deg, #8fb6ff, #5166d6)",
-            transition: "width 0.3s",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function HandCount({ count }: { count: number }) {
-  return (
-    <div
-      className="gf-card-soft"
-      style={{
-        padding: "6px 12px",
-        fontSize: 14,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      <span style={{ fontSize: 18 }}>✋</span>
-      <span style={{ fontWeight: 900 }}>{count}枚</span>
-    </div>
-  );
 }

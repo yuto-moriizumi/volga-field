@@ -31,20 +31,7 @@ export function CardView({
   if (hidden || cardRef.id === "hidden") {
     return (
       <div
-        style={{
-          width: 104,
-          height: 148,
-          background:
-            "repeating-linear-gradient(45deg, #4ca89b 0 8px, #3a8a7e 8px 16px)",
-          borderRadius: 12,
-          border: "3px solid #1f5b50",
-          boxShadow: "0 3px 0 rgba(0,0,0,0.25)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 30,
-          color: "#fff",
-        }}
+        className="gf-hand-card gf-hand-card-hidden"
       >
         ?
       </div>
@@ -55,13 +42,7 @@ export function CardView({
   if (!card) {
     return (
       <div
-        style={{
-          width: 104,
-          height: 148,
-          background: "#eef4cc",
-          borderRadius: 12,
-          border: "2px solid #2f7568",
-        }}
+        className="gf-hand-card"
       />
     );
   }
@@ -71,72 +52,30 @@ export function CardView({
 
   return (
     <button
+      className="gf-hand-card"
       onClick={onClick}
       disabled={!playable}
+      data-selected={selected}
       style={{
-        width: 104,
-        height: 148,
         background: playable ? tone.bg : "#d6d6c8",
-        borderRadius: 12,
-        border: `3px solid ${selected ? tone.chip : "#2f7568"}`,
-        boxShadow: selected
-          ? `0 0 0 3px ${tone.chip}55, 0 6px 0 rgba(0,0,0,0.2)`
-          : "0 3px 0 rgba(0,0,0,0.2)",
-        transform: selected ? "translateY(-10px)" : "none",
-        transition: "transform 0.12s ease, box-shadow 0.12s ease",
+        borderColor: selected ? tone.chip : undefined,
         color: tone.ink,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "stretch",
-        justifyContent: "space-between",
-        padding: 6,
         cursor: playable ? "pointer" : "default",
-        textAlign: "center",
       }}
     >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 900,
-          letterSpacing: "0.05em",
-          color: tone.chip,
-        }}
-      >
-        {categoryLabel(card.category)}
-        {learned ? " / 習得" : ""}
-      </div>
-      <div style={{ fontSize: 38, lineHeight: 1 }}>{card.emoji}</div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 900 }}>{card.name}</div>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            opacity: 0.8,
-            lineHeight: 1.15,
-            marginTop: 2,
-          }}
-        >
-          {card.description}
-        </div>
+      <div className="gf-hand-card-art">{card.emoji}</div>
+      <div className="gf-hand-card-caption">
+        <span>{shortPower(card)}</span>
+        {learned && <small>習</small>}
       </div>
     </button>
   );
 }
 
-function categoryLabel(cat: string): string {
-  switch (cat) {
-    case "weapon":
-      return "武器";
-    case "shield":
-      return "盾";
-    case "potion":
-      return "薬";
-    case "miracle":
-      return "奇跡";
-    case "special":
-      return "特殊";
-    default:
-      return cat;
-  }
+function shortPower(card: NonNullable<ReturnType<typeof findCard>>): string {
+  const amount = card.effects.find((effect) => typeof effect.amount === "number")?.amount;
+  if (card.category === "shield") return `守${amount ?? ""}`;
+  if (card.category === "miracle") return `MP${card.mpCost ?? 0}`;
+  if (card.effects.some((effect) => effect.kind === "heal")) return `癒${amount ?? ""}`;
+  return `攻${amount ?? ""}`;
 }
