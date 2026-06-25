@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameState } from "@volga/shared";
-import { defendAttack } from "./battle.js";
+import { defendAttack, playCard } from "./battle.js";
 
 function defenseState(): GameState {
   return {
@@ -11,9 +11,7 @@ function defenseState(): GameState {
         id: "attacker",
         name: "Attacker",
         hp: 20,
-        maxHp: 20,
         mp: 0,
-        maxMp: 0,
         hand: [],
         learnedMiracles: [],
         ready: true,
@@ -22,9 +20,7 @@ function defenseState(): GameState {
         id: "defender",
         name: "Defender",
         hp: 20,
-        maxHp: 20,
         mp: 0,
-        maxMp: 0,
         hand: [{ id: "shield" }, { id: "leaf_shield" }, { id: "potion" }],
         learnedMiracles: [],
         ready: true,
@@ -67,3 +63,18 @@ test("defendAttack can use multiple defense cards at once", () => {
   assert.equal(result.state.log.filter((entry) => entry.kind === "defense").length, 2);
 });
 
+test("playCard rejects defense cards on the attacker's turn", () => {
+  const state = defenseState();
+  state.phase = "play";
+  state.pendingAttack = null;
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "shield" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "shield" });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "defense card can only be used while defending");
+});
