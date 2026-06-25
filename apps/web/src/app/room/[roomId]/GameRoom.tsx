@@ -8,6 +8,9 @@ import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
 import { BattleLog } from "./BattleLog";
 import { CardView } from "./CardView";
+import { LargeCard } from "./LargeCard";
+import { SourceZone } from "./SourceZone";
+import { TargetZone } from "./TargetZone";
 
 export function GameRoom({
   params,
@@ -607,64 +610,25 @@ function BattleBoard({
 
   return (
     <section className="gf-battle-board" aria-label="戦闘">
-      <div className="gf-battle-status-grid" aria-label="プレイヤー状況">
-        <div className="gf-status-stack">
-          <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
-          {discardMode && <div className="gf-discard-status">カードを捨てる</div>}
-        </div>
-        <NamePlate
-          label={pending ? "攻撃対象" : "ターゲット"}
-          name={targetPlayer?.name ?? "未選択"}
-          tone="blue"
-        />
-      </div>
+      <SourceZone
+        activePlayer={activePlayer}
+        selectedCards={selectedCards}
+        discardMode={discardMode}
+        confirmLabel={confirmLabel}
+        confirmDisabled={confirmDisabled}
+        canEndTurn={canEndTurn}
+        canPassDefense={canPassDefense}
+        onConfirm={confirmAction}
+      />
 
-      <button
-        type="button"
-        className="gf-confirm-zone"
-        onClick={confirmAction}
-        disabled={confirmDisabled}
-        aria-label={confirmLabel}
-      >
-        {selectedCards.length > 0 ? (
-          <div className="gf-confirm-card-stack">
-            {selectedCards.map((card, idx) => (
-              <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
-            ))}
-          </div>
-        ) : discardMode ? (
-          <span className="gf-confirm-empty-action is-danger">{confirmLabel}</span>
-        ) : canEndTurn ? (
-          <span className="gf-confirm-empty-action">ターン終了</span>
-        ) : canPassDefense ? (
-          <span className="gf-confirm-empty-action is-danger">許す</span>
-        ) : (
-          <span className="gf-confirm-placeholder" />
-        )}
-      </button>
-
-      <div className="gf-action-stage">
-        {hitFlash && (
-          <div
-            key={hitFlash.key}
-            className="gf-hit-flash"
-          >
-            <strong>{hitFlash.amount}</strong>
-            <span>ダメージ</span>
-          </div>
-        )}
-        {canUseDiscard && (
-          <button
-            className="gf-btn gf-discard-mode-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleDiscardMode();
-            }}
-          >
-            {discardMode ? "キャンセル" : "カードを捨てる"}
-          </button>
-        )}
-      </div>
+      <TargetZone
+        pending={pending}
+        targetPlayer={targetPlayer ?? null}
+        hitFlash={hitFlash}
+        canUseDiscard={canUseDiscard}
+        discardMode={discardMode}
+        onToggleDiscardMode={onToggleDiscardMode}
+      />
 
       <div className="gf-target-list">
         {players.map((p) => (
@@ -687,50 +651,6 @@ function BattleBoard({
         ))}
       </div>
     </section>
-  );
-}
-
-function NamePlate({
-  label,
-  name,
-  tone,
-  compact = false,
-}: {
-  label: string;
-  name: string;
-  tone: "teal" | "blue";
-  compact?: boolean;
-}) {
-  return (
-    <div className={`gf-name-plate tone-${tone}${compact ? " is-compact" : ""}`}>
-      <span className="gf-name-dot" />
-      <span className="gf-name-label">{label}</span>
-      <span className="gf-name-text">{name}</span>
-    </div>
-  );
-}
-
-function LargeCard({ cardRef }: { cardRef: { id: string } }) {
-  const card = findCard(cardRef.id);
-  if (!card) return null;
-  const power =
-    card.category === "miracle"
-      ? card.mpCost
-      : card.effects.find((effect) => typeof effect.amount === "number")?.amount;
-  return (
-    <div className="gf-large-card">
-      <div className="gf-large-card-art">
-        {card.emoji}
-      </div>
-      <div className="gf-large-card-body">
-        <div className="gf-large-card-name">{card.name}</div>
-        <div className="gf-large-card-power">
-          {card.category === "miracle" ? "MP" : card.category === "shield" ? "守" : "攻"}
-          {power ?? ""}
-        </div>
-        <div className="gf-large-card-desc">{card.description}</div>
-      </div>
-    </div>
   );
 }
 
