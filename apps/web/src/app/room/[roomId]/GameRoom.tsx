@@ -502,17 +502,6 @@ function BattleBoard({
           name={targetPlayer?.name ?? "未選択"}
           tone="blue"
         />
-        <div className="gf-match-player-list" aria-label="参加プレイヤー">
-          {players.map((p) => (
-            <NamePlate
-              key={p.id}
-              label={p.id === playerId ? "あなた" : "参加者"}
-              name={p.name}
-              tone={p.id === playerId ? "teal" : "blue"}
-              compact
-            />
-          ))}
-        </div>
       </div>
 
       <button
