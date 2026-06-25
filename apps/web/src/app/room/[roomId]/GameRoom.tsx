@@ -478,6 +478,8 @@ function BattleBoard({
   const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
   const leftCard = isDefending ? pending?.card : selectedCard;
   const defensePower = defenseCards.reduce((total, card) => total + getDefensePower(card.id), 0);
+  const canPassDefense = isDefending && defenseCards.length === 0;
+  const canEndTurn = canAct && !gameState.winner && !isDefending;
   const actionLabel = isDefending
     ? defenseCards.length > 0
       ? `${defenseCards.length}枚 防${defensePower}で受ける`
@@ -543,16 +545,21 @@ function BattleBoard({
         >
           {actionLabel}
         </div>
-        <button
-          className="gf-btn gf-end-turn-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEndTurn();
-          }}
-          disabled={!canAct || gameState.winner !== null || isDefending}
-        >
-          許す
-        </button>
+        {(canPassDefense || canEndTurn) && (
+          <button
+            className="gf-btn gf-end-turn-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (canPassDefense) {
+                onPassDefense();
+              } else {
+                onEndTurn();
+              }
+            }}
+          >
+            {canPassDefense ? "許す" : "ターン終了"}
+          </button>
+        )}
       </div>
 
       <div className="gf-target-list">
