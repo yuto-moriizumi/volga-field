@@ -17,12 +17,12 @@ export interface AttributeInfo {
 
 export const ATTRIBUTES: AttributeInfo[] = [
   { key: "none", label: "無属性", icon: "〇", color: "#9aa4a0", bgColor: "#e6ebe9" },
-  { key: "fire", label: "火属性", icon: "♨", color: "#d9473a", bgColor: "#fbe2dc" },
-  { key: "water", label: "水属性", icon: "〰", color: "#3a78d4", bgColor: "#dde9f8" },
-  { key: "wood", label: "木属性", icon: "✿", color: "#d68a3a", bgColor: "#f6e9d2" },
-  { key: "earth", label: "土属性", icon: "⛰", color: "#8a8074", bgColor: "#e8e3da" },
-  { key: "light", label: "光属性", icon: "☀", color: "#e5b431", bgColor: "#fbeec3" },
-  { key: "dark", label: "闇属性", icon: "☾", color: "#8b5cc4", bgColor: "#e6dcf3" },
+  { key: "fire", label: "社会主義", icon: "♨", color: "#d9473a", bgColor: "#fbe2dc" },
+  { key: "water", label: "資本主義", icon: "〰", color: "#3a78d4", bgColor: "#dde9f8" },
+  { key: "wood", label: "共和主義", icon: "✿", color: "#d68a3a", bgColor: "#f6e9d2" },
+  { key: "earth", label: "封建主義", icon: "⛰", color: "#8a8074", bgColor: "#e8e3da" },
+  { key: "light", label: "環境主義", icon: "☀", color: "#e5b431", bgColor: "#fbeec3" },
+  { key: "dark", label: "無政府主義", icon: "☾", color: "#8b5cc4", bgColor: "#e6dcf3" },
 ];
 
 export const ATTR_BY_KEY: Record<AttributeKey, AttributeInfo> =
@@ -305,7 +305,7 @@ export const GUARDIANS: GuardianCard[] = [
     id: "michael",
     name: "ミカエル",
     emoji: "👼",
-    description: "闇属性の攻撃を無効化",
+    description: "無政府主義の攻撃を無効化",
   },
   {
     id: "raphael",
@@ -317,7 +317,7 @@ export const GUARDIANS: GuardianCard[] = [
     id: "uriel",
     name: "ウリエル",
     emoji: "🔥",
-    description: "炎の加護：火属性の攻撃を+2",
+    description: "炎の加護：社会主義の攻撃を+2",
   },
 ];
 
@@ -326,7 +326,7 @@ export const PHENOMENA: PhenomenonCard[] = [
     id: "eclipse",
     name: "日蝕",
     emoji: "🌒",
-    description: "闇属性の攻撃力2倍",
+    description: "無政府主義の攻撃力2倍",
   },
   {
     id: "meteor",
