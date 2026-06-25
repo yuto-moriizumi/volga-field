@@ -112,11 +112,6 @@ export interface AttributeEntry {
   note?: string;
 }
 
-export interface TradeEntry {
-  title: string;
-  description: string;
-}
-
 export interface TextbookCategory {
   id: string;
   title: string;
@@ -143,8 +138,6 @@ export interface TextbookCategory {
     | CalamityCard[];
   /** テキスト形式のエントリ */
   entries?: AttributeEntry[];
-  /** 取引エントリ */
-  trades?: TradeEntry[];
 }
 
 function T(value: string): Token {
@@ -342,21 +335,6 @@ export const PHENOMENA: PhenomenonCard[] = [
   },
 ];
 
-export const TRADES: TradeEntry[] = [
-  {
-    title: "預言者の加護",
-    description: "HP5を捧げて、強力な神器を授かる。",
-  },
-  {
-    title: "豊穣の儀",
-    description: "神器を捧げて、HPを全回復する。",
-  },
-  {
-    title: "闇の取引",
-    description: "HP半分と引き換えに、禁忌の神器を得る。",
-  },
-];
-
 export const CATEGORIES: TextbookCategory[] = [
   {
     id: "zokusei",
@@ -418,7 +396,6 @@ export const CATEGORIES: TextbookCategory[] = [
     id: "torihiki",
     title: "取引",
     variant: "trade-list",
-    trades: TRADES,
   },
   {
     id: "buki",
