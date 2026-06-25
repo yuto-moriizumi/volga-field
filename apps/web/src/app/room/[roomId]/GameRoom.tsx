@@ -27,6 +27,7 @@ export function GameRoom({
     return null;
   });
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
   const [discardMode, setDiscardMode] = useState(false);
@@ -127,6 +128,7 @@ export function GameRoom({
     if (!card) return;
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
     setSelectedCardIdx(nextSelectedIdx);
+    setSelectedCardId(nextSelectedIdx === null ? null : card.id);
     if (nextSelectedIdx === null) {
       setSelectedTargetId(null);
       return;
@@ -146,8 +148,10 @@ export function GameRoom({
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || discardMode || sellMode || selectedCardIdx === null) return;
-    const card = playableCards(me)[selectedCardIdx];
+    if (!me || !canAct || discardMode || sellMode) return;
+    const cardId = selectedCardId;
+    if (!cardId) return;
+    const card = playableCards(me).find((c) => c.id === cardId);
     if (!card) return;
     const definition = findCard(card.id);
     const target = selectedTargetId ?? defaultTargetId(card.id, me.id, opponent?.id ?? null);
@@ -201,6 +205,7 @@ export function GameRoom({
       });
     }
     setSelectedCardIdx(null);
+    setSelectedCardId(null);
     setSelectedTargetId(null);
   }
 
@@ -225,6 +230,7 @@ export function GameRoom({
     setExchangeMode(false);
     setExchangeDraft(null);
     setSelectedCardIdx(null);
+    setSelectedCardId(null);
     setSelectedTargetId(null);
   }
 
@@ -246,6 +252,8 @@ export function GameRoom({
     setExchangeDraft(null);
     setSelectedDiscardIdxes([]);
     setSelectedSellIdxes([]);
+    setSelectedCardIdx(null);
+    setSelectedCardId(null);
     send({ type: "end_turn" });
   }
 
@@ -259,6 +267,7 @@ export function GameRoom({
         setExchangeDraft(null);
         setSelectedSellIdxes([]);
         setSelectedCardIdx(null);
+        setSelectedCardId(null);
         setSelectedTargetId(null);
       } else {
         setSelectedDiscardIdxes([]);
@@ -450,7 +459,7 @@ export function GameRoom({
                 gameState={gameState}
                 playerId={playerId}
                 canAct={canAct}
-                selectedCardIdx={selectedCardIdx}
+                selectedCardId={selectedCardId}
                 selectedTargetId={selectedTargetId}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
@@ -480,7 +489,7 @@ export function GameRoom({
                 me={me}
                 canAct={canAct}
                 isDefending={isDefending}
-                selectedCardIdx={selectedCardIdx}
+                selectedCardId={selectedCardId}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
                 sellMode={sellMode}
@@ -598,7 +607,7 @@ function BattleField({
   gameState,
   playerId,
   canAct,
-  selectedCardIdx,
+  selectedCardId,
   selectedTargetId,
   selectedDefenseIdxes,
   discardMode,
@@ -627,7 +636,7 @@ function BattleField({
   gameState: GameState;
   playerId: string | null;
   canAct: boolean;
-  selectedCardIdx: number | null;
+  selectedCardId: string | null;
   selectedTargetId: string | null;
   selectedDefenseIdxes: number[];
   discardMode: boolean;
@@ -652,7 +661,10 @@ function BattleField({
   onConfirmExchange: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
-  const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
+  const selectedCard =
+    selectedCardId && me
+      ? playableCards(me).find((c) => c.id === selectedCardId) ?? null
+      : null;
   const defenseCards = me
     ? selectedDefenseIdxes
         .map((idx) => me.hand[idx])

@@ -6,6 +6,7 @@ export {
   defendAttack,
   discardCards,
   endTurn,
+  joinParty,
   playCard,
   listPlayers,
   startBuy,

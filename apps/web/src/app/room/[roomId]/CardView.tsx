@@ -22,6 +22,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; ink: string; chip: string }>
   trade: { bg: "#fde7f1", ink: "#7a1d4d", chip: "#c66b8a" },
   colorless: { bg: "#ececec", ink: "#3a3a3a", chip: "#8a8a8a" },
   misc: { bg: "#e3f1f6", ink: "#1b4a5a", chip: "#3a8aa6" },
+  party: { bg: "#fff5d6", ink: "#6b4a13", chip: "#d8a64a" },
 };
 
 export function CardView({
@@ -85,6 +86,7 @@ export function CardView({
 
 function shortPower(card: NonNullable<ReturnType<typeof findCard>>): string {
   if (card.category === "trade") return card.name;
+  if (card.category === "party") return "入党";
   const amount = card.effects.find((effect) => typeof effect.amount === "number")?.amount;
   if (card.category === "shield") return `守${amount ?? ""}`;
   if (card.category === "miracle") return `MP${card.mpCost ?? 0}`;

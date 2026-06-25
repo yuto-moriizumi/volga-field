@@ -13,6 +13,9 @@ import {
   INITIAL_MONEY,
   INITIAL_MP,
   getCardPrice,
+  getPartyId,
+  isPartyCard,
+  PARTY_LABELS,
 } from "./cards.js";
 import { buildDeck, drawCards } from "./deck.js";
 import {
@@ -58,6 +61,7 @@ export function createGame(
       money: INITIAL_MONEY,
       hand: drawn,
       learnedMiracles: [],
+      party: null,
       ready: false,
     });
   }
@@ -263,6 +267,11 @@ export function playCard(
   if (!card) return { ok: false, reason: "unknown card" };
   if (card.category === "trade") {
     return { ok: false, reason: "trade card needs special handler" };
+  }
+  if (card.category === "party") {
+    const joined = joinParty(state, playerId, cardRef);
+    if (!joined.ok) return joined;
+    return { ok: true, state: joined.state, deck };
   }
   if (card.effects.every((effect) => effect.kind === "defense")) {
     return { ok: false, reason: "defense card can only be used while defending" };
@@ -773,6 +782,69 @@ export function confirmBuy(
   return { ok: true, state: newState };
 }
 
+export function joinParty(
+  state: GameState,
+  playerId: PlayerId,
+  cardRef: CardRef,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+
+  const card = findCard(cardRef.id);
+  if (!card) return { ok: false, reason: "unknown card" };
+  if (!isPartyCard(cardRef.id)) return { ok: false, reason: "not a party card" };
+
+  const idx = active.hand.findIndex((c) => c.id === cardRef.id);
+  if (idx === -1) return { ok: false, reason: "card not in hand" };
+
+  const newHand = [...active.hand];
+  newHand.splice(idx, 1);
+
+  const partyId = getPartyId(cardRef.id);
+  const previousParty = active.party;
+  const updatedActive: PlayerState = { ...active, hand: newHand, party: partyId };
+
+  const finalPlayers = state.players.map((p) =>
+    p.id === playerId ? updatedActive : p,
+  );
+  const winner = determineWinner(finalPlayers);
+
+  const message = previousParty
+    ? `${active.name}が${PARTY_LABELS[previousParty]}から${card.name}へ所属を変更した`
+    : `${active.name}が${card.name}に入党した`;
+
+  const logs: BattleLogEntry[] = [
+    {
+      turn: state.turn,
+      playerId,
+      message,
+      kind: "special",
+    },
+  ];
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    phase: "play",
+    pendingAttack: null,
+    winner,
+    log: [...state.log, ...logs],
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: newState.turn,
+      playerId: winner,
+      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+      kind: "system",
+    });
+  }
+
+  return { ok: true, state: newState };
+}
+
 export function sellCards(
   state: GameState,
   playerId: PlayerId,
@@ -958,3 +1030,4 @@ export function exchangeStats(
 
   return { ok: true, state: newState };
 }
+

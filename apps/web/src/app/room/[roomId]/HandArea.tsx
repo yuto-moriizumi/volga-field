@@ -8,7 +8,7 @@ interface HandAreaProps {
   me: PlayerState | null;
   canAct: boolean;
   isDefending: boolean;
-  selectedCardIdx: number | null;
+  selectedCardId: string | null;
   selectedDefenseIdxes: number[];
   discardMode: boolean;
   sellMode: boolean;
@@ -27,7 +27,7 @@ export function HandArea({
   me,
   canAct,
   isDefending,
-  selectedCardIdx,
+  selectedCardId,
   selectedDefenseIdxes,
   discardMode,
   sellMode,
@@ -55,16 +55,16 @@ export function HandArea({
           const canDiscardCard = discardMode && !isLearned && !isTradeCard(card.id);
           const canSellCard =
             sellMode && !isLearned && !isSellCardItself(card.id) && !isBuyCardItself(card.id);
+          const isSelected =
+            card.id === selectedCardId ||
+            selectedDefenseIdxes.includes(idx) ||
+            selectedDiscardIdxes.includes(idx) ||
+            selectedSellIdxes.includes(idx);
           return (
             <CardView
               key={`${card.id}-${idx}`}
               cardRef={card}
-              selected={
-                selectedCardIdx === idx ||
-                selectedDefenseIdxes.includes(idx) ||
-                selectedDiscardIdxes.includes(idx) ||
-                selectedSellIdxes.includes(idx)
-              }
+              selected={isSelected}
               playable={
                 discardMode
                   ? canDiscardCard
@@ -123,7 +123,9 @@ function isDefenseCard(cardId: string): boolean {
 
 function isDefenseOnlyCard(cardId: string): boolean {
   const card = findCard(cardId);
-  return card ? card.effects.every((effect) => effect.kind === "defense") : false;
+  if (!card) return false;
+  if (card.effects.length === 0) return false;
+  return card.effects.every((effect) => effect.kind === "defense");
 }
 
 function isTradeCard(cardId: string): boolean {
