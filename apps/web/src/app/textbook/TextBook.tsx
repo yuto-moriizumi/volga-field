@@ -82,7 +82,7 @@ function CategoryView({
     case "phenomenon-list":
       return <PhenomenonListView cards={category.cards as PhenomenonCard[]} />;
     case "trade-list":
-      return <TradeListView trades={category.trades ?? []} />;
+      return <TradeListView />;
     case "text":
     default:
       return <TextEntriesView entries={category.entries ?? []} />;
@@ -427,14 +427,28 @@ function PhenomenonListView({ cards }: { cards: PhenomenonCard[] }) {
   );
 }
 
-function TradeListView({ trades }: { trades: { title: string; description: string }[] }) {
+function TradeListView() {
+  const trades = [
+    {
+      name: "買う",
+      emoji: "💰",
+      description: "相手の手札から1枚選んで買う",
+    },
+    {
+      name: "売る",
+      emoji: "🏷️",
+      description: "手札を選んで相手に売りつける",
+    },
+  ];
   return (
     <div className="gf-textbook-trade">
       <h2 className="gf-textbook-title">取引</h2>
       <div className="gf-textbook-trade-list">
-        {trades.map((t, i) => (
-          <div key={i} className="gf-textbook-trade-item">
-            <div className="gf-textbook-trade-title">{t.title}</div>
+        {trades.map((t) => (
+          <div key={t.name} className="gf-textbook-trade-item">
+            <div className="gf-textbook-trade-title">
+              {t.emoji} {t.name}
+            </div>
             <div className="gf-textbook-trade-desc">{t.description}</div>
           </div>
         ))}
