@@ -46,6 +46,10 @@ export function spendMp(p: PlayerState, amount: number): PlayerState {
   return { ...p, mp: Math.max(0, p.mp - amount) };
 }
 
+export function recoverMp(p: PlayerState, amount: number): PlayerState {
+  return { ...p, mp: Math.min(p.maxMp, p.mp + amount) };
+}
+
 export function transferMoney(
   source: PlayerState,
   target: PlayerState,

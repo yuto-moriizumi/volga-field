@@ -19,6 +19,7 @@ import {
   chargePlayer,
   damagePlayer,
   healPlayer,
+  recoverMp,
   spendMp,
   transferMoney,
 } from "./player.js";
@@ -221,6 +222,22 @@ function applyEffect(
           playerId: actorId,
           message: `${target.name}が${healed}回復 (${cardName})`,
           kind: "heal",
+        });
+      }
+      if (effect.target === "self") return { self: updated, opponent, log: logs };
+      return { self, opponent: updated, log: logs };
+    }
+    case "mpRecover": {
+      const target = effect.target === "self" ? self : opponent;
+      const before = target.mp;
+      const updated = recoverMp(target, effect.amount ?? 0);
+      const recovered = updated.mp - before;
+      if (recovered > 0) {
+        logs.push({
+          turn,
+          playerId: actorId,
+          message: `${target.name}のMPが${recovered}回復 (${cardName})`,
+          kind: "mpRecover",
         });
       }
       if (effect.target === "self") return { self: updated, opponent, log: logs };

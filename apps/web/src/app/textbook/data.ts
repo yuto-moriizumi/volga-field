@@ -188,6 +188,10 @@ export const ITEMS: ItemCard[] = [
   { id: "antidote", name: "解毒草", emoji: "🍀", price: 2, description: "病気を取り除く" },
   { id: "bomb", name: "爆弾", emoji: "💣", price: 4, description: "相手-4" },
   { id: "poison", name: "毒薬", emoji: "☠️", price: 3, description: "相手-3" },
+  { id: "local_campaign", name: "地方遊説", emoji: "🎤", price: 3, description: "MP+1" },
+  { id: "supporter_rally", name: "支持者集会", emoji: "📣", price: 5, description: "MP+2" },
+  { id: "national_campaign", name: "全国遊説", emoji: "🗣️", price: 7, description: "MP+3" },
+  { id: "un_speech", name: "国連総会演説", emoji: "🌐", price: 10, description: "MP+5" },
 ];
 
 export const MIRACLES: MiracleCard[] = [
