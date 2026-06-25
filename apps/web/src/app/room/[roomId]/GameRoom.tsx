@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { findCard } from "@volga/game-core";
+import { findCard, INITIAL_HP, INITIAL_MP } from "@volga/game-core";
 import type { GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -408,8 +408,8 @@ function OpponentArea({ opponents }: { opponents: PlayerState[] }) {
             </div>
             <div style={{ fontSize: 20, fontWeight: 900 }}>{opponent.name}</div>
           </div>
-          <HpBar hp={opponent.hp} maxHp={opponent.maxHp} />
-          <MpBar mp={opponent.mp} maxMp={opponent.maxMp} />
+          <HpBar hp={opponent.hp} />
+          <MpBar mp={opponent.mp} />
           <HandCount count={opponent.hand.length} />
         </div>
       ))}
@@ -466,8 +466,8 @@ function MyArea({
           </div>
           <div style={{ fontSize: 20, fontWeight: 900 }}>{me.name}</div>
         </div>
-        <HpBar hp={me.hp} maxHp={me.maxHp} self />
-        <MpBar mp={me.mp} maxMp={me.maxMp} />
+        <HpBar hp={me.hp} self />
+        <MpBar mp={me.mp} />
         <HandCount count={me.hand.length} />
       </div>
       <div
@@ -725,14 +725,12 @@ function playableCards(player: PlayerState): { id: string }[] {
 
 function HpBar({
   hp,
-  maxHp,
   self,
 }: {
   hp: number;
-  maxHp: number;
   self?: boolean;
 }) {
-  const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
+  const pct = Math.max(0, Math.min(100, (hp / INITIAL_HP) * 100));
   return (
     <div style={{ flex: "1 1 220px", minWidth: 200 }}>
       <div
@@ -746,9 +744,7 @@ function HpBar({
         }}
       >
         <span>HP</span>
-        <span>
-          {hp}/{maxHp}
-        </span>
+        <span>{hp}</span>
       </div>
       <div
         style={{
@@ -777,12 +773,10 @@ function HpBar({
 
 function MpBar({
   mp,
-  maxMp,
 }: {
   mp: number;
-  maxMp: number;
 }) {
-  const pct = Math.max(0, Math.min(100, (mp / maxMp) * 100));
+  const pct = Math.max(0, Math.min(100, (mp / INITIAL_MP) * 100));
   return (
     <div style={{ flex: "1 1 160px", minWidth: 150 }}>
       <div
@@ -796,9 +790,7 @@ function MpBar({
         }}
       >
         <span>MP</span>
-        <span>
-          {mp}/{maxMp}
-        </span>
+        <span>{mp}</span>
       </div>
       <div
         style={{
