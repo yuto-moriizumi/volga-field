@@ -1,5 +1,6 @@
 import type { WebSocket } from "ws";
 import type {
+  CardRef,
   ClientMessage,
   DoomsdayTurn,
   PlayerId,
@@ -15,6 +16,7 @@ import {
   createGame,
   defendAttack,
   endTurn,
+  findCard,
   playCard,
 } from "@volga/game-core";
 import {
@@ -109,6 +111,41 @@ function activePlayer(room: Room): RoomPlayer | null {
   return room.players.find((p) => p.id === activeState.id) ?? null;
 }
 
+function pickAiDefenseCard(room: Room, aiId: PlayerId): CardRef | undefined {
+  const aiState = room.gameState?.players.find((p) => p.id === aiId);
+  const card = aiState?.hand.find((cardRef) =>
+    findCard(cardRef.id)?.effects.some((effect) => effect.kind === "defense"),
+  );
+  return card ? { id: card.id } : undefined;
+}
+
+function finishActiveAiTurn(room: Room): boolean {
+  const ai = activePlayer(room);
+  if (!ai?.ai || !room.gameState || room.gameState.winner || room.gameState.phase === "defense") {
+    return false;
+  }
+
+  const ended = endTurn(room.gameState, ai.id, room.deck);
+  if (!ended.ok) return false;
+  room.gameState = ended.state;
+  room.deck = ended.deck;
+  broadcastStateToAll(room);
+  return true;
+}
+
+function resolveAiDefense(room: Room): boolean {
+  const pending = room.gameState?.pendingAttack;
+  if (!pending || room.gameState?.phase !== "defense") return false;
+  const defender = room.players.find((p) => p.id === pending.defenderId);
+  if (!defender?.ai) return false;
+
+  const defended = defendAttack(room.gameState, defender.id, pickAiDefenseCard(room, defender.id));
+  if (!defended.ok) return false;
+  room.gameState = defended.state;
+  broadcastStateToAll(room);
+  return true;
+}
+
 function runAiTurn(room: Room): void {
   for (let guard = 0; guard < room.players.length * 2; guard += 1) {
     const ai = activePlayer(room);
@@ -126,12 +163,9 @@ function runAiTurn(room: Room): void {
       }
     }
 
+    resolveAiDefense(room);
     if (!room.gameState || room.gameState.winner) return;
-    const ended = endTurn(room.gameState, ai.id, room.deck);
-    if (!ended.ok) return;
-    room.gameState = ended.state;
-    room.deck = ended.deck;
-    broadcastStateToAll(room);
+    if (!finishActiveAiTurn(room)) return;
   }
 }
 
@@ -393,6 +427,15 @@ function handlePlayCard(
     playerId: client.id,
     cardRef: { id: cardId },
   });
+  if (resolveAiDefense(room) && room.gameState && !room.gameState.winner) {
+    const ended = endTurn(room.gameState, client.id, room.deck);
+    if (ended.ok) {
+      room.gameState = ended.state;
+      room.deck = ended.deck;
+      broadcastStateToAll(room);
+      runAiTurn(room);
+    }
+  }
 }
 
 function handleDefend(client: Client, cardId?: string): void {
@@ -410,6 +453,9 @@ function handleDefend(client: Client, cardId?: string): void {
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
+  if (finishActiveAiTurn(room)) {
+    runAiTurn(room);
+  }
 }
 
 function handleEndTurn(client: Client): void {
