@@ -8,9 +8,20 @@ import type {
 } from "@volga/shared";
 import { findCard } from "./cards.js";
 import type { CardEffect } from "./cards.js";
-import { MAX_LEARNED_MIRACLES, INITIAL_MP } from "./cards.js";
+import {
+  MAX_LEARNED_MIRACLES,
+  INITIAL_MONEY,
+  INITIAL_MP,
+  getCardPrice,
+} from "./cards.js";
 import { buildDeck, drawCards } from "./deck.js";
-import { damagePlayer, healPlayer, spendMp } from "./player.js";
+import {
+  chargePlayer,
+  damagePlayer,
+  healPlayer,
+  spendMp,
+  transferMoney,
+} from "./player.js";
 
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
@@ -43,6 +54,7 @@ export function createGame(
       maxHp: INITIAL_HP,
       mp: INITIAL_MP,
       maxMp: INITIAL_MP,
+      money: INITIAL_MONEY,
       hand: drawn,
       learnedMiracles: [],
       ready: false,
@@ -59,6 +71,8 @@ export function createGame(
     activePlayerIndex: 0,
     phase: "play",
     pendingAttack: null,
+    pendingBuy: null,
+    pendingSell: null,
     log: [
       {
         turn: 1,
@@ -229,6 +243,9 @@ export function playCard(
   if (state.phase === "defense") return { ok: false, reason: "defense pending" };
   const card = findCard(cardRef.id);
   if (!card) return { ok: false, reason: "unknown card" };
+  if (card.category === "trade") {
+    return { ok: false, reason: "trade card needs special handler" };
+  }
   if (card.effects.every((effect) => effect.kind === "defense")) {
     return { ok: false, reason: "defense card can only be used while defending" };
   }
@@ -601,4 +618,241 @@ export function endTurn(
 
 export function listPlayers(state: GameState): PlayerState[] {
   return state.players;
+}
+
+export function startBuy(
+  state: GameState,
+  playerId: PlayerId,
+  targetPlayerId: PlayerId,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+  if (state.pendingBuy) return { ok: false, reason: "buy already pending" };
+  if (state.pendingSell) return { ok: false, reason: "sell already pending" };
+
+  const buyIdx = active.hand.findIndex((c) => c.id === "buy");
+  if (buyIdx === -1) return { ok: false, reason: "buy card not in hand" };
+
+  const target = state.players.find((p) => p.id === targetPlayerId);
+  if (!target) return { ok: false, reason: "target not found" };
+  if (target.id === playerId) return { ok: false, reason: "cannot buy from self" };
+  if (target.hand.length === 0) return { ok: false, reason: "target has no cards" };
+
+  const tradeableCards = target.hand.filter((c) => c.id !== "buy" && c.id !== "sell");
+  const pool = tradeableCards.length > 0 ? tradeableCards : target.hand;
+  const pickIdx = Math.floor(Math.random() * pool.length);
+  const pickedCard = pool[pickIdx]!;
+  const price = getCardPrice(pickedCard.id);
+
+  const newHand = [...active.hand];
+  newHand.splice(buyIdx, 1);
+
+  const updatedPlayers = state.players.map((p) =>
+    p.id === playerId ? { ...p, hand: newHand } : p,
+  );
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players: updatedPlayers,
+      pendingBuy: {
+        sourceId: playerId,
+        targetId: target.id,
+        card: { id: pickedCard.id },
+        cardName: findCard(pickedCard.id)?.name ?? pickedCard.id,
+        price,
+      },
+      log: [
+        ...state.log,
+        {
+          turn: state.turn,
+          playerId,
+          message: `${active.name}が買う札を使った → ${target.name}の手札から${findCard(pickedCard.id)?.name ?? pickedCard.id}が提示された`,
+          kind: "trade",
+        },
+      ],
+    },
+  };
+}
+
+export function confirmBuy(
+  state: GameState,
+  playerId: PlayerId,
+  accept: boolean,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const pending = state.pendingBuy;
+  if (!pending) return { ok: false, reason: "no pending buy" };
+  if (pending.sourceId !== playerId) return { ok: false, reason: "not your buy" };
+
+  let source = state.players.find((p) => p.id === pending.sourceId);
+  let target = state.players.find((p) => p.id === pending.targetId);
+  if (!source || !target) return { ok: false, reason: "player not found" };
+
+  const logs: BattleLogEntry[] = [];
+  const finalPlayers: PlayerState[] = [];
+
+  if (accept && source.money >= pending.price) {
+    const sourceTargetIdx = target.hand.findIndex((c) => c.id === pending.card.id);
+    if (sourceTargetIdx === -1) {
+      logs.push({
+        turn: state.turn,
+        playerId,
+        message: `${target.name}の手札に${pending.cardName}が見つからなかった`,
+        kind: "trade",
+      });
+    } else {
+      const newTargetHand = [...target.hand];
+      newTargetHand.splice(sourceTargetIdx, 1);
+      target = { ...target, hand: newTargetHand };
+      const sourceWithCard = { ...source, hand: [...source.hand, { id: pending.card.id }] };
+      const transfer = transferMoney(sourceWithCard, target, pending.price);
+      source = transfer.source;
+      target = transfer.target;
+      logs.push({
+        turn: state.turn,
+        playerId,
+        message: `${source.name}が${pending.cardName}を${pending.price}円で買った`,
+        kind: "trade",
+      });
+    }
+  } else {
+    logs.push({
+      turn: state.turn,
+      playerId,
+      message: `${source.name}は${pending.cardName}を買わなかった`,
+      kind: "trade",
+    });
+  }
+
+  for (const p of state.players) {
+    if (p.id === source.id) finalPlayers.push(source);
+    else if (p.id === target.id) finalPlayers.push(target);
+    else finalPlayers.push(p);
+  }
+
+  const winner = determineWinner(finalPlayers);
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    pendingBuy: null,
+    winner,
+    log: [...state.log, ...logs],
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: newState.turn,
+      playerId: winner,
+      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+      kind: "system",
+    });
+  }
+
+  return { ok: true, state: newState };
+}
+
+export function sellCards(
+  state: GameState,
+  playerId: PlayerId,
+  cardRefs: CardRef[],
+  targetPlayerId: PlayerId,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  if (state.phase === "defense") return { ok: false, reason: "defense pending" };
+  if (state.pendingBuy) return { ok: false, reason: "buy pending" };
+  if (state.pendingSell) return { ok: false, reason: "sell pending" };
+  if (cardRefs.length === 0) return { ok: false, reason: "no cards selected" };
+
+  const sellIdx = active.hand.findIndex((c) => c.id === "sell");
+  if (sellIdx === -1) return { ok: false, reason: "sell card not in hand" };
+
+  const target = state.players.find((p) => p.id === targetPlayerId);
+  if (!target) return { ok: false, reason: "target not found" };
+  if (target.id === playerId) return { ok: false, reason: "cannot sell to self" };
+
+  const nextHand = [...active.hand];
+  const sellable: CardRef[] = [];
+  const sellableNames: string[] = [];
+  for (const cardRef of cardRefs) {
+    if (cardRef.id === "sell") return { ok: false, reason: "cannot sell the sell card" };
+    const idx = nextHand.findIndex((c) => c.id === cardRef.id);
+    if (idx === -1) return { ok: false, reason: "card not in hand" };
+    nextHand.splice(idx, 1);
+    sellable.push({ id: cardRef.id });
+    sellableNames.push(findCard(cardRef.id)?.name ?? cardRef.id);
+  }
+  nextHand.splice(sellIdx, 1);
+
+  const totalPrice = sellable.reduce((sum, c) => sum + getCardPrice(c.id), 0);
+
+  const charge = chargePlayer(target, totalPrice);
+  const updatedTarget: PlayerState = {
+    ...charge.player,
+    hand: [...charge.player.hand, ...sellable],
+  };
+
+  let updatedSeller: PlayerState = {
+    ...active,
+    hand: nextHand,
+    money: active.money + totalPrice,
+  };
+
+  const logs: BattleLogEntry[] = [
+    {
+      turn: state.turn,
+      playerId,
+      message: `${active.name}が${target.name}へ${sellableNames.join("、")}を${totalPrice}円で売りつけた`,
+      kind: "trade",
+    },
+  ];
+
+  if (charge.moneyPaid < totalPrice) {
+    const deficit = totalPrice - charge.moneyPaid;
+    const mpPart = charge.mpPaid > 0 ? `MP-${charge.mpPaid}` : "";
+    const hpPart = charge.hpPaid > 0 ? `HP-${charge.hpPaid}` : "";
+    const detail = [mpPart, hpPart].filter(Boolean).join(" / ");
+    if (detail) {
+      logs.push({
+        turn: state.turn,
+        playerId: target.id,
+        message: `${target.name}は代金の不足分${deficit}円を${detail}で支払った`,
+        kind: "trade",
+      });
+    }
+  }
+
+  const finalPlayers = state.players.map((p) => {
+    if (p.id === playerId) return updatedSeller;
+    if (p.id === target.id) return updatedTarget;
+    return p;
+  });
+
+  const winner = determineWinner(finalPlayers);
+
+  const newState: GameState = {
+    ...state,
+    players: finalPlayers,
+    pendingSell: null,
+    winner,
+    log: [...state.log, ...logs],
+  };
+
+  if (winner) {
+    newState.log.push({
+      turn: newState.turn,
+      playerId: winner,
+      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+      kind: "system",
+    });
+  }
+
+  void updatedSeller;
+
+  return { ok: true, state: newState };
 }

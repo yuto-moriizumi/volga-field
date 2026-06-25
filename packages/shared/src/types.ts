@@ -2,7 +2,13 @@ export type PlayerId = string;
 export type RoomId = string;
 export type CardId = string;
 
-export type CardCategory = "weapon" | "shield" | "potion" | "miracle" | "special";
+export type CardCategory =
+  | "weapon"
+  | "shield"
+  | "potion"
+  | "miracle"
+  | "special"
+  | "trade";
 
 export interface CardRef {
   id: CardId;
@@ -16,6 +22,7 @@ export interface PlayerState {
   maxHp: number;
   mp: number;
   maxMp: number;
+  money: number;
   hand: CardRef[];
   learnedMiracles: CardRef[];
   ready: boolean;
@@ -33,11 +40,27 @@ export interface PendingAttack {
   amount: number;
 }
 
+export interface PendingBuy {
+  sourceId: PlayerId;
+  targetId: PlayerId;
+  card: CardRef;
+  cardName: string;
+  price: number;
+}
+
+export interface PendingSell {
+  sourceId: PlayerId;
+  targetId: PlayerId;
+  cards: CardRef[];
+  cardNames: string[];
+  price: number;
+}
+
 export interface BattleLogEntry {
   turn: number;
   playerId: PlayerId;
   message: string;
-  kind: "attack" | "heal" | "defense" | "miracle" | "system" | "special";
+  kind: "attack" | "heal" | "defense" | "miracle" | "system" | "special" | "trade";
   damage?: number;
 }
 
@@ -52,6 +75,8 @@ export interface GameState {
   activePlayerIndex: number;
   phase: TurnPhase;
   pendingAttack: PendingAttack | null;
+  pendingBuy: PendingBuy | null;
+  pendingSell: PendingSell | null;
   log: BattleLogEntry[];
   winner: PlayerId | null;
   startedAt: number;

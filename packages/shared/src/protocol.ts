@@ -24,6 +24,9 @@ export type ClientMessage =
   | { type: "play_card"; cardRef: CardRef; targetPlayerId?: PlayerId }
   | { type: "defend"; cardRef?: CardRef; cardRefs?: CardRef[] }
   | { type: "discard_cards"; cardRefs: CardRef[] }
+  | { type: "buy_card"; cardRef: CardRef; targetPlayerId: PlayerId }
+  | { type: "confirm_buy"; accept: boolean }
+  | { type: "sell_cards"; cardRefs: CardRef[]; targetPlayerId: PlayerId }
   | { type: "end_turn" }
   | { type: "list_rooms" }
   | { type: "ping" };
@@ -51,6 +54,9 @@ export const CLIENT_MESSAGE_TYPES: ClientMessage["type"][] = [
   "play_card",
   "defend",
   "discard_cards",
+  "buy_card",
+  "confirm_buy",
+  "sell_cards",
   "end_turn",
   "list_rooms",
   "ping",

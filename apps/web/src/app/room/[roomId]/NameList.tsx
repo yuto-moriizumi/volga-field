@@ -33,7 +33,7 @@ export function NameList({
           <span className="gf-target-dot" />
           <span className="gf-target-name">{p.name}</span>
           <span className="gf-target-stats">
-            <b>HP</b> {p.hp} <b>MP</b> {p.mp} <b>￥</b> 20
+            <b>HP</b> {p.hp} <b>MP</b> {p.mp} <b>￥</b> {p.money}
           </span>
         </button>
       ))}

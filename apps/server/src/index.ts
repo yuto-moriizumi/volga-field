@@ -13,12 +13,15 @@ import {
   type GameState,
 } from "@volga/shared";
 import {
+  confirmBuy,
   createGame,
   defendAttack,
   discardCards,
   endTurn,
   findCard,
   playCard,
+  sellCards,
+  startBuy,
 } from "@volga/game-core";
 import {
   createRoom,
@@ -169,7 +172,7 @@ function runAiTurn(room: Room): void {
 
     const aiState = room.gameState.players.find((p) => p.id === ai.id);
     const target = room.gameState.players.find((p) => p.id !== ai.id && p.hp > 0);
-    const card = aiState?.hand[0];
+    const card = aiState?.hand.find((c) => findCard(c.id)?.category !== "trade");
     if (card) {
       const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id, room.deck);
       if (played.ok) {
@@ -297,6 +300,7 @@ function placeholderState(
       maxHp: 20,
       mp: 10,
       maxMp: 10,
+      money: 20,
       hand: [],
       learnedMiracles: [],
       ready: p.ready,
@@ -309,6 +313,8 @@ function placeholderState(
     activePlayerIndex: 0,
     phase: "draw",
     pendingAttack: null,
+    pendingBuy: null,
+    pendingSell: null,
     log: [
       {
         turn: 0,
@@ -383,6 +389,7 @@ function handleJoinRoom(client: Client, roomId: RoomId, name: string): void {
       maxHp: 20,
       mp: 10,
       maxMp: 10,
+      money: 20,
       hand: [],
       learnedMiracles: [],
       ready: false,
@@ -491,6 +498,62 @@ function handleDiscardCards(client: Client, cardIds: string[] = []): void {
   broadcastStateToAll(room);
 }
 
+function handleBuyCard(
+  client: Client,
+  cardId: string,
+  targetPlayerId: PlayerId,
+): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  if (cardId !== "buy") {
+    send(client.ws, { type: "error", message: "buy card expected" });
+    return;
+  }
+  const result = startBuy(room.gameState, client.id, targetPlayerId);
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
+function handleConfirmBuy(client: Client, accept: boolean): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = confirmBuy(room.gameState, client.id, accept);
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
+function handleSellCards(
+  client: Client,
+  cardIds: string[],
+  targetPlayerId: PlayerId,
+): void {
+  if (!client.roomId) return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = sellCards(
+    room.gameState,
+    client.id,
+    cardIds.map((id) => ({ id })),
+    targetPlayerId,
+  );
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
 function handleEndTurn(client: Client): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
@@ -559,6 +622,19 @@ function dispatch(client: Client, msg: ClientMessage): void {
       break;
     case "discard_cards":
       handleDiscardCards(client, msg.cardRefs.map((cardRef) => cardRef.id));
+      break;
+    case "buy_card":
+      handleBuyCard(client, msg.cardRef.id, msg.targetPlayerId);
+      break;
+    case "confirm_buy":
+      handleConfirmBuy(client, msg.accept);
+      break;
+    case "sell_cards":
+      handleSellCards(
+        client,
+        msg.cardRefs.map((cardRef) => cardRef.id),
+        msg.targetPlayerId,
+      );
       break;
     case "end_turn":
       handleEndTurn(client);

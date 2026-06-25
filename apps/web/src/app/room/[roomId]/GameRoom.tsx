@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { findCard } from "@volga/game-core";
+import { findCard, getCardPrice } from "@volga/game-core";
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -30,6 +30,8 @@ export function GameRoom({
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
   const [discardMode, setDiscardMode] = useState(false);
+  const [sellMode, setSellMode] = useState(false);
+  const [selectedSellIdxes, setSelectedSellIdxes] = useState<number[]>([]);
   const [selectedDiscardIdxes, setSelectedDiscardIdxes] = useState<number[]>([]);
   const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
   const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
@@ -110,30 +112,83 @@ export function GameRoom({
   useEffect(() => {
     if (canAct) return;
     setDiscardMode(false);
+    setSellMode(false);
     setSelectedDiscardIdxes([]);
+    setSelectedSellIdxes([]);
   }, [canAct]);
 
   function playCard(idx: number) {
-    if (!me || !canAct || discardMode) return;
+    if (!me || !canAct || discardMode || sellMode) return;
     const card = playableCards(me)[idx];
     if (!card) return;
     const nextSelectedIdx = selectedCardIdx === idx ? null : idx;
     setSelectedCardIdx(nextSelectedIdx);
-    setSelectedTargetId(
-      nextSelectedIdx !== null ? (defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null) : null,
-    );
+    if (nextSelectedIdx === null) {
+      setSelectedTargetId(null);
+      return;
+    }
+    const isTrade = findCard(card.id)?.category === "trade";
+    if (isTrade) {
+      setSelectedTargetId(opponent?.id ?? null);
+    } else {
+      setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
+    }
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || discardMode || selectedCardIdx === null) return;
+    if (!me || !canAct || discardMode || sellMode || selectedCardIdx === null) return;
     const card = playableCards(me)[selectedCardIdx];
     if (!card) return;
-    send({
-      type: "play_card",
-      cardRef: { id: card.id },
-      targetPlayerId: selectedTargetId ?? defaultTargetId(card.id, me.id, opponent?.id ?? null),
-    });
+    const definition = findCard(card.id);
+    const target = selectedTargetId ?? defaultTargetId(card.id, me.id, opponent?.id ?? null);
+    if (definition?.category === "trade") {
+      if (!target) return;
+      if (card.id === "buy") {
+        send({
+          type: "buy_card",
+          cardRef: { id: card.id },
+          targetPlayerId: target,
+        });
+      } else if (card.id === "sell") {
+        if (sellMode && selectedSellIdxes.length > 0) {
+          const cardRefs = selectedSellIdxes
+            .map((i) => me.hand[i])
+            .filter((c): c is { id: string } => Boolean(c) && c.id !== "sell")
+            .map((c) => ({ id: c.id }));
+          if (cardRefs.length > 0) {
+            send({
+              type: "sell_cards",
+              cardRefs,
+              targetPlayerId: target,
+            });
+          }
+          setSellMode(false);
+          setSelectedSellIdxes([]);
+        } else {
+          setSellMode(true);
+          setSelectedSellIdxes([]);
+        }
+      }
+    } else if (sellMode) {
+      if (card.id !== "sell" && target) {
+        const cardRefs = [{ id: card.id }];
+        send({
+          type: "sell_cards",
+          cardRefs,
+          targetPlayerId: target,
+        });
+        setSellMode(false);
+        setSelectedSellIdxes([]);
+      }
+    } else {
+      send({
+        type: "play_card",
+        cardRef: { id: card.id },
+        targetPlayerId: target,
+      });
+    }
     setSelectedCardIdx(null);
+    setSelectedTargetId(null);
   }
 
   function defend(cardIdxes: number[] = []) {
@@ -149,7 +204,9 @@ export function GameRoom({
   function endTurn() {
     if (!canAct) return;
     setDiscardMode(false);
+    setSellMode(false);
     setSelectedDiscardIdxes([]);
+    setSelectedSellIdxes([]);
     send({ type: "end_turn" });
   }
 
@@ -158,10 +215,26 @@ export function GameRoom({
     setDiscardMode((current) => {
       const next = !current;
       if (next) {
+        setSellMode(false);
+        setSelectedSellIdxes([]);
         setSelectedCardIdx(null);
         setSelectedTargetId(null);
       } else {
         setSelectedDiscardIdxes([]);
+      }
+      return next;
+    });
+  }
+
+  function toggleSellMode() {
+    if (!canAct) return;
+    setSellMode((current) => {
+      const next = !current;
+      if (next) {
+        setDiscardMode(false);
+        setSelectedDiscardIdxes([]);
+      } else {
+        setSelectedSellIdxes([]);
       }
       return next;
     });
@@ -176,6 +249,18 @@ export function GameRoom({
     send({ type: "discard_cards", cardRefs });
     setDiscardMode(false);
     setSelectedDiscardIdxes([]);
+  }
+
+  function acceptBuy() {
+    if (!me || !gameState?.pendingBuy) return;
+    if (gameState.pendingBuy.sourceId !== playerId) return;
+    send({ type: "confirm_buy", accept: true });
+  }
+
+  function declineBuy() {
+    if (!me || !gameState?.pendingBuy) return;
+    if (gameState.pendingBuy.sourceId !== playerId) return;
+    send({ type: "confirm_buy", accept: false });
   }
 
   function leaveRoom() {
@@ -264,6 +349,10 @@ export function GameRoom({
     gameState.players[0]!.hand.length > 0;
   const displayedActionTurn = gameState.actionTurn ?? gameState.turn;
   const meReady = me?.ready ?? false;
+  const pendingBuy = gameState.pendingBuy;
+  const pendingSell = gameState.pendingSell;
+  const myPendingBuy = pendingBuy && pendingBuy.sourceId === playerId ? pendingBuy : null;
+  const canAffordBuy = myPendingBuy ? (me?.money ?? 0) >= myPendingBuy.price : false;
 
   return (
     <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
@@ -322,10 +411,18 @@ export function GameRoom({
                 selectedTargetId={selectedTargetId}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
+                sellMode={sellMode}
                 selectedDiscardCount={selectedDiscardIdxes.length}
+                selectedSellCount={selectedSellIdxes.length}
+                sellTotalPrice={sellTotalPrice(me, selectedSellIdxes)}
+                pendingBuy={myPendingBuy}
+                pendingSell={pendingSell}
+                canAffordBuy={canAffordBuy}
                 hitFlash={hitFlash}
                 onSelectTarget={setSelectedTargetId}
                 onExecute={executeSelectedCard}
+                onAcceptBuy={acceptBuy}
+                onDeclineBuy={declineBuy}
                 onPassDefense={() => defend(selectedDefenseIdxes)}
                 onEndTurn={endTurn}
                 onConfirmDiscard={confirmDiscard}
@@ -339,6 +436,8 @@ export function GameRoom({
                 selectedCardIdx={selectedCardIdx}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
+                sellMode={sellMode}
+                selectedSellIdxes={selectedSellIdxes}
                 selectedDiscardIdxes={selectedDiscardIdxes}
                 onPlayCard={playCard}
                 onHoverCard={setLastHoveredCard}
@@ -356,7 +455,15 @@ export function GameRoom({
                       : [...current, idx],
                   )
                 }
+                onSelectSell={(idx) =>
+                  setSelectedSellIdxes((current) =>
+                    current.includes(idx)
+                      ? current.filter((selectedIdx) => selectedIdx !== idx)
+                      : [...current, idx],
+                  )
+                }
                 onToggleDiscardMode={toggleDiscardMode}
+                onToggleSellMode={toggleSellMode}
               />
               <InfoArea
                 hoveredCard={lastHoveredCard}
@@ -376,6 +483,7 @@ export function GameRoom({
           </span>
         )}
         <span className="gf-tag">山札 {gameState.deckSize}</span>
+        {me && <span className="gf-tag">￥{me.money}</span>}
       </BottomBar>
 
       {gameState.winner && (
@@ -447,10 +555,18 @@ function BattleField({
   selectedTargetId,
   selectedDefenseIdxes,
   discardMode,
+  sellMode,
   selectedDiscardCount,
+  selectedSellCount,
+  sellTotalPrice,
+  pendingBuy,
+  pendingSell,
+  canAffordBuy,
   hitFlash,
   onSelectTarget,
   onExecute,
+  onAcceptBuy,
+  onDeclineBuy,
   onPassDefense,
   onEndTurn,
   onConfirmDiscard,
@@ -464,10 +580,18 @@ function BattleField({
   selectedTargetId: string | null;
   selectedDefenseIdxes: number[];
   discardMode: boolean;
+  sellMode: boolean;
   selectedDiscardCount: number;
+  selectedSellCount: number;
+  sellTotalPrice: number;
+  pendingBuy: GameState["pendingBuy"];
+  pendingSell: GameState["pendingSell"];
+  canAffordBuy: boolean;
   hitFlash: { amount: number; key: number } | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
+  onAcceptBuy: () => void;
+  onDeclineBuy: () => void;
   onPassDefense: () => void;
   onEndTurn: () => void;
   onConfirmDiscard: () => void;
@@ -481,7 +605,11 @@ function BattleField({
     : [];
   const pending = gameState.pendingAttack;
   const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
-  const targetPlayerId = pending?.defenderId ?? selectedTargetId;
+  const targetPlayerId =
+    pending?.defenderId ??
+    pendingBuy?.targetId ??
+    pendingSell?.targetId ??
+    selectedTargetId;
   const targetPlayer = targetPlayerId
     ? players.find((p) => p.id === targetPlayerId)
     : null;
@@ -489,10 +617,16 @@ function BattleField({
   const selectedCards = isDefending ? defenseCards : selectedCard ? [selectedCard] : [];
   const canPassDefense = isDefending && defenseCards.length === 0;
   const canEndTurn = canAct && !gameState.winner && !isDefending;
-  const canSelectTarget = canAct && !isDefending && !discardMode;
+  const canSelectTarget =
+    canAct && !isDefending && !discardMode && !pendingBuy && !pendingSell;
   const canConfirmSelection =
     (isDefending && defenseCards.length > 0) ||
-    (!isDefending && Boolean(selectedCard) && canAct && !discardMode) ||
+    (!isDefending &&
+      Boolean(selectedCard) &&
+      canAct &&
+      !discardMode &&
+      !pendingBuy &&
+      !pendingSell) ||
     (discardMode && selectedDiscardCount > 0);
   const canConfirmEmpty =
     canPassDefense || (canEndTurn && selectedCards.length === 0 && !discardMode);
@@ -505,9 +639,13 @@ function BattleField({
       ? selectedDiscardCount > 0
         ? `${selectedDiscardCount}枚 捨てる`
         : "捨てるカードを選択"
-      : selectedCards.length === 0
-        ? "ターン終了"
-        : "確定";
+      : sellMode
+        ? selectedSellCount > 0
+          ? `${selectedSellCount}枚 ￥${sellTotalPrice} で売る`
+          : "売るカードを選択"
+        : selectedCards.length === 0
+          ? "ターン終了"
+          : "確定";
 
   function confirmAction() {
     if (gameState.winner) return;
@@ -534,14 +672,21 @@ function BattleField({
         activePlayer={activePlayer}
         selectedCards={selectedCards}
         discardMode={discardMode}
+        sellMode={sellMode}
         confirmLabel={confirmLabel}
         confirmDisabled={confirmDisabled}
         canEndTurn={canEndTurn}
         canPassDefense={canPassDefense}
+        pendingBuy={pendingBuy}
+        canAffordPendingBuy={canAffordBuy}
         onConfirm={confirmAction}
+        onAcceptBuy={onAcceptBuy}
+        onDeclineBuy={onDeclineBuy}
       />
       <TargetArea
         pending={pending}
+        pendingBuy={pendingBuy}
+        pendingSell={pendingSell}
         targetPlayer={targetPlayer ?? null}
         hitFlash={hitFlash}
       />
@@ -569,11 +714,25 @@ function defaultTargetId(
   selfId: string,
   opponentId: string | null,
 ): string | undefined {
+  const card = findCard(cardId);
+  if (card?.category === "trade") return opponentId ?? undefined;
   return isAttackCard(cardId) ? (opponentId ?? undefined) : selfId;
 }
 
 function getDefensePower(cardId: string): number {
   return findCard(cardId)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0;
+}
+
+function sellTotalPrice(
+  me: PlayerState | null,
+  indexes: number[],
+): number {
+  if (!me) return 0;
+  return indexes.reduce((total, idx) => {
+    const card = me.hand[idx];
+    if (!card || card.id === "sell") return total;
+    return total + getCardPrice(card.id);
+  }, 0);
 }
 
 function playableCards(player: PlayerState): { id: string }[] {

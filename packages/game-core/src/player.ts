@@ -1,5 +1,5 @@
 import type { PlayerId, PlayerState } from "@volga/shared";
-import { HAND_SIZE, INITIAL_HP, INITIAL_MP } from "./cards.js";
+import { HAND_SIZE, INITIAL_HP, INITIAL_MONEY, INITIAL_MP } from "./cards.js";
 
 export function createPlayer(
   id: PlayerId,
@@ -13,6 +13,7 @@ export function createPlayer(
     maxHp: INITIAL_HP,
     mp: INITIAL_MP,
     maxMp: INITIAL_MP,
+    money: INITIAL_MONEY,
     hand: startingHand,
     learnedMiracles: [],
     ready: false,
@@ -43,4 +44,46 @@ export function healPlayer(p: PlayerState, amount: number): PlayerState {
 
 export function spendMp(p: PlayerState, amount: number): PlayerState {
   return { ...p, mp: Math.max(0, p.mp - amount) };
+}
+
+export function transferMoney(
+  source: PlayerState,
+  target: PlayerState,
+  amount: number,
+): { source: PlayerState; target: PlayerState; actualAmount: number } {
+  const actualAmount = Math.max(0, Math.min(amount, source.money));
+  return {
+    source: { ...source, money: source.money - actualAmount },
+    target: { ...target, money: target.money + actualAmount },
+    actualAmount,
+  };
+}
+
+export interface ChargeResult {
+  player: PlayerState;
+  moneyPaid: number;
+  mpPaid: number;
+  hpPaid: number;
+}
+
+export function chargePlayer(
+  player: PlayerState,
+  amount: number,
+): ChargeResult {
+  const moneyPaid = Math.min(player.money, amount);
+  let remaining = amount - moneyPaid;
+  const mpPaid = Math.min(player.mp, remaining);
+  remaining -= mpPaid;
+  const hpPaid = Math.min(player.hp, remaining);
+  return {
+    player: {
+      ...player,
+      money: player.money - moneyPaid,
+      mp: player.mp - mpPaid,
+      hp: player.hp - hpPaid,
+    },
+    moneyPaid,
+    mpPaid,
+    hpPaid,
+  };
 }

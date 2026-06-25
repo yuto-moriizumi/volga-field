@@ -17,6 +17,7 @@ export interface CardDefinition {
   description: string;
   effects: CardEffect[];
   mpCost?: number;
+  price?: number;
   customTags?: string[];
 }
 
@@ -27,6 +28,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "weapon",
     emoji: "⚔️",
     description: "相手-3",
+    price: 4,
     effects: [
       {
         kind: "damage",
@@ -42,6 +44,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "weapon",
     emoji: "🗡️",
     description: "相手-5 / 自分も-1",
+    price: 6,
     effects: [
       {
         kind: "damage",
@@ -63,6 +66,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "weapon",
     emoji: "🪓",
     description: "相手-4 / 自分も-2",
+    price: 5,
     effects: [
       {
         kind: "damage",
@@ -84,6 +88,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "weapon",
     emoji: "🔱",
     description: "相手-2",
+    price: 3,
     effects: [
       {
         kind: "damage",
@@ -99,6 +104,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "weapon",
     emoji: "🏹",
     description: "相手-2",
+    price: 3,
     effects: [
       {
         kind: "damage",
@@ -114,6 +120,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "shield",
     emoji: "🛡️",
     description: "防御力+3",
+    price: 3,
     effects: [
       {
         kind: "defense",
@@ -129,6 +136,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "shield",
     emoji: "🛡️",
     description: "防御力+6 (攻撃時-3)",
+    price: 6,
     effects: [
       {
         kind: "defense",
@@ -144,6 +152,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "shield",
     emoji: "🍃",
     description: "防御力+1",
+    price: 1,
     effects: [
       {
         kind: "defense",
@@ -159,6 +168,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "potion",
     emoji: "🧪",
     description: "HP+5",
+    price: 4,
     effects: [
       {
         kind: "heal",
@@ -174,6 +184,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "potion",
     emoji: "🍷",
     description: "HP+10",
+    price: 8,
     effects: [
       {
         kind: "heal",
@@ -189,6 +200,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "potion",
     emoji: "☠️",
     description: "相手-3",
+    price: 4,
     effects: [
       {
         kind: "damage",
@@ -205,6 +217,7 @@ export const BASE_CARDS: CardDefinition[] = [
     emoji: "🔥",
     description: "MP2 / 相手-4",
     mpCost: 2,
+    price: 5,
     effects: [
       {
         kind: "damage",
@@ -221,6 +234,7 @@ export const BASE_CARDS: CardDefinition[] = [
     emoji: "⚡",
     description: "MP4 / 相手-3 / 自分も-1",
     mpCost: 4,
+    price: 6,
     effects: [
       {
         kind: "damage",
@@ -243,6 +257,7 @@ export const BASE_CARDS: CardDefinition[] = [
     emoji: "✨",
     description: "MP7 / HP+8",
     mpCost: 7,
+    price: 10,
     effects: [
       {
         kind: "heal",
@@ -258,6 +273,7 @@ export const BASE_CARDS: CardDefinition[] = [
     category: "special",
     emoji: "💀",
     description: "相手-8 / 自分も-5",
+    price: 7,
     effects: [
       {
         kind: "damage",
@@ -273,6 +289,22 @@ export const BASE_CARDS: CardDefinition[] = [
       },
     ],
   },
+  {
+    id: "buy",
+    name: "買う",
+    category: "trade",
+    emoji: "💰",
+    description: "相手の手札から1枚選んで買う",
+    effects: [],
+  },
+  {
+    id: "sell",
+    name: "売る",
+    category: "trade",
+    emoji: "🏷️",
+    description: "手札を選んで相手に売りつける",
+    effects: [],
+  },
 ];
 
 export function findCard(id: string): CardDefinition | undefined {
@@ -286,5 +318,19 @@ export function getCardsByTag(tag: string): CardDefinition[] {
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
 export const INITIAL_MP = 10;
+export const INITIAL_MONEY = 20;
 export const MAX_LEARNED_MIRACLES = 6;
 export const DECK_SIZE = 30;
+
+export function getCardPrice(id: string): number {
+  const card = findCard(id);
+  return card?.price ?? 0;
+}
+
+export function isBuyCard(id: string): boolean {
+  return id === "buy";
+}
+
+export function isSellCard(id: string): boolean {
+  return id === "sell";
+}
