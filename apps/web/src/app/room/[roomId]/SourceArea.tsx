@@ -4,7 +4,7 @@ import type { CardRef, PlayerState } from "@volga/shared";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
 
-export function SourceZone({
+export function SourceArea({
   activePlayer,
   selectedCards,
   discardMode,
@@ -24,7 +24,7 @@ export function SourceZone({
   onConfirm: () => void;
 }) {
   return (
-    <div className="gf-source-zone" aria-label="ソースゾーン">
+    <div className="gf-source-area" aria-label="ソースエリア">
       <div className="gf-status-stack">
         <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
         {discardMode && <div className="gf-discard-status">カードを捨てる</div>}

@@ -6,11 +6,12 @@ import { findCard } from "@volga/game-core";
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
-import { BattleLog } from "./BattleLog";
-import { CardView } from "./CardView";
-import { LargeCard } from "./LargeCard";
-import { SourceZone } from "./SourceZone";
-import { TargetZone } from "./TargetZone";
+import { HandArea } from "./HandArea";
+import { Header } from "./Header";
+import { InfoArea } from "./InfoArea";
+import { NameList } from "./NameList";
+import { SourceArea } from "./SourceArea";
+import { TargetArea } from "./TargetArea";
 
 export function GameRoom({
   params,
@@ -266,10 +267,7 @@ export function GameRoom({
 
   return (
     <div className={`gf-app${gameState.doomsdayActive ? " gf-doomsday-active" : ""}`}>
-      <TopBar
-        title={`G.F.${displayedActionTurn}`}
-        rightAction={{ label: "退出", icon: "🚪", onClick: leaveRoom }}
-      />
+      <Header actionTurn={displayedActionTurn} onLeave={leaveRoom} />
 
       <main
         className={`gf-main${gameStarted ? " gf-battle-main" : ""}`}
@@ -313,58 +311,58 @@ export function GameRoom({
 
         {gameStarted && (
           <>
-            <BattleBoard
-              me={me}
-              players={gameState.players}
-              gameState={gameState}
-              playerId={playerId}
-              canAct={canAct}
-              selectedCardIdx={selectedCardIdx}
-              selectedTargetId={selectedTargetId}
-              selectedDefenseIdxes={selectedDefenseIdxes}
-              discardMode={discardMode}
-              selectedDiscardCount={selectedDiscardIdxes.length}
-              hitFlash={hitFlash}
-              onSelectTarget={setSelectedTargetId}
-              onExecute={executeSelectedCard}
-              onToggleDiscardMode={toggleDiscardMode}
-              onConfirmDiscard={confirmDiscard}
-              onPassDefense={() => defend(selectedDefenseIdxes)}
-              onEndTurn={endTurn}
-            />
-            <MyArea
-              me={me}
-              canAct={canAct}
-              isDefending={isDefending}
-              selectedCardIdx={selectedCardIdx}
-              selectedDefenseIdxes={selectedDefenseIdxes}
-              discardMode={discardMode}
-              selectedDiscardIdxes={selectedDiscardIdxes}
-              onPlayCard={playCard}
-              onHoverCard={setLastHoveredCard}
-              onSelectDefense={(idx) =>
-                setSelectedDefenseIdxes((current) =>
-                  current.includes(idx)
-                    ? current.filter((selectedIdx) => selectedIdx !== idx)
-                    : [...current, idx],
-                )
-              }
-              onSelectDiscard={(idx) =>
-                setSelectedDiscardIdxes((current) =>
-                  current.includes(idx)
-                    ? current.filter((selectedIdx) => selectedIdx !== idx)
-                    : [...current, idx],
-                )
-              }
-            />
-            <div className="gf-battle-log-dock">
-              <BattleLog entries={gameState.log} />
+            <div className="gf-battle-row">
+              <BattleField
+                me={me}
+                players={gameState.players}
+                gameState={gameState}
+                playerId={playerId}
+                canAct={canAct}
+                selectedCardIdx={selectedCardIdx}
+                selectedTargetId={selectedTargetId}
+                selectedDefenseIdxes={selectedDefenseIdxes}
+                discardMode={discardMode}
+                selectedDiscardCount={selectedDiscardIdxes.length}
+                hitFlash={hitFlash}
+                onSelectTarget={setSelectedTargetId}
+                onExecute={executeSelectedCard}
+                onPassDefense={() => defend(selectedDefenseIdxes)}
+                onEndTurn={endTurn}
+                onConfirmDiscard={confirmDiscard}
+              />
             </div>
-            {lastHoveredCard && (
-              <aside className="gf-hover-card-preview" aria-label="最後にホバーしたカード">
-                <LargeCard cardRef={lastHoveredCard} />
-              </aside>
-            )}
+            <div className="gf-battle-row gf-battle-row-split">
+              <HandArea
+                me={me}
+                canAct={canAct}
+                isDefending={isDefending}
+                selectedCardIdx={selectedCardIdx}
+                selectedDefenseIdxes={selectedDefenseIdxes}
+                discardMode={discardMode}
+                selectedDiscardIdxes={selectedDiscardIdxes}
+                onPlayCard={playCard}
+                onHoverCard={setLastHoveredCard}
+                onSelectDefense={(idx) =>
+                  setSelectedDefenseIdxes((current) =>
+                    current.includes(idx)
+                      ? current.filter((selectedIdx) => selectedIdx !== idx)
+                      : [...current, idx],
+                  )
+                }
+                onSelectDiscard={(idx) =>
+                  setSelectedDiscardIdxes((current) =>
+                    current.includes(idx)
+                      ? current.filter((selectedIdx) => selectedIdx !== idx)
+                      : [...current, idx],
+                  )
+                }
+                onToggleDiscardMode={toggleDiscardMode}
+              />
+              <InfoArea
+                hoveredCard={lastHoveredCard}
+                entries={gameState.log}
+              />
+            </div>
           </>
         )}
 
@@ -439,83 +437,7 @@ function PlayerSlot({
   );
 }
 
-function MyArea({
-  me,
-  canAct,
-  isDefending,
-  selectedCardIdx,
-  selectedDefenseIdxes,
-  discardMode,
-  selectedDiscardIdxes,
-  onPlayCard,
-  onHoverCard,
-  onSelectDefense,
-  onSelectDiscard,
-}: {
-  me: PlayerState | null;
-  canAct: boolean;
-  isDefending: boolean;
-  selectedCardIdx: number | null;
-  selectedDefenseIdxes: number[];
-  discardMode: boolean;
-  selectedDiscardIdxes: number[];
-  onPlayCard: (idx: number) => void;
-  onHoverCard: (card: CardRef) => void;
-  onSelectDefense: (idx: number) => void;
-  onSelectDiscard: (idx: number) => void;
-}) {
-  if (!me) return <div />;
-  const cards = playableCards(me);
-  return (
-    <section className="gf-hand-dock" aria-label="手札">
-      <div className="gf-hand-strip">
-        {cards.length === 0 && (
-          <div className="gf-empty-hand">
-            手札がない…
-          </div>
-        )}
-        {cards.map((card, idx) => {
-          const definition = findCard(card.id);
-          const isLearned = idx >= me.hand.length;
-          const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
-          const canPlayCard = canAct && hasEnoughMp && !isDefenseOnlyCard(card.id);
-          const canDiscardCard = discardMode && !isLearned;
-          return (
-          <CardView
-            key={`${card.id}-${idx}`}
-            cardRef={card}
-            selected={
-              selectedCardIdx === idx ||
-              selectedDefenseIdxes.includes(idx) ||
-              selectedDiscardIdxes.includes(idx)
-            }
-            playable={
-              discardMode
-                ? canDiscardCard
-                : isDefending
-                  ? !isLearned && isDefenseCard(card.id)
-                  : canPlayCard
-            }
-            learned={isLearned}
-            onHover={() => onHoverCard(card)}
-            onClick={() => {
-              if (discardMode) {
-                if (canDiscardCard) onSelectDiscard(idx);
-              } else if (isDefending) {
-                if (!isLearned) onSelectDefense(idx);
-              } else if (canPlayCard) {
-                onPlayCard(idx);
-              }
-            }}
-          />
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function BattleBoard({
+function BattleField({
   me,
   players,
   gameState,
@@ -529,10 +451,9 @@ function BattleBoard({
   hitFlash,
   onSelectTarget,
   onExecute,
-  onToggleDiscardMode,
-  onConfirmDiscard,
   onPassDefense,
   onEndTurn,
+  onConfirmDiscard,
 }: {
   me: PlayerState | null;
   players: PlayerState[];
@@ -547,10 +468,9 @@ function BattleBoard({
   hitFlash: { amount: number; key: number } | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
-  onToggleDiscardMode: () => void;
-  onConfirmDiscard: () => void;
   onPassDefense: () => void;
   onEndTurn: () => void;
+  onConfirmDiscard: () => void;
 }) {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const selectedCard = selectedCardIdx !== null && me ? playableCards(me)[selectedCardIdx] : null;
@@ -569,7 +489,7 @@ function BattleBoard({
   const selectedCards = isDefending ? defenseCards : selectedCard ? [selectedCard] : [];
   const canPassDefense = isDefending && defenseCards.length === 0;
   const canEndTurn = canAct && !gameState.winner && !isDefending;
-  const canUseDiscard = canAct && !isDefending;
+  const canSelectTarget = canAct && !isDefending && !discardMode;
   const canConfirmSelection =
     (isDefending && defenseCards.length > 0) ||
     (!isDefending && Boolean(selectedCard) && canAct && !discardMode) ||
@@ -585,9 +505,9 @@ function BattleBoard({
       ? selectedDiscardCount > 0
         ? `${selectedDiscardCount}枚 捨てる`
         : "捨てるカードを選択"
-    : selectedCards.length === 0
-      ? "ターン終了"
-      : "確定";
+      : selectedCards.length === 0
+        ? "ターン終了"
+        : "確定";
 
   function confirmAction() {
     if (gameState.winner) return;
@@ -609,8 +529,8 @@ function BattleBoard({
   }
 
   return (
-    <section className="gf-battle-board" aria-label="戦闘">
-      <SourceZone
+    <>
+      <SourceArea
         activePlayer={activePlayer}
         selectedCards={selectedCards}
         discardMode={discardMode}
@@ -620,51 +540,20 @@ function BattleBoard({
         canPassDefense={canPassDefense}
         onConfirm={confirmAction}
       />
-
-      <TargetZone
+      <TargetArea
         pending={pending}
         targetPlayer={targetPlayer ?? null}
         hitFlash={hitFlash}
-        canUseDiscard={canUseDiscard}
-        discardMode={discardMode}
-        onToggleDiscardMode={onToggleDiscardMode}
       />
-
-      <div className="gf-target-list">
-        {players.map((p) => (
-          <button
-            className="gf-target-pill"
-            key={p.id}
-            onClick={() => onSelectTarget(p.id)}
-            disabled={!canAct || isDefending || discardMode}
-            style={{
-              color: p.id === playerId ? "var(--bar-teal-dark)" : "#3f35d8",
-            }}
-            data-selected={selectedTargetId === p.id}
-          >
-            <span className="gf-target-dot" />
-            <span className="gf-target-name">{p.name}</span>
-            <span className="gf-target-stats">
-              <b>HP</b> {p.hp} <b>MP</b> {p.mp} <b>￥</b> 20
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
+      <NameList
+        players={players}
+        playerId={playerId}
+        selectedTargetId={selectedTargetId}
+        canSelect={canSelectTarget}
+        onSelect={onSelectTarget}
+      />
+    </>
   );
-}
-
-function isDefenseCard(cardId: string): boolean {
-  return findCard(cardId)?.effects.some((effect) => effect.kind === "defense") ?? false;
-}
-
-function isDefenseOnlyCard(cardId: string): boolean {
-  const card = findCard(cardId);
-  return card ? card.effects.every((effect) => effect.kind === "defense") : false;
-}
-
-function getDefensePower(cardId: string): number {
-  return findCard(cardId)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0;
 }
 
 function isAttackCard(cardId: string): boolean {
@@ -681,6 +570,10 @@ function defaultTargetId(
   opponentId: string | null,
 ): string | undefined {
   return isAttackCard(cardId) ? (opponentId ?? undefined) : selfId;
+}
+
+function getDefensePower(cardId: string): number {
+  return findCard(cardId)?.effects.find((effect) => effect.kind === "defense")?.amount ?? 0;
 }
 
 function playableCards(player: PlayerState): { id: string }[] {
