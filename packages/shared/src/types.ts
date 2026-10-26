@@ -30,6 +30,7 @@ export interface PlayerState {
   id: PlayerId;
   name: string;
   hp: number;
+  /** Initial/base HP. This is not an upper limit for healing. */
   maxHp: number;
   mp: number;
   maxMp: number;
