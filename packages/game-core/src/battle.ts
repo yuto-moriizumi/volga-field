@@ -18,6 +18,7 @@ import {
   PARTY_LABELS,
 } from "./cards.js";
 import { buildDeck, drawCards } from "./deck.js";
+import { applyDoomsdayDevil, rollDoomsdayDevil } from "./devils.js";
 import { resolvePartyActions } from "./parties.js";
 import type { Rng } from "./parties.js";
 import {
@@ -32,15 +33,6 @@ import {
 export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
 export const MAX_PLAYERS = 9;
-const DOOMSDAY_EVENT_RATE = 0.25;
-
-const DOOMSDAY_EVENTS = [
-  { name: "小悪魔", weight: 7, damage: 10 },
-  { name: "中悪魔", weight: 5, damage: 20 },
-  { name: "大悪魔", weight: 3, damage: 30 },
-  { name: "イタズラマン", weight: 5, discard: 2 },
-  { name: "めぐみの妖精", weight: 5, heal: 10 },
-] as const;
 
 export function createGame(
   roomId: string,
@@ -93,61 +85,6 @@ export function createGame(
     startedAt: Date.now(),
   };
   return { state, deck };
-}
-
-function pickDoomsdayEvent() {
-  const total = DOOMSDAY_EVENTS.reduce((sum, event) => sum + event.weight, 0);
-  let roll = Math.random() * total;
-  for (const event of DOOMSDAY_EVENTS) {
-    roll -= event.weight;
-    if (roll <= 0) return event;
-  }
-  return DOOMSDAY_EVENTS[0]!;
-}
-
-function applyDoomsdayEvent(
-  player: PlayerState,
-  turn: number,
-): { player: PlayerState; log: BattleLogEntry | null } {
-  if (Math.random() >= DOOMSDAY_EVENT_RATE) return { player, log: null };
-
-  const event = pickDoomsdayEvent();
-  if ("damage" in event) {
-    return {
-      player: damagePlayer(player, event.damage),
-      log: {
-        turn,
-        playerId: player.id,
-        message: `終末の時: ${event.name}が現れ、${player.name}が${event.damage}ダメージを受けた`,
-        kind: "system",
-        damage: event.damage,
-      },
-    };
-  }
-  if ("discard" in event) {
-    const nextHand = player.hand.slice(0, Math.max(0, player.hand.length - event.discard));
-    const discarded = player.hand.length - nextHand.length;
-    return {
-      player: { ...player, hand: nextHand },
-      log: {
-        turn,
-        playerId: player.id,
-        message: `終末の時: ${event.name}が現れ、${player.name}の神器を${discarded}枚捨てた`,
-        kind: "system",
-      },
-    };
-  }
-
-  const healed = healPlayer(player, event.heal);
-  return {
-    player: healed,
-    log: {
-      turn,
-      playerId: player.id,
-      message: `終末の時: ${event.name}が現れ、${player.name}のHPが${healed.hp - player.hp}回復した`,
-      kind: "system",
-    },
-  };
 }
 
 function determineWinner(players: PlayerState[]): PlayerId | null {
@@ -677,9 +614,11 @@ export function endTurn(
   if (deficit > 0 && newDeck.length > 0) {
     if (state.doomsdayActive) {
       for (let i = 0; i < deficit; i++) {
-        const result = applyDoomsdayEvent(self, state.turn);
+        const devil = rollDoomsdayDevil(rng);
+        if (!devil) continue;
+        const result = applyDoomsdayDevil(devil, self, state.turn);
         self = result.player;
-        if (result.log) logs.push(result.log);
+        logs.push(result.log);
       }
     }
     const result = drawCards(newDeck, deficit);

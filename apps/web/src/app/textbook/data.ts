@@ -83,6 +83,10 @@ export interface DevilCard {
   name: string;
   emoji: string;
   description: string;
+  /** 悪魔が起こす行動の名前 */
+  action?: string;
+  /** 出現抽選の相対的な重み（全悪魔の合計は25） */
+  weight?: number;
 }
 
 export interface PartyCard {
@@ -409,24 +413,50 @@ export const CALAMITIES: CalamityCard[] = [
   },
 ];
 
+/** 悪魔カテゴリの説明。出現率と重み付き抽選のルールを教典に明記する。 */
+export const DEVIL_RULE =
+  "終末の時、手札を補充するために1枚引くたびに25%で悪魔が出現する。出現する悪魔は重み付き抽選で決まり、重みの合計は25。悪魔は手番プレイヤーに災いをもたらし、ゲームを終局へ導く。";
+
 export const DEVILS: DevilCard[] = [
   {
-    id: "berial",
-    name: "ベリアル",
-    emoji: "😈",
-    description: "HP半分と引き換えに、強力な神器を得る",
+    id: "trump",
+    name: "トランプ大統領",
+    emoji: "🇺🇸",
+    action: "ツイート砲",
+    weight: 7,
+    description: "SNSに投稿を乱射して攻撃する。10ダメージ",
   },
   {
-    id: "astaroth",
-    name: "アスタロト",
-    emoji: "👿",
-    description: "神器を捧げて相手神器を1つ破壊",
+    id: "putin",
+    name: "プーチン大統領",
+    emoji: "🐻",
+    action: "特別軍事作戦",
+    weight: 5,
+    description: "軍事作戦を強行する。20ダメージ",
   },
   {
-    id: "leviathan",
-    name: "リヴァイアサン",
-    emoji: "🐉",
-    description: "HP3と引き換えに、相手-8",
+    id: "kim_jong_un",
+    name: "金正恩委員長",
+    emoji: "🚀",
+    action: "ミサイル発射",
+    weight: 3,
+    description: "ミサイルを発射する。30ダメージ",
+  },
+  {
+    id: "elon_musk",
+    name: "イーロン・マスク",
+    emoji: "🐦",
+    action: "アカウント凍結",
+    weight: 5,
+    description: "神器を2枚凍結して使えなくする",
+  },
+  {
+    id: "boj_governor",
+    name: "日銀総裁",
+    emoji: "🏦",
+    action: "金融緩和",
+    weight: 5,
+    description: "金融緩和でHPを10回復する（HP上限なし）",
   },
 ];
 

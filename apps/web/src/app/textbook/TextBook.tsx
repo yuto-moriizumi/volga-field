@@ -6,6 +6,7 @@ import { TopBar } from "../_components/TopBar";
 import {
   ATTR_BY_KEY,
   CATEGORIES,
+  DEVIL_RULE,
   type ArmorCard,
   type AttributeKey,
   type CalamityCard,
@@ -365,6 +366,12 @@ function MiracleListView({ cards }: { cards: MiracleCard[] }) {
 function DevilListView({ cards }: { cards: DevilCard[] }) {
   return (
     <div className="gf-textbook-calamity">
+      <div
+        className="gf-textbook-calamity-desc"
+        style={{ marginBottom: 12, lineHeight: 1.7 }}
+      >
+        {DEVIL_RULE}
+      </div>
       <div className="gf-textbook-calamity-grid">
         {cards.map((card) => (
           <div
@@ -379,7 +386,18 @@ function DevilListView({ cards }: { cards: DevilCard[] }) {
                 style={{ color: "#8b5cc4" }}
               >
                 {card.name}
+                {card.weight !== undefined && (
+                  <span className="gf-textbook-item-price">重み {card.weight}</span>
+                )}
               </div>
+              {card.action && (
+                <div
+                  className="gf-textbook-calamity-desc"
+                  style={{ fontWeight: 600 }}
+                >
+                  {card.action}
+                </div>
+              )}
               <div className="gf-textbook-calamity-desc">{card.description}</div>
             </div>
           </div>
