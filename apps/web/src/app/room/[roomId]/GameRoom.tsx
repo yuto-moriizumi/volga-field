@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { findCard, getCardPrice } from "@volga/game-core";
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
@@ -20,12 +20,15 @@ export function GameRoom({
 }) {
   const { roomId } = use(params);
   const { status, playerId, gameState: ctxGameState, send, lastMessage } = useGameSocket();
-  const [gameState, setGameState] = useState<GameState | null>(() => {
-    if (ctxGameState && ctxGameState.roomId === roomId) {
-      return ctxGameState;
-    }
-    return null;
-  });
+  // The context receives every `game_state` message directly from the socket, so
+  // it is the source of truth. Reading `lastMessage` here would drop updates when
+  // `game_state` and a following `card_played` message are batched together.
+  const gameState = useMemo<GameState | null>(
+    () => (ctxGameState?.roomId === roomId ? ctxGameState : null),
+    [ctxGameState, roomId],
+  );
+  const autoJoinAttemptedRef = useRef(false);
+  const previousLogLengthRef = useRef<number | null>(null);
   const [selectedCardIdxes, setSelectedCardIdxes] = useState<number[]>([]);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
@@ -49,37 +52,31 @@ export function GameRoom({
   }, []);
 
   useEffect(() => {
-    if (
-      status === "connected" &&
-      !gameState &&
-      !joinRequested &&
-      name.trim()
-    ) {
-      setJoinRequested(true);
-      send({ type: "join_room", roomId, playerName: name.trim() });
-    }
+    if (status !== "connected") return;
+    if (gameState || joinRequested || !name.trim()) return;
+    if (autoJoinAttemptedRef.current) return;
+    autoJoinAttemptedRef.current = true;
+    setJoinRequested(true);
+    send({ type: "join_room", roomId, playerName: name.trim() });
   }, [status, gameState, joinRequested, name, roomId, send]);
 
   useEffect(() => {
-    if (!lastMessage) return;
-    if (
-      lastMessage.type === "room_joined" ||
-      lastMessage.type === "game_started" ||
-      lastMessage.type === "game_state"
-    ) {
-      setGameState(lastMessage.gameState);
-      setError(null);
-    }
-    if (lastMessage.type === "error") {
-      setError(lastMessage.message);
-      setJoinRequested(false);
-    }
+    if (!lastMessage || lastMessage.type !== "error") return;
+    setError(lastMessage.message);
+    setJoinRequested(false);
   }, [lastMessage]);
+
+  useEffect(() => {
+    if (!gameState) return;
+    setError(null);
+  }, [gameState]);
 
   function submitName() {
     const trimmed = name.trim();
     if (!trimmed) return;
     localStorage.setItem("volga-player-name", trimmed);
+    autoJoinAttemptedRef.current = true;
+    setError(null);
     setJoinRequested(true);
     send({ type: "join_room", roomId, playerName: trimmed });
   }
@@ -104,12 +101,18 @@ export function GameRoom({
   const canAct = Boolean(isMyTurn && gameState?.phase !== "defense" && !gameState.winner);
 
   useEffect(() => {
-    if (!lastMessage || lastMessage.type !== "game_state") return;
-    const latest = lastMessage.gameState.log.at(-1);
-    if (latest?.kind === "attack" && latest.damage) {
-      setHitFlash({ amount: latest.damage, key: Date.now() });
+    if (!gameState) return;
+    const previousLength = previousLogLengthRef.current;
+    previousLogLengthRef.current = gameState.log.length;
+    if (previousLength === null || gameState.log.length <= previousLength) return;
+    const newEntries = gameState.log.slice(previousLength);
+    const attack = newEntries
+      .reverse()
+      .find((entry) => entry.kind === "attack" && Boolean(entry.damage));
+    if (attack?.damage) {
+      setHitFlash({ amount: attack.damage, key: Date.now() });
     }
-  }, [lastMessage]);
+  }, [gameState]);
 
   useEffect(() => {
     if (canAct) return;
@@ -567,7 +570,7 @@ export function GameRoom({
         <div className="gf-modal-backdrop">
           <div className="gf-modal" style={{ alignItems: "center", textAlign: "center" }}>
             <div style={{ fontSize: 56, lineHeight: 1 }}>
-              {gameState.winner === playerId ? "" : "💀"}
+              {gameState.winner === playerId ? "🏆" : "💀"}
             </div>
             <h2
               style={{
