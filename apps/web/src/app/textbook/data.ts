@@ -1,660 +1,360 @@
-export type AttributeKey =
-  | "none"
-  | "fire"
-  | "water"
-  | "wood"
-  | "earth"
-  | "light"
-  | "dark";
+import {
+  BASE_CARDS,
+  DECK_SIZE,
+  DOOMSDAY_DEVIL_RATE,
+  DOOMSDAY_DEVILS,
+  HAND_SIZE,
+  INITIAL_HP,
+  INITIAL_MONEY,
+  INITIAL_MP,
+  PARTY_ACTION_CHANCE,
+  PARTY_ACTIONS,
+  PARTY_IDEOLOGIES,
+  getPartyId,
+} from "@volga/game-core";
+import type {
+  CardDefinition,
+  CardEffect,
+  DoomsdayDevil,
+  PartyAction,
+} from "@volga/game-core";
+import type { CardCategory, PartyId } from "@volga/shared";
 
-export interface AttributeInfo {
-  key: AttributeKey;
-  label: string;
-  icon: string;
-  color: string;
-  bgColor: string;
-}
+/**
+ * 教典のカード情報は packages/game-core の実装データから生成する。
+ * このファイルには表示用の型・派生処理・静的なルール文だけを置き、
+ * カードそのものの定義は持たない。
+ */
 
-export const ATTRIBUTES: AttributeInfo[] = [
-  { key: "none", label: "無属性", icon: "〇", color: "#9aa4a0", bgColor: "#e6ebe9" },
-  { key: "fire", label: "社会主義", icon: "♨", color: "#d9473a", bgColor: "#fbe2dc" },
-  { key: "water", label: "資本主義", icon: "〰", color: "#3a78d4", bgColor: "#dde9f8" },
-  { key: "wood", label: "共和主義", icon: "✿", color: "#d68a3a", bgColor: "#f6e9d2" },
-  { key: "earth", label: "封建主義", icon: "⛰", color: "#8a8074", bgColor: "#e8e3da" },
-  { key: "light", label: "環境主義", icon: "☀", color: "#e5b431", bgColor: "#fbeec3" },
-  { key: "dark", label: "無政府主義", icon: "☾", color: "#8b5cc4", bgColor: "#e6dcf3" },
-];
-
-export const ATTR_BY_KEY: Record<AttributeKey, AttributeInfo> =
-  ATTRIBUTES.reduce(
-    (acc, attr) => ({ ...acc, [attr.key]: attr }),
-    {} as Record<AttributeKey, AttributeInfo>,
-  );
-
-export type Token =
-  | { type: "text"; value: string }
-  | { type: "attr"; key: AttributeKey };
-
-export interface WeaponCard {
+export interface CatalogCard {
   id: string;
   name: string;
   emoji: string;
+  category: CardCategory;
+  description: string;
+  /** 相手に与えるダメージ */
+  damage: number;
+  /** 攻撃力上昇 */
+  attackPower: number;
+  /** 表示用の攻撃値 (damage + attackPower) */
   attack: number;
-  /** 価格 (￥) */
-  price: number;
-  /** 授かり率 */
-  rate: string;
-  attribute?: AttributeKey;
-  note?: string;
-  /** 攻撃力を追加するカード (trueなら他の攻撃カードや攻撃力追加カードと同時に使用可能) */
-  isAttackPower?: boolean;
-}
-
-export interface ArmorCard {
-  id: string;
-  name: string;
-  emoji: string;
+  /** 自分に与えるダメージ */
+  selfDamage: number;
   defense: number;
+  heal: number;
+  mpRecover: number;
+  mpCost?: number;
   price?: number;
-  attribute?: AttributeKey;
-  note?: string;
 }
 
-export interface ItemCard {
-  id: string;
+function sumEffects(
+  card: CardDefinition,
+  kind: CardEffect["kind"],
+  target: CardEffect["target"],
+): number {
+  return card.effects
+    .filter((effect) => effect.kind === kind && effect.target === target)
+    .reduce((total, effect) => total + (effect.amount ?? 0), 0);
+}
+
+export function toCatalogCard(card: CardDefinition): CatalogCard {
+  const damage = sumEffects(card, "damage", "opponent");
+  const attackPower = sumEffects(card, "attack_power", "self");
+
+  return {
+    id: card.id,
+    name: card.name,
+    emoji: card.emoji,
+    category: card.category,
+    description: card.description,
+    damage,
+    attackPower,
+    attack: damage + attackPower,
+    selfDamage: sumEffects(card, "damage", "self"),
+    defense: sumEffects(card, "defense", "self"),
+    heal: sumEffects(card, "heal", "self"),
+    mpRecover: sumEffects(card, "mpRecover", "self"),
+    mpCost: card.mpCost,
+    price: card.price,
+  };
+}
+
+/** BASE_CARDS から生成した全カードの一覧。 */
+export const CARD_CATALOG: CatalogCard[] = BASE_CARDS.map(toCatalogCard);
+
+export function cardsByCategory(category: CardCategory): CatalogCard[] {
+  return CARD_CATALOG.filter((card) => card.category === category);
+}
+
+/** カードの効果から表示用の数値ラベルを作る。 */
+export function cardStatLabels(card: CatalogCard): string[] {
+  const labels: string[] = [];
+  if (card.damage > 0) {
+    labels.push(
+      card.category === "weapon" ? `攻${card.damage}` : `相手-${card.damage}`,
+    );
+  }
+  if (card.attackPower > 0) labels.push(`攻+${card.attackPower}`);
+  if (card.defense > 0) labels.push(`防${card.defense}`);
+  if (card.heal > 0) labels.push(`HP+${card.heal}`);
+  if (card.mpRecover > 0) labels.push(`MP+${card.mpRecover}`);
+  if (card.selfDamage > 0) labels.push(`自分-${card.selfDamage}`);
+  if (card.mpCost !== undefined) labels.push(`MP${card.mpCost}`);
+  return labels;
+}
+
+export interface CatalogParty {
+  id: PartyId;
   name: string;
   emoji: string;
+  description: string;
+  ideology: string;
   price?: number;
-  description: string;
-  attribute?: AttributeKey;
+  actions: readonly PartyAction[];
 }
 
-export interface MiracleCard {
-  id: string;
-  name: string;
-  emoji: string;
-  price?: number;
-  description: string;
-  attribute?: AttributeKey;
-}
-
-export interface DevilCard {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-  /** 悪魔が起こす行動の名前 */
-  action?: string;
-  /** 出現抽選の相対的な重み（全悪魔の合計は25） */
-  weight?: number;
-}
-
-export interface PartyCard {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-  attribute: AttributeKey;
-}
-
-export interface PhenomenonCard {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-}
-
-export interface CalamityCard {
-  id: string;
-  name: string;
-  emoji: string;
-  /** 表示色 */
-  color: string;
-  description: string;
-  note?: string;
-}
-
-export interface AttributeEntry {
-  tokens: Token[];
-  note?: string;
-}
-
-export interface TextbookCategory {
-  id: string;
-  title: string;
-  variant:
-    | "text"
-    | "weapon-grid"
-    | "armor-grid"
-    | "item-list"
-    | "miracle-list"
-    | "calamity-list"
-    | "devil-list"
-    | "party-list"
-    | "phenomenon-list"
-    | "trade-list";
-  /** 画像グリッドで表示するカード群 */
-  cards?:
-    | WeaponCard[]
-    | ArmorCard[]
-    | ItemCard[]
-    | MiracleCard[]
-    | DevilCard[]
-    | PartyCard[]
-    | PhenomenonCard[]
-    | CalamityCard[];
-  /** テキスト形式のエントリ */
-  entries?: AttributeEntry[];
-}
-
-function T(value: string): Token {
-  return { type: "text", value };
-}
-function A(key: AttributeKey): Token {
-  return { type: "attr", key };
-}
-
-export const WEAPONS: WeaponCard[] = [
-  { id: "club", name: "こん棒", emoji: "🪵", attack: 1, price: 1, rate: "3/500" },
-  { id: "dagger", name: "短剣", emoji: "🗡️", attack: 2, price: 2, rate: "5/500" },
-  { id: "sword", name: "剣", emoji: "⚔️", attack: 3, price: 3, rate: "6/500" },
-  { id: "axe", name: "斧", emoji: "🪓", attack: 4, price: 4, rate: "5/500", note: "自分も-2" },
-  { id: "spear", name: "槍", emoji: "🔱", attack: 2, price: 2, rate: "5/500" },
-  { id: "bow", name: "弓", emoji: "🏹", attack: 2, price: 2, rate: "5/500" },
-  {
-    id: "great_sword",
-    name: "大剣",
-    emoji: "⚔️",
-    attack: 5,
-    price: 6,
-    rate: "4/500",
-    note: "自分も-1",
-  },
-  { id: "flame_sword", name: "炎の剣", emoji: "🔥", attack: 4, price: 5, rate: "3/500", attribute: "fire" },
-  { id: "trident", name: "トライデント", emoji: "🔱", attack: 4, price: 5, rate: "3/500", attribute: "water" },
-  { id: "thorn_whip", name: "茨の鞭", emoji: "🌿", attack: 3, price: 4, rate: "3/500", attribute: "wood" },
-  { id: "rock_hammer", name: "岩の槌", emoji: "🪨", attack: 5, price: 5, rate: "3/500", attribute: "earth" },
-  { id: "light_spear", name: "光の槍", emoji: "✨", attack: 4, price: 5, rate: "3/500", attribute: "light" },
-  { id: "dark_blade", name: "闇の刃", emoji: "🌑", attack: 5, price: 6, rate: "3/500", attribute: "dark" },
-  { id: "god_slayer", name: "神殺し", emoji: "💀", attack: 8, price: 10, rate: "1/500", note: "自分も-3" },
-  ...attributeWeapons("socialist_strike", "socialism", "fire", [
-    { name: "労働者の一撃", emoji: "🔨" },
-    { name: "階級闘争", emoji: "✊" },
-    { name: "国有化攻勢", emoji: "🏭" },
-    { name: "革命の波", emoji: "🌊" },
-    { name: "赤い総攻撃", emoji: "🚩" },
-  ]),
-  ...attributeWeapons("socialist_power", "socialism", "fire", [
-    { name: "団結", emoji: "🤝" },
-    { name: "計画経済", emoji: "📊" },
-    { name: "労働動員", emoji: "👷" },
-    { name: "革命熱", emoji: "🔥" },
-    { name: "前衛党指導", emoji: "⭐" },
-  ], { isAttackPower: true }),
-  ...attributeWeapons("capitalist_strike", "capitalist", "water", [
-    { name: "市場の一撃", emoji: "💵" },
-    { name: "価格競争", emoji: "🏷️" },
-    { name: "企業買収", emoji: "🏢" },
-    { name: "投資攻勢", emoji: "💰" },
-    { name: "独占支配", emoji: "👑" },
-  ]),
-  ...attributeWeapons("capitalist_power", "capitalist", "water", [
-    { name: "利益追求", emoji: "📈" },
-    { name: "資本注入", emoji: "💸" },
-    { name: "株価高騰", emoji: "📊" },
-    { name: "大量生産", emoji: "🏭" },
-    { name: "市場独占", emoji: "🔒" },
-  ], { isAttackPower: true }),
-  ...attributeWeapons("republican_strike", "republican", "wood", [
-    { name: "市民の一撃", emoji: "👤" },
-    { name: "議会追及", emoji: "🏛️" },
-    { name: "世論攻勢", emoji: "📢" },
-    { name: "共和の剣", emoji: "⚔️" },
-    { name: "民意の鉄槌", emoji: "🔨" },
-  ]),
-  ...attributeWeapons("republican_power", "republican", "wood", [
-    { name: "市民支持", emoji: "👍" },
-    { name: "議会承認", emoji: "✅" },
-    { name: "憲法精神", emoji: "📜" },
-    { name: "連帯演説", emoji: "🎤" },
-    { name: "国民主権", emoji: "🗽" },
-  ], { isAttackPower: true }),
-  ...attributeWeapons("feudal_strike", "feudal", "earth", [
-    { name: "従士の一撃", emoji: "🛡️" },
-    { name: "年貢徴収", emoji: "💴" },
-    { name: "騎士突撃", emoji: "🐎" },
-    { name: "領主命令", emoji: "👑" },
-    { name: "王権制圧", emoji: "🏰" },
-  ]),
-  ...attributeWeapons("feudal_power", "feudal", "earth", [
-    { name: "忠誠", emoji: "💯" },
-    { name: "家臣団", emoji: "👥" },
-    { name: "城塞支援", emoji: "🏰" },
-    { name: "血統の威光", emoji: "👑" },
-    { name: "王命絶対", emoji: "🫅" },
-  ], { isAttackPower: true }),
-  ...attributeWeapons("environmentalist_strike", "environmentalist", "light", [
-    { name: "蔦の一撃", emoji: "🌱" },
-    { name: "抗議活動", emoji: "✊" },
-    { name: "自然の反撃", emoji: "🐻" },
-    { name: "緑の包囲網", emoji: "🌿" },
-    { name: "大地の怒り", emoji: "🌍" },
-  ]),
-  ...attributeWeapons("environmentalist_power", "environmentalist", "light", [
-    { name: "再生力", emoji: "💚" },
-    { name: "森林保護", emoji: "🌳" },
-    { name: "エコ連携", emoji: "♻️" },
-    { name: "自然共鳴", emoji: "🌸" },
-    { name: "地球の加護", emoji: "☀️" },
-  ], { isAttackPower: true }),
-  ...attributeWeapons("anarchist_strike", "anarchist", "dark", [
-    { name: "投石", emoji: "🪨" },
-    { name: "直接行動", emoji: "👊" },
-    { name: "バリケード突破", emoji: "🚧" },
-    { name: "権威破壊", emoji: "💥" },
-    { name: "完全蜂起", emoji: "🔥" },
-  ]),
-  ...attributeWeapons("anarchist_power", "anarchist", "dark", [
-    { name: "自律行動", emoji: "🌀" },
-    { name: "分散戦術", emoji: "⚡" },
-    { name: "反権威精神", emoji: "✊" },
-    { name: "自由連帯", emoji: "🤝" },
-    { name: "秩序崩壊", emoji: "💣" },
-  ], { isAttackPower: true }),
-  // 外交カードはカテゴリ上「武器」として扱う（属性は無属性）。
-  { id: "concern_expressed", name: "懸念を表明する", emoji: "🕊️", attack: 1, price: 1, rate: "—", attribute: "none" },
-  { id: "strong_concern", name: "強い懸念を表明する", emoji: "📢", attack: 2, price: 2, rate: "—", attribute: "none" },
-  { id: "deeply_concerned", name: "憂慮している", emoji: "😟", attack: 3, price: 3, rate: "—", attribute: "none" },
-  { id: "gravely_concerned", name: "深く憂慮している", emoji: "😰", attack: 4, price: 4, rate: "—", attribute: "none" },
-  { id: "regrettable", name: "遺憾である", emoji: "😔", attack: 5, price: 5, rate: "—", attribute: "none" },
-  { id: "extremely_regrettable", name: "極めて遺憾である", emoji: "😠", attack: 6, price: 6, rate: "—", attribute: "none" },
-  { id: "strongly_protest", name: "強く抗議する", emoji: "📣", attack: 7, price: 7, rate: "—", attribute: "none" },
-  { id: "sternly_protest", name: "厳重に抗議する", emoji: "🚨", attack: 8, price: 8, rate: "—", attribute: "none" },
-  { id: "unacceptable", name: "断じて受け入れられない", emoji: "⛔", attack: 9, price: 9, rate: "—", attribute: "none" },
-  { id: "strongly_condemn", name: "強く非難する", emoji: "👊", attack: 10, price: 10, rate: "—", attribute: "none" },
-  {
-    id: "condemn_strongest_terms",
-    name: "最も強い言葉で非難する",
-    emoji: "🔥",
-    attack: 11,
-    price: 11,
-    rate: "—",
-    attribute: "none",
-  },
-];
-
-function attributeWeapons(
-  idPrefix: string,
-  _tag: string,
-  attribute: AttributeKey,
-  cards: { name: string; emoji: string }[],
-  options: { isAttackPower?: boolean } = {},
-): WeaponCard[] {
-  return cards.map((card, idx) => {
-    const level = idx + 1;
-    return {
-      id: `${idPrefix}_${level}`,
+export const PARTY_CATALOG: CatalogParty[] = BASE_CARDS.flatMap((card) => {
+  const partyId = getPartyId(card.id);
+  if (!partyId) return [];
+  return [
+    {
+      id: partyId,
       name: card.name,
       emoji: card.emoji,
-      attack: level,
-      price: level,
-      rate: level <= 2 ? "3/500" : level <= 4 ? "4/500" : "2/500",
-      attribute,
-      isAttackPower: options.isAttackPower,
-      note: options.isAttackPower ? "他の攻撃カードや攻撃力追加カードと同時に使える" : undefined,
-    };
-  });
+      description: card.description,
+      ideology: PARTY_IDEOLOGIES[partyId],
+      price: card.price,
+      actions: PARTY_ACTIONS[partyId],
+    },
+  ];
+});
+
+export function partyActionText(action: PartyAction): string {
+  switch (action.kind) {
+    case "damage":
+      return `相手-${action.amount}`;
+    case "heal":
+      return `HP+${action.amount}`;
+    case "mp":
+      return `MP+${action.amount}`;
+    case "money":
+      return `お金+${action.amount}`;
+    case "steal":
+      return `相手から${action.amount}円奪う`;
+    default:
+      return action.name;
+  }
 }
 
-export const ARMORS: ArmorCard[] = [
-  { id: "leaf_shield", name: "木の葉盾", emoji: "🍃", defense: 1, price: 1 },
-  { id: "small_shield", name: "小盾", emoji: "🛡️", defense: 2, price: 2 },
-  { id: "shield", name: "盾", emoji: "🛡️", defense: 3, price: 3 },
-  { id: "great_shield", name: "大盾", emoji: "🛡️", defense: 6, price: 5, note: "攻撃時-3" },
-  { id: "rock_shield", name: "岩の盾", emoji: "🪨", defense: 4, price: 4, attribute: "earth" },
-  { id: "holy_shield", name: "聖なる盾", emoji: "✨", defense: 4, price: 4, attribute: "light" },
-];
+export interface CatalogDevil {
+  id: string;
+  name: string;
+  emoji: string;
+  action: string;
+  effectLabel: string;
+  weight: number;
+  description: string;
+}
 
-export const ITEMS: ItemCard[] = [
-  { id: "herb", name: "薬草", emoji: "🌿", price: 1, description: "HP+3" },
-  { id: "potion", name: "回復薬", emoji: "🧪", price: 3, description: "HP+5" },
-  { id: "hi_potion", name: "高級回復薬", emoji: "🍷", price: 6, description: "HP+10" },
-  { id: "antidote", name: "解毒草", emoji: "🍀", price: 2, description: "病気を取り除く" },
-  { id: "bomb", name: "爆弾", emoji: "💣", price: 4, description: "相手-4" },
-  { id: "poison", name: "毒薬", emoji: "☠️", price: 3, description: "相手-3" },
-  { id: "local_campaign", name: "地方遊説", emoji: "🎤", price: 3, description: "MP+1" },
-  { id: "supporter_rally", name: "支持者集会", emoji: "📣", price: 5, description: "MP+2" },
-  { id: "national_campaign", name: "全国遊説", emoji: "🗣️", price: 7, description: "MP+3" },
-  { id: "un_speech", name: "国連総会演説", emoji: "🌐", price: 10, description: "MP+5" },
-];
+function describeDevilEffect(effect: DoomsdayDevil["effect"]): string {
+  switch (effect.kind) {
+    case "damage":
+      return `${effect.amount}ダメージ`;
+    case "discard":
+      return `神器を${effect.amount}枚捨てる`;
+    case "heal":
+      return `HP+${effect.amount}`;
+    default:
+      return "";
+  }
+}
 
-export const MIRACLES: MiracleCard[] = [
-  { id: "fire", name: "ファイア", emoji: "🔥", price: 5, description: "MP2 / 相手-4" },
-  { id: "thunder", name: "サンダー", emoji: "⚡", price: 6, description: "MP4 / 相手-3 / 自分も-1" },
-  { id: "heal", name: "ヒール", emoji: "✨", price: 5, description: "HP+8" },
-  {
-    id: "tenbin",
-    name: "天罰",
-    emoji: "⚡",
-    price: 8,
-    description: "相手-5",
-    attribute: "light",
-  },
-  {
-    id: "kokoro_no_omoi",
-    name: "自己犠牲",
-    emoji: "💀",
-    price: 7,
-    description: "相手-8 / 自分も-5",
-  },
-];
+export const DEVIL_CATALOG: CatalogDevil[] = DOOMSDAY_DEVILS.map((devil) => ({
+  id: devil.id,
+  name: devil.name,
+  emoji: devil.emoji,
+  action: devil.action,
+  effectLabel: describeDevilEffect(devil.effect),
+  weight: devil.weight,
+  description: devil.description,
+}));
 
-export const CALAMITIES: CalamityCard[] = [
-  {
-    id: "kaze",
-    name: "風邪",
-    emoji: "🤧",
-    color: "#3a78d4",
-    description: "毎ターン1ダメージ",
-    note: "(悪化すると熱病)",
-  },
-  {
-    id: "netsu",
-    name: "熱病",
-    emoji: "🔥",
-    color: "#d9473a",
-    description: "毎ターン2ダメージ",
-    note: "(悪化すると地獄病)",
-  },
-  {
-    id: "jigoku",
-    name: "地獄病",
-    emoji: "🌋",
-    color: "#d9473a",
-    description: "毎ターン5ダメージ",
-    note: "(悪化すると天国病)",
-  },
-  {
-    id: "tengoku",
-    name: "天国病",
-    emoji: "🌈",
-    color: "#3a78d4",
-    description: "毎ターン+HP5",
-    note: "(悪化するとHP0になる)",
-  },
-  {
-    id: "kiri",
-    name: "霧",
-    emoji: "🌫️",
-    color: "#8b5cc4",
-    description: "周りの状況がわからなくなる",
-  },
-  {
-    id: "senkou",
-    name: "閃光",
-    emoji: "⚡",
-    color: "#e5b431",
-    description: "防御のときに神器を一つしか使えない",
-  },
-  {
-    id: "yume",
-    name: "夢",
-    emoji: "💫",
-    color: "#d68a3a",
-    description: "授かった神器が50%の確率で別の神器に見える",
-  },
-  {
-    id: "anun",
-    name: "暗雲",
-    emoji: "☁️",
-    color: "#8b5cc4",
-    description: "全体攻撃を受けると必ず命中する",
-  },
-];
+export const DEVIL_WEIGHT_TOTAL = DOOMSDAY_DEVILS.reduce(
+  (total, devil) => total + devil.weight,
+  0,
+);
 
-/** 悪魔カテゴリの説明。出現率と重み付き抽選のルールを教典に明記する。 */
-export const DEVIL_RULE =
-  "終末の時、手札を補充するために1枚引くたびに25%で悪魔が出現する。出現する悪魔は重み付き抽選で決まり、重みの合計は25。悪魔は手番プレイヤーに災いをもたらし、ゲームを終局へ導く。";
+export const DEVIL_RULE = `終末の時、手札を補充するために1枚引くたびに ${Math.round(
+  DOOMSDAY_DEVIL_RATE * 100,
+)}% の確率で悪魔が出現します。出現する悪魔は重み付き抽選で決まり、重みの合計は ${DEVIL_WEIGHT_TOTAL} です。悪魔は手番プレイヤーに効果を与えます。`;
 
-export const DEVILS: DevilCard[] = [
-  {
-    id: "trump",
-    name: "トランプ大統領",
-    emoji: "🇺🇸",
-    action: "ツイート砲",
-    weight: 7,
-    description: "SNSに投稿を乱射して攻撃する。10ダメージ",
-  },
-  {
-    id: "putin",
-    name: "プーチン大統領",
-    emoji: "🐻",
-    action: "特別軍事作戦",
-    weight: 5,
-    description: "軍事作戦を強行する。20ダメージ",
-  },
-  {
-    id: "kim_jong_un",
-    name: "金正恩委員長",
-    emoji: "🚀",
-    action: "ミサイル発射",
-    weight: 3,
-    description: "ミサイルを発射する。30ダメージ",
-  },
-  {
-    id: "elon_musk",
-    name: "イーロン・マスク",
-    emoji: "🐦",
-    action: "アカウント凍結",
-    weight: 5,
-    description: "神器を2枚凍結して使えなくする",
-  },
-  {
-    id: "boj_governor",
-    name: "日銀総裁",
-    emoji: "🏦",
-    action: "金融緩和",
-    weight: 5,
-    description: "金融緩和でHPを10回復する（HP上限なし）",
-  },
-];
+export const PARTY_RULE = `他のプレイヤーのターン終了時、所属しているプレイヤーはそれぞれ ${Math.round(
+  PARTY_ACTION_CHANCE * 100,
+)}% で政党行動を起こします。行動は政党ごとの重み付き抽選で決まります。`;
 
-export const PARTIES: PartyCard[] = [
-  {
-    id: "communist_party",
-    name: "共産党",
-    emoji: "🚩",
-    description:
-      "使用すると社会主義の政党に所属する。他者のターン終了時25%で 労働者の反撃(相手-3) / 団結(MP+2)",
-    attribute: "fire",
-  },
-  {
-    id: "ldp",
-    name: "自民党",
-    emoji: "🏛️",
-    description:
-      "使用すると資本主義の政党に所属する。他者のターン終了時25%で 経済成長(お金+3) / 市場の一撃(相手-2)",
-    attribute: "water",
-  },
-  {
-    id: "democratic_party",
-    name: "民主党",
-    emoji: "🗳️",
-    description:
-      "使用すると共和主義の政党に所属する。他者のターン終了時25%で 世論の追い風(MP+2) / 政策協力(HP+2)",
-    attribute: "wood",
-  },
-  {
-    id: "constitutional_imperial_party",
-    name: "立憲帝政党",
-    emoji: "👑",
-    description:
-      "使用すると封建主義の政党に所属する。他者のターン終了時25%で 王権の威光(相手-3) / 城塞の守り(HP+3)",
-    attribute: "earth",
-  },
-  {
-    id: "green_party",
-    name: "緑の党",
-    emoji: "🌿",
-    description:
-      "使用すると環境主義の政党に所属する。他者のターン終了時25%で 自然の恵み(HP+3) / 再生エネルギー(MP+2)",
-    attribute: "light",
-  },
-  {
-    id: "anarchist_party",
-    name: "無政府党",
-    emoji: "🪬",
-    description:
-      "使用すると無政府主義の政党に所属する。他者のターン終了時25%で 直接行動(相手-2) / 略奪(お金を持つ相手から2円)",
-    attribute: "dark",
-  },
-];
+export const DECK_NOTE = `デッキは全カードから${DECK_SIZE}枚を選んで構成します。カードごとの出現率は設定していません。`;
 
-export const PHENOMENA: PhenomenonCard[] = [
-  {
-    id: "eclipse",
-    name: "日蝕",
-    emoji: "🌒",
-    description: "無政府主義の攻撃力2倍",
-  },
-  {
-    id: "meteor",
-    name: "流星群",
-    emoji: "☄️",
-    description: "全員-3",
-  },
-  {
-    id: "rift",
-    name: "次元断裂",
-    emoji: "🌀",
-    description: "神器が一時的に使用不能",
-  },
-];
+export interface RuleSection {
+  title: string;
+  lines: string[];
+}
 
-export const CATEGORIES: TextbookCategory[] = [
+export const RULES: RuleSection[] = [
   {
-    id: "zokusei",
-    title: "属性",
-    variant: "text",
-    entries: [
-      { tokens: [T("無属性の攻撃は、どの属性でも防御できる。")] },
-      {
-        tokens: [
-          A("fire"),
-          T("の攻撃は、"),
-          A("water"),
-          T("で防御できる。"),
-        ],
-      },
-      {
-        tokens: [
-          A("water"),
-          T("の攻撃は、"),
-          A("fire"),
-          T("で防御できる。"),
-        ],
-      },
-      {
-        tokens: [
-          A("wood"),
-          T("の攻撃は、"),
-          A("earth"),
-          T("で防御できる。"),
-        ],
-      },
-      {
-        tokens: [
-          A("earth"),
-          T("の攻撃は、"),
-          A("wood"),
-          T("で防御できる。"),
-        ],
-      },
-      {
-        tokens: [A("light"), T("の攻撃は、どの属性でも防御できない。")],
-      },
-      {
-        tokens: [
-          A("dark"),
-          T("の攻撃は、どの属性でも防御できる。"),
-        ],
-        note: "ただし、ダメージを受けるとHP0になる。",
-      },
+    title: "基本",
+    lines: [
+      `HPは${INITIAL_HP}で開始。回復に上限はなく、${INITIAL_HP}を超えて増える。`,
+      `MPは${INITIAL_MP}で開始。回復は最大MPまで。`,
+      `所持金は${INITIAL_MONEY}で開始。取引カードで増減する。`,
+      `手札は${HAND_SIZE}枚。山札から自動で補充する。`,
     ],
   },
   {
-    id: "wazawai",
-    title: "災い",
-    variant: "calamity-list",
-    cards: CALAMITIES,
+    title: "ターン",
+    lines: [
+      "1ターン中に複数のカードをプレイでき、好きなタイミングでターン終了を宣言する。",
+      "攻撃カードと攻撃力追加カードは同時に使える。",
+      "防御のときは防御カードを複数枚同時に使える。",
+      "HPが0になったプレイヤーは敗北し、最後まで生存した1人が勝利する。",
+    ],
   },
   {
-    id: "torihiki",
-    title: "取引",
-    variant: "trade-list",
+    title: "終末の時",
+    lines: [
+      "修行モードでは終末の時を G.F.50 / G.F.75 / G.F.100 から選べる（なしも可）。",
+      DEVIL_RULE,
+    ],
   },
+  {
+    title: "政党",
+    lines: [
+      "政党カードを使うとその政党に所属する。所属は1つだけ。",
+      PARTY_RULE,
+      "攻撃・略奪の対象は、行動者から見た生存中の相手からランダムに選ばれる。",
+      "所持金のある生存相手がいない場合、略奪は何も起こらない。",
+    ],
+  },
+  {
+    title: "カード",
+    lines: [
+      "カテゴリは 武器 / 防具 / 薬 / 雑貨 / 奇跡 / 特殊 / 取引 / 政党。",
+      "悪魔はカードではなく、終末の時に出現するイベント。",
+      "雑貨は選挙運動の道具で、使うと MP を回復する。",
+      DECK_NOTE,
+    ],
+  },
+];
+
+export type TextbookVariant =
+  | "card-grid"
+  | "card-list"
+  | "party-list"
+  | "devil-list"
+  | "rules";
+
+interface CategoryBase {
+  id: string;
+  title: string;
+  note?: string;
+}
+
+export interface CardCategoryDefinition extends CategoryBase {
+  variant: "card-grid" | "card-list";
+  cards: CatalogCard[];
+}
+
+export interface PartyCategoryDefinition extends CategoryBase {
+  variant: "party-list";
+  parties: CatalogParty[];
+}
+
+export interface DevilCategoryDefinition extends CategoryBase {
+  variant: "devil-list";
+  devils: CatalogDevil[];
+  rule: string;
+}
+
+export interface RulesCategoryDefinition extends CategoryBase {
+  variant: "rules";
+  sections: RuleSection[];
+}
+
+export type TextbookCategory =
+  | CardCategoryDefinition
+  | PartyCategoryDefinition
+  | DevilCategoryDefinition
+  | RulesCategoryDefinition;
+
+/** 教典のタブ。実装済みのカテゴリだけを並べる。 */
+export const CATEGORIES: TextbookCategory[] = [
   {
     id: "buki",
     title: "武器",
-    variant: "weapon-grid",
-    cards: WEAPONS,
+    variant: "card-grid",
+    cards: cardsByCategory("weapon"),
+    note: DECK_NOTE,
   },
   {
     id: "bugu",
     title: "防具",
-    variant: "armor-grid",
-    cards: ARMORS,
+    variant: "card-grid",
+    cards: cardsByCategory("shield"),
+    note: DECK_NOTE,
+  },
+  {
+    id: "kusuri",
+    title: "薬",
+    variant: "card-list",
+    cards: cardsByCategory("potion"),
+    note: DECK_NOTE,
   },
   {
     id: "zakka",
     title: "雑貨",
-    variant: "item-list",
-    cards: ITEMS,
+    variant: "card-list",
+    cards: cardsByCategory("misc"),
+    note: `雑貨は選挙運動の道具で、使うと MP を回復します。${DECK_NOTE}`,
   },
   {
     id: "kiseki",
     title: "奇跡",
-    variant: "miracle-list",
-    cards: MIRACLES,
+    variant: "card-list",
+    cards: cardsByCategory("miracle"),
+    note: DECK_NOTE,
   },
   {
-    id: "akuma",
-    title: "悪魔",
-    variant: "devil-list",
-    cards: DEVILS,
+    id: "tokushu",
+    title: "特殊",
+    variant: "card-list",
+    cards: cardsByCategory("special"),
+    note: DECK_NOTE,
+  },
+  {
+    id: "torihiki",
+    title: "取引",
+    variant: "card-list",
+    cards: cardsByCategory("trade"),
+    note: "取引カードは手札から使って、相手や自分のカード・HP・MP・お金を動かします。",
   },
   {
     id: "seitou",
     title: "政党",
     variant: "party-list",
-    cards: PARTIES,
+    parties: PARTY_CATALOG,
+    note: PARTY_RULE,
   },
   {
-    id: "choujougenshou",
-    title: "超常現象",
-    variant: "phenomenon-list",
-    cards: PHENOMENA,
+    id: "akuma",
+    title: "悪魔",
+    variant: "devil-list",
+    devils: DEVIL_CATALOG,
+    rule: DEVIL_RULE,
+    note: DECK_NOTE,
   },
   {
-    id: "fukano",
-    title: "負荷の連携",
-    variant: "text",
-    entries: [
-      { tokens: [T("異なる属性の神器を一緒に使うと無属性になる。")] },
-      {
-        tokens: [
-          A("light"),
-          T("は、"),
-          A("fire"),
-          T("、"),
-          A("water"),
-          T("、"),
-          A("wood"),
-          T("、"),
-          A("earth"),
-          T("の代わりになれる。"),
-        ],
-      },
-    ],
+    id: "rule",
+    title: "ルール",
+    variant: "rules",
+    sections: RULES,
   },
 ];

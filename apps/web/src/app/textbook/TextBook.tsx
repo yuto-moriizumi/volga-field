@@ -4,25 +4,20 @@ import { useMemo, useState } from "react";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 import {
-  ATTR_BY_KEY,
   CATEGORIES,
-  DEVIL_RULE,
-  type ArmorCard,
-  type AttributeKey,
-  type CalamityCard,
-  type DevilCard,
-  type ItemCard,
-  type MiracleCard,
-  type PartyCard,
-  type PhenomenonCard,
-  type Token,
-  type WeaponCard,
+  cardStatLabels,
+  partyActionText,
+  type CatalogCard,
+  type CatalogDevil,
+  type CatalogParty,
+  type RuleSection,
+  type TextbookCategory,
 } from "./data";
 
 export function TextBook() {
   const [activeId, setActiveId] = useState<string>(CATEGORIES[0]!.id);
   const active =
-    CATEGORIES.find((c) => c.id === activeId) ?? CATEGORIES[0]!;
+    CATEGORIES.find((category) => category.id === activeId) ?? CATEGORIES[0]!;
 
   return (
     <div className="gf-app">
@@ -36,15 +31,15 @@ export function TextBook() {
         }}
       >
         <aside className="gf-textbook-side">
-          {CATEGORIES.map((cat) => {
-            const isActive = cat.id === activeId;
+          {CATEGORIES.map((category) => {
+            const isActive = category.id === activeId;
             return (
               <button
-                key={cat.id}
+                key={category.id}
                 className={`gf-textbook-cat${isActive ? " is-active" : ""}`}
-                onClick={() => setActiveId(cat.id)}
+                onClick={() => setActiveId(category.id)}
               >
-                {cat.title}
+                {category.title}
               </button>
             );
           })}
@@ -63,9 +58,8 @@ export function TextBook() {
               color: "var(--text-dark)",
             }}
           >
-            <strong>注意:</strong>{" "}
-            教典には構想段階・未実装の内容が含まれます。実装済みのカードとルールは{" "}
-            <code>packages/game-core/src/cards.ts</code> が正です。
+            カード一覧は <code>packages/game-core</code>{" "}
+            の実装データから自動生成しています。
           </div>
           <CategoryView category={active} />
         </section>
@@ -76,150 +70,84 @@ export function TextBook() {
   );
 }
 
-function CategoryView({
-  category,
-}: {
-  category: (typeof CATEGORIES)[number];
-}) {
+function CategoryView({ category }: { category: TextbookCategory }) {
   switch (category.variant) {
-    case "weapon-grid":
-      return <WeaponGridView cards={category.cards as WeaponCard[]} />;
-    case "armor-grid":
-      return <ArmorGridView cards={category.cards as ArmorCard[]} />;
-    case "calamity-list":
-      return <CalamityListView cards={category.cards as CalamityCard[]} />;
-    case "item-list":
-      return <ItemListView cards={category.cards as ItemCard[]} />;
-    case "miracle-list":
-      return <MiracleListView cards={category.cards as MiracleCard[]} />;
-    case "devil-list":
-      return <DevilListView cards={category.cards as DevilCard[]} />;
+    case "card-grid":
+      return (
+        <CardGridCatalog
+          key={category.id}
+          cards={category.cards}
+          note={category.note}
+        />
+      );
+    case "card-list":
+      return (
+        <CardListCatalog
+          key={category.id}
+          cards={category.cards}
+          note={category.note}
+        />
+      );
     case "party-list":
-      return <PartyListView cards={category.cards as PartyCard[]} />;
-    case "phenomenon-list":
-      return <PhenomenonListView cards={category.cards as PhenomenonCard[]} />;
-    case "trade-list":
-      return <TradeListView />;
-    case "text":
+      return (
+        <PartyListView
+          key={category.id}
+          parties={category.parties}
+          note={category.note}
+        />
+      );
+    case "devil-list":
+      return (
+        <DevilListView
+          key={category.id}
+          devils={category.devils}
+          rule={category.rule}
+          note={category.note}
+        />
+      );
+    case "rules":
+      return (
+        <RulesView
+          key={category.id}
+          title={category.title}
+          sections={category.sections}
+        />
+      );
     default:
-      return <TextEntriesView entries={category.entries ?? []} />;
+      return null;
   }
 }
 
-function WeaponGridView({ cards }: { cards: WeaponCard[] }) {
-  const [selectedId, setSelectedId] = useState<string>(cards[0]?.id ?? "");
-  const selected = useMemo(
-    () => cards.find((c) => c.id === selectedId) ?? cards[0]!,
-    [cards, selectedId],
-  );
-  if (!selected) return null;
-
-  return (
-    <div className="gf-textbook-weapon">
-      <div className="gf-textbook-weapon-detail">
-        <div className="gf-textbook-weapon-icon">
-          <span>{selected.emoji}</span>
-          {selected.attribute && (
-            <span
-              className="gf-textbook-attr-mark"
-              style={{
-                background: ATTR_BY_KEY[selected.attribute].bgColor,
-                color: ATTR_BY_KEY[selected.attribute].color,
-                borderColor: ATTR_BY_KEY[selected.attribute].color,
-              }}
-            >
-              {ATTR_BY_KEY[selected.attribute].icon}
-            </span>
-          )}
-        </div>
-        <div className="gf-textbook-weapon-info">
-          <div className="gf-textbook-weapon-name">{selected.name}</div>
-          <div className="gf-textbook-weapon-stats">
-            <span>{selected.isAttackPower ? `+${selected.attack}` : `攻${selected.attack}`}</span>
-            {selected.note && (
-              <span className="gf-textbook-weapon-note">{selected.note}</span>
-            )}
-          </div>
-        </div>
-        <div className="gf-textbook-weapon-price">￥{selected.price}</div>
-      </div>
-      <div className="gf-textbook-weapon-rate">授かり率: {selected.rate}</div>
-      <div className="gf-textbook-weapon-grid">
-        {cards.map((card) => (
-          <WeaponTile
-            key={card.id}
-            card={card}
-            active={card.id === selected.id}
-            onClick={() => setSelectedId(card.id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function WeaponTile({
-  card,
-  active,
-  onClick,
+function CardGridCatalog({
+  cards,
+  note,
 }: {
-  card: WeaponCard;
-  active: boolean;
-  onClick: () => void;
+  cards: CatalogCard[];
+  note?: string;
 }) {
-  const attr = card.attribute ? ATTR_BY_KEY[card.attribute] : null;
-  return (
-    <button
-      className={`gf-textbook-tile${active ? " is-active" : ""}`}
-      onClick={onClick}
-      style={
-        attr
-          ? {
-              background: attr.bgColor,
-              borderColor: attr.color,
-            }
-          : undefined
-      }
-    >
-      <span className="gf-textbook-tile-emoji">{card.emoji}</span>
-    </button>
-  );
-}
-
-function ArmorGridView({ cards }: { cards: ArmorCard[] }) {
   const [selectedId, setSelectedId] = useState<string>(cards[0]?.id ?? "");
   const selected = useMemo(
-    () => cards.find((c) => c.id === selectedId) ?? cards[0]!,
+    () => cards.find((card) => card.id === selectedId) ?? cards[0],
     [cards, selectedId],
   );
   if (!selected) return null;
+
+  const stats = cardStatLabels(selected);
 
   return (
     <div className="gf-textbook-weapon">
       <div className="gf-textbook-weapon-detail">
         <div className="gf-textbook-weapon-icon">
           <span>{selected.emoji}</span>
-          {selected.attribute && (
-            <span
-              className="gf-textbook-attr-mark"
-              style={{
-                background: ATTR_BY_KEY[selected.attribute].bgColor,
-                color: ATTR_BY_KEY[selected.attribute].color,
-                borderColor: ATTR_BY_KEY[selected.attribute].color,
-              }}
-            >
-              {ATTR_BY_KEY[selected.attribute].icon}
-            </span>
-          )}
         </div>
         <div className="gf-textbook-weapon-info">
           <div className="gf-textbook-weapon-name">{selected.name}</div>
           <div className="gf-textbook-weapon-stats">
-            <span>防{selected.defense}</span>
-            {selected.note && (
-              <span className="gf-textbook-weapon-note">{selected.note}</span>
-            )}
+            {stats.map((stat) => (
+              <span key={stat}>{stat}</span>
+            ))}
           </div>
+          <div className="gf-textbook-weapon-note">{selected.description}</div>
         </div>
         {selected.price !== undefined && (
           <div className="gf-textbook-weapon-price">￥{selected.price}</div>
@@ -227,332 +155,213 @@ function ArmorGridView({ cards }: { cards: ArmorCard[] }) {
       </div>
       <div className="gf-textbook-weapon-grid">
         {cards.map((card) => (
-          <ArmorTile
+          <button
             key={card.id}
-            card={card}
-            active={card.id === selected.id}
+            className={`gf-textbook-tile${
+              card.id === selected.id ? " is-active" : ""
+            }`}
             onClick={() => setSelectedId(card.id)}
-          />
+            title={card.name}
+            aria-label={card.name}
+          >
+            <span className="gf-textbook-tile-emoji">{card.emoji}</span>
+          </button>
         ))}
       </div>
+      {note && (
+        <div className="gf-textbook-calamity-footer">
+          <p>{note}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function ArmorTile({
-  card,
-  active,
-  onClick,
+function CardListCatalog({
+  cards,
+  note,
 }: {
-  card: ArmorCard;
-  active: boolean;
-  onClick: () => void;
+  cards: CatalogCard[];
+  note?: string;
 }) {
-  const attr = card.attribute ? ATTR_BY_KEY[card.attribute] : null;
-  return (
-    <button
-      className={`gf-textbook-tile${active ? " is-active" : ""}`}
-      onClick={onClick}
-      style={
-        attr
-          ? {
-              background: attr.bgColor,
-              borderColor: attr.color,
-            }
-          : undefined
-      }
-    >
-      <span className="gf-textbook-tile-emoji">{card.emoji}</span>
-    </button>
-  );
-}
-
-function CalamityListView({ cards }: { cards: CalamityCard[] }) {
-  return (
-    <div className="gf-textbook-calamity">
-      <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => (
-          <div key={card.id} className="gf-textbook-calamity-card">
-            <div className="gf-textbook-calamity-icon">{card.emoji}</div>
-            <div className="gf-textbook-calamity-body">
-              <div
-                className="gf-textbook-calamity-name"
-                style={{ color: card.color }}
-              >
-                {card.name}
-              </div>
-              <div className="gf-textbook-calamity-desc">
-                {card.description}
-              </div>
-              {card.note && (
-                <div className="gf-textbook-calamity-note">{card.note}</div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="gf-textbook-calamity-footer">
-        <p>病は毎ターン5%の確率で自然に悪化する。</p>
-        <p>病に病を重ねると悪化する。</p>
-        <p>霧の中から敵に神器を使う場合、使用先は霧の中から無作為に選ばれる。</p>
-      </div>
-    </div>
-  );
-}
-
-function ItemListView({ cards }: { cards: ItemCard[] }) {
-  return (
-    <div className="gf-textbook-calamity">
-      <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => (
-          <div key={card.id} className="gf-textbook-item-card">
-            <div className="gf-textbook-calamity-icon">{card.emoji}</div>
-            <div className="gf-textbook-calamity-body">
-              <div className="gf-textbook-item-name">
-                {card.name}
-                {card.price !== undefined && (
-                  <span className="gf-textbook-item-price">￥{card.price}</span>
-                )}
-              </div>
-              <div className="gf-textbook-calamity-desc">{card.description}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MiracleListView({ cards }: { cards: MiracleCard[] }) {
   return (
     <div className="gf-textbook-calamity">
       <div className="gf-textbook-calamity-grid">
         {cards.map((card) => {
-          const attr = card.attribute ? ATTR_BY_KEY[card.attribute] : null;
+          const stats = cardStatLabels(card);
           return (
-            <div
-              key={card.id}
-              className="gf-textbook-item-card"
-              style={
-                attr
-                  ? {
-                      background: attr.bgColor,
-                      borderColor: attr.color,
-                    }
-                  : undefined
-              }
-            >
+            <div key={card.id} className="gf-textbook-item-card">
               <div className="gf-textbook-calamity-icon">{card.emoji}</div>
               <div className="gf-textbook-calamity-body">
-                <div
-                  className="gf-textbook-item-name"
-                  style={attr ? { color: attr.color } : undefined}
-                >
-                  {card.name}
+                <div className="gf-textbook-item-name">
+                  <span>{card.name}</span>
                   {card.price !== undefined && (
-                    <span className="gf-textbook-item-price">￥{card.price}</span>
+                    <span className="gf-textbook-item-price">
+                      ￥{card.price}
+                    </span>
                   )}
                 </div>
-                <div className="gf-textbook-calamity-desc">{card.description}</div>
+                <div className="gf-textbook-calamity-desc">
+                  {card.description}
+                </div>
+                {stats.length > 0 && (
+                  <div className="gf-textbook-stats">
+                    {stats.map((stat) => (
+                      <span key={stat} className="gf-textbook-stat">
+                        {stat}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+      {note && (
+        <div className="gf-textbook-calamity-footer">
+          <p>{note}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function DevilListView({ cards }: { cards: DevilCard[] }) {
+function PartyListView({
+  parties,
+  note,
+}: {
+  parties: CatalogParty[];
+  note?: string;
+}) {
+  return (
+    <div className="gf-textbook-calamity">
+      <div className="gf-textbook-calamity-grid">
+        {parties.map((party) => (
+          <div
+            key={party.id}
+            className="gf-textbook-item-card"
+            style={{ background: "#e2efe5", borderColor: "#6cae8a" }}
+          >
+            <div className="gf-textbook-calamity-icon">{party.emoji}</div>
+            <div className="gf-textbook-calamity-body">
+              <div className="gf-textbook-item-name">
+                <span>{party.name}</span>
+                {party.price !== undefined && (
+                  <span className="gf-textbook-item-price">
+                    ￥{party.price}
+                  </span>
+                )}
+              </div>
+              <div className="gf-textbook-party-ideology">
+                {party.ideology}
+              </div>
+              <div className="gf-textbook-calamity-desc">
+                {party.description}
+              </div>
+              <div className="gf-textbook-party-actions">
+                {party.actions.map((action) => (
+                  <div key={action.name} className="gf-textbook-party-action">
+                    <span className="gf-textbook-party-action-name">
+                      {action.name}
+                    </span>
+                    <span>{partyActionText(action)}</span>
+                    <span className="gf-textbook-party-action-weight">
+                      重み {action.weight}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {note && (
+        <div className="gf-textbook-calamity-footer">
+          <p>{note}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DevilListView({
+  devils,
+  rule,
+  note,
+}: {
+  devils: CatalogDevil[];
+  rule: string;
+  note?: string;
+}) {
   return (
     <div className="gf-textbook-calamity">
       <div
         className="gf-textbook-calamity-desc"
         style={{ marginBottom: 12, lineHeight: 1.7 }}
       >
-        {DEVIL_RULE}
+        {rule}
       </div>
       <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => (
+        {devils.map((devil) => (
           <div
-            key={card.id}
+            key={devil.id}
             className="gf-textbook-item-card"
             style={{ background: "#e6dcf3", borderColor: "#8b5cc4" }}
           >
-            <div className="gf-textbook-calamity-icon">{card.emoji}</div>
+            <div className="gf-textbook-calamity-icon">{devil.emoji}</div>
             <div className="gf-textbook-calamity-body">
-              <div
-                className="gf-textbook-item-name"
-                style={{ color: "#8b5cc4" }}
-              >
-                {card.name}
-                {card.weight !== undefined && (
-                  <span className="gf-textbook-item-price">重み {card.weight}</span>
-                )}
+              <div className="gf-textbook-item-name">
+                <span>{devil.name}</span>
+                <span className="gf-textbook-item-price">
+                  重み {devil.weight}
+                </span>
               </div>
-              {card.action && (
-                <div
-                  className="gf-textbook-calamity-desc"
-                  style={{ fontWeight: 600 }}
-                >
-                  {card.action}
-                </div>
-              )}
-              <div className="gf-textbook-calamity-desc">{card.description}</div>
+              <div className="gf-textbook-devil-action">{devil.action}</div>
+              <div className="gf-textbook-calamity-desc">
+                {devil.effectLabel}
+              </div>
+              <div className="gf-textbook-calamity-desc">
+                {devil.description}
+              </div>
             </div>
           </div>
         ))}
       </div>
+      {note && (
+        <div className="gf-textbook-calamity-footer">
+          <p>{note}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function PartyListView({ cards }: { cards: PartyCard[] }) {
-  return (
-    <div className="gf-textbook-calamity">
-      <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => {
-          const attr = ATTR_BY_KEY[card.attribute];
-          return (
-            <div
-              key={card.id}
-              className="gf-textbook-item-card"
-              style={{ background: attr.bgColor, borderColor: attr.color }}
-            >
-              <div className="gf-textbook-calamity-icon">{card.emoji}</div>
-              <div className="gf-textbook-calamity-body">
-                <div
-                  className="gf-textbook-item-name"
-                  style={{ color: attr.color }}
-                >
-                  {card.name}
-                  <span
-                    className="gf-textbook-attr-mark"
-                    style={{
-                      background: attr.bgColor,
-                      color: attr.color,
-                      borderColor: attr.color,
-                    }}
-                  >
-                    {attr.icon}
-                  </span>
-                </div>
-                <div className="gf-textbook-calamity-desc">{card.description}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PhenomenonListView({ cards }: { cards: PhenomenonCard[] }) {
-  return (
-    <div className="gf-textbook-calamity">
-      <div className="gf-textbook-calamity-grid">
-        {cards.map((card) => (
-          <div
-            key={card.id}
-            className="gf-textbook-item-card"
-            style={{ background: "#dde9f8", borderColor: "#3a78d4" }}
-          >
-            <div className="gf-textbook-calamity-icon">{card.emoji}</div>
-            <div className="gf-textbook-calamity-body">
-              <div
-                className="gf-textbook-item-name"
-                style={{ color: "#3a78d4" }}
-              >
-                {card.name}
-              </div>
-              <div className="gf-textbook-calamity-desc">{card.description}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TradeListView() {
-  const trades = [
-    {
-      name: "買う",
-      emoji: "💰",
-      description: "相手の手札から1枚選んで買う",
-    },
-    {
-      name: "売る",
-      emoji: "🏷️",
-      description: "手札を選んで相手に売りつける",
-    },
-    {
-      name: "両替",
-      emoji: "🔄",
-      description: "HPを削ってMPやお金に換える",
-    },
-  ];
-  return (
-    <div className="gf-textbook-trade">
-      <h2 className="gf-textbook-title">取引</h2>
-      <div className="gf-textbook-trade-list">
-        {trades.map((t) => (
-          <div key={t.name} className="gf-textbook-trade-item">
-            <div className="gf-textbook-trade-title">
-              {t.emoji} {t.name}
-            </div>
-            <div className="gf-textbook-trade-desc">{t.description}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TextEntriesView({
-  entries,
+function RulesView({
+  title,
+  sections,
 }: {
-  entries: { tokens: Token[]; note?: string }[];
+  title: string;
+  sections: RuleSection[];
 }) {
   return (
-    <>
-      <h2 className="gf-textbook-title">説明</h2>
-      <div className="gf-textbook-entries">
-        {entries.map((entry, i) => (
-          <div
-            key={i}
-            className={`gf-textbook-entry${entry.note ? " has-note" : ""}`}
-          >
-            <div className="gf-textbook-row">
-              {entry.tokens.map((tok, j) => (
-                <TokenView key={j} tok={tok} />
-              ))}
-            </div>
-            {entry.note && (
-              <div className="gf-textbook-note">{entry.note}</div>
-            )}
+    <div className="gf-textbook-trade">
+      <h2 className="gf-textbook-title">{title}</h2>
+      {sections.map((section) => (
+        <div key={section.title} className="gf-textbook-trade-item">
+          <div className="gf-textbook-trade-title">{section.title}</div>
+          <div className="gf-textbook-rule-lines">
+            {section.lines.map((line, index) => (
+              <div
+                key={`${section.title}-${index}`}
+                className="gf-textbook-trade-desc"
+              >
+                {line}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function TokenView({ tok }: { tok: Token }) {
-  if (tok.type === "text") {
-    return <span className="gf-textbook-text">{tok.value}</span>;
-  }
-  const attr = ATTR_BY_KEY[tok.key as AttributeKey];
-  return (
-    <span
-      className="gf-textbook-attr"
-      style={{ color: attr.color }}
-      title={attr.label}
-    >
-      <span className="gf-textbook-attr-icon" style={{ borderColor: attr.color }}>
-        {attr.icon}
-      </span>
-      <span className="gf-textbook-attr-label">{attr.label}</span>
-    </span>
+        </div>
+      ))}
+    </div>
   );
 }

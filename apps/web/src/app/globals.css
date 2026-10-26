@@ -985,6 +985,73 @@ a {
   color: #4a3812;
 }
 
+.gf-textbook-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.gf-textbook-stat {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-teal);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-dark);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.gf-textbook-party-ideology {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--bar-teal-dark);
+  letter-spacing: 0.04em;
+}
+
+.gf-textbook-party-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.gf-textbook-party-action {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(108, 174, 138, 0.55);
+  font-size: 11px;
+  color: #1f3a35;
+  font-weight: 700;
+}
+
+.gf-textbook-party-action-name {
+  font-weight: 900;
+  color: var(--bar-teal-dark);
+}
+
+.gf-textbook-party-action-weight {
+  margin-left: auto;
+  color: var(--text-dark-soft);
+}
+
+.gf-textbook-devil-action {
+  font-size: 13px;
+  font-weight: 900;
+  color: #5b2f8c;
+}
+
+.gf-textbook-rule-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .gf-textbook-calamity-footer {
   display: flex;
   flex-direction: column;
