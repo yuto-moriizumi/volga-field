@@ -436,10 +436,10 @@ test("playCard recovers MP when the player uses a misc MP-recovery card", () => 
     ...state.players[0]!,
     hp: 20,
     mp: 2,
-    hand: [{ id: "supporter_rally" }],
+    hand: [{ id: "tasuki" }],
   };
 
-  const result = playCard(state, "attacker", { id: "supporter_rally" }, "defender");
+  const result = playCard(state, "attacker", { id: "tasuki" }, "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -449,7 +449,7 @@ test("playCard recovers MP when the player uses a misc MP-recovery card", () => 
   assert.equal(defender?.mp, 0);
   const mpRecoverLog = result.state.log.find((entry) => entry.kind === "mpRecover");
   assert.ok(mpRecoverLog);
-  assert.equal(mpRecoverLog?.message, "AttackerのMPが2回復 (支持者集会)");
+  assert.equal(mpRecoverLog?.message, "AttackerのMPが2回復 (タスキ)");
 });
 
 test("playCard caps MP recovery at the player's maxMp", () => {
@@ -459,10 +459,10 @@ test("playCard caps MP recovery at the player's maxMp", () => {
     hp: 20,
     mp: 8,
     maxMp: 10,
-    hand: [{ id: "un_speech" }],
+    hand: [{ id: "election_car" }],
   };
 
-  const result = playCard(state, "attacker", { id: "un_speech" }, "defender");
+  const result = playCard(state, "attacker", { id: "election_car" }, "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -476,16 +476,42 @@ test("playCard consumes the misc card from hand after use", () => {
     ...state.players[0]!,
     hp: 20,
     mp: 0,
-    hand: [{ id: "local_campaign" }, { id: "potion" }],
+    hand: [{ id: "nobori" }, { id: "potion" }],
   };
 
-  const result = playCard(state, "attacker", { id: "local_campaign" }, "defender");
+  const result = playCard(state, "attacker", { id: "nobori" }, "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
   assert.equal(attacker?.mp, 1);
   assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+});
+
+test("misc cards are political campaign items that recover MP", () => {
+  const politicalItems = [
+    { id: "nobori", name: "のぼり", mpRecover: 1, price: 3 },
+    { id: "tasuki", name: "タスキ", mpRecover: 2, price: 5 },
+    { id: "poster", name: "ポスター", mpRecover: 3, price: 7 },
+    { id: "election_car", name: "選挙カー", mpRecover: 5, price: 10 },
+  ];
+
+  const miscIds = BASE_CARDS.filter((card) => card.category === "misc").map(
+    (card) => card.id,
+  );
+  assert.deepEqual(miscIds, politicalItems.map((item) => item.id));
+
+  for (const expected of politicalItems) {
+    const card = findCard(expected.id);
+    assert.ok(card, `missing misc card: ${expected.id}`);
+    assert.equal(card?.category, "misc");
+    assert.equal(card?.name, expected.name);
+    assert.equal(card?.price, expected.price);
+
+    const mpRecover = card?.effects.find((effect) => effect.kind === "mpRecover");
+    assert.equal(mpRecover?.target, "self");
+    assert.equal(mpRecover?.amount, expected.mpRecover);
+  }
 });
 
 function attributeWeaponState(): GameState {

@@ -1334,10 +1334,10 @@ export const BASE_CARDS: CardDefinition[] = [
     effects: [],
   },
   {
-    id: "local_campaign",
-    name: "地方遊説",
+    id: "nobori",
+    name: "のぼり",
     category: "misc",
-    emoji: "🎤",
+    emoji: "🎏",
     description: "MP+1",
     price: 3,
     effects: [
@@ -1350,10 +1350,10 @@ export const BASE_CARDS: CardDefinition[] = [
     ],
   },
   {
-    id: "supporter_rally",
-    name: "支持者集会",
+    id: "tasuki",
+    name: "タスキ",
     category: "misc",
-    emoji: "📣",
+    emoji: "🎗️",
     description: "MP+2",
     price: 5,
     effects: [
@@ -1366,10 +1366,10 @@ export const BASE_CARDS: CardDefinition[] = [
     ],
   },
   {
-    id: "national_campaign",
-    name: "全国遊説",
+    id: "poster",
+    name: "ポスター",
     category: "misc",
-    emoji: "🗣️",
+    emoji: "🖼️",
     description: "MP+3",
     price: 7,
     effects: [
@@ -1382,10 +1382,10 @@ export const BASE_CARDS: CardDefinition[] = [
     ],
   },
   {
-    id: "un_speech",
-    name: "国連総会演説",
+    id: "election_car",
+    name: "選挙カー",
     category: "misc",
-    emoji: "🌐",
+    emoji: "🚐",
     description: "MP+5",
     price: 10,
     effects: [
