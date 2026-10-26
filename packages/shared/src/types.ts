@@ -9,7 +9,6 @@ export type CardCategory =
   | "miracle"
   | "special"
   | "trade"
-  | "colorless"
   | "misc"
   | "party";
 

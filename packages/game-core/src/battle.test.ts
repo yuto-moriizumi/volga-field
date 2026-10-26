@@ -11,7 +11,7 @@ import {
   sellCards,
   startBuy,
 } from "./battle.js";
-import { BASE_CARDS, DECK_SIZE } from "./cards.js";
+import { BASE_CARDS, DECK_SIZE, findCard } from "./cards.js";
 import { buildDeck } from "./deck.js";
 
 function defenseState(): GameState {
@@ -588,6 +588,29 @@ test("playCard combines multiple attack_power cards together", () => {
   if (!result.ok) return;
   assert.equal(result.state.pendingAttack?.amount, 5);
   assert.equal(result.state.pendingAttack?.cardName, "計画経済+労働動員");
+});
+
+test("former colorless diplomatic cards are weapons and combine with other weapons", () => {
+  assert.equal(findCard("concern_expressed")?.category, "weapon");
+  assert.equal(findCard("condemn_strongest_terms")?.category, "weapon");
+
+  const state = attributeWeaponState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "concern_expressed" }, { id: "sword" }],
+  };
+
+  const result = playCard(
+    state,
+    "attacker",
+    [{ id: "concern_expressed" }, { id: "sword" }],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.amount, 4);
+  assert.equal(result.state.pendingAttack?.cardName, "懸念を表明する+剣");
 });
 
 test("playCard rejects when any selected card is missing from hand", () => {
