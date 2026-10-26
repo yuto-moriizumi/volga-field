@@ -81,7 +81,13 @@ export function SourceArea({
   return (
     <div className="gf-source-area" aria-label="ソースエリア">
       <div className="gf-status-stack">
-        <NamePlate label="ターン" name={activePlayer?.name ?? "?"} tone="teal" />
+        <NamePlate
+          label="ターン"
+          name={activePlayer?.name ?? "?"}
+          tone="teal"
+          playerId={activePlayer?.id}
+          active
+        />
         {discardMode && <div className="gf-discard-status">カードを捨てる</div>}
         {sellMode && <div className="gf-discard-status">カードを売る</div>}
       </div>

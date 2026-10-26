@@ -6,12 +6,15 @@ import { findCard, getCardPrice } from "@volga/game-core";
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
+import { BattleEffects } from "./BattleEffects";
 import { HandArea } from "./HandArea";
 import { Header } from "./Header";
 import { InfoArea } from "./InfoArea";
 import { NameList } from "./NameList";
 import { SourceArea, type ExchangeDraft } from "./SourceArea";
 import { TargetArea } from "./TargetArea";
+import { eventAffectsPlayer, type PresentedBattleEvent } from "./battleEvents";
+import { useBattlePresentation } from "./useBattlePresentation";
 
 export function GameRoom({
   params,
@@ -28,7 +31,7 @@ export function GameRoom({
     [ctxGameState, roomId],
   );
   const autoJoinAttemptedRef = useRef(false);
-  const previousLogLengthRef = useRef<number | null>(null);
+  const lastActionAtRef = useRef(0);
   const [selectedCardIdxes, setSelectedCardIdxes] = useState<number[]>([]);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [selectedDefenseIdxes, setSelectedDefenseIdxes] = useState<number[]>([]);
@@ -39,7 +42,6 @@ export function GameRoom({
   const [selectedSellIdxes, setSelectedSellIdxes] = useState<number[]>([]);
   const [selectedDiscardIdxes, setSelectedDiscardIdxes] = useState<number[]>([]);
   const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
-  const [hitFlash, setHitFlash] = useState<{ amount: number; key: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [joinRequested, setJoinRequested] = useState(
@@ -99,20 +101,16 @@ export function GameRoom({
     gameState?.players[gameState.activePlayerIndex]?.id === playerId;
   const isDefending = gameState?.phase === "defense" && gameState.pendingAttack?.defenderId === playerId;
   const canAct = Boolean(isMyTurn && gameState?.phase !== "defense" && !gameState.winner);
+  const presentation = useBattlePresentation(gameState, playerId);
+  const isAnimating = presentation.isAnimating;
 
-  useEffect(() => {
-    if (!gameState) return;
-    const previousLength = previousLogLengthRef.current;
-    previousLogLengthRef.current = gameState.log.length;
-    if (previousLength === null || gameState.log.length <= previousLength) return;
-    const newEntries = gameState.log.slice(previousLength);
-    const attack = newEntries
-      .reverse()
-      .find((entry) => entry.kind === "attack" && Boolean(entry.damage));
-    if (attack?.damage) {
-      setHitFlash({ amount: attack.damage, key: Date.now() });
-    }
-  }, [gameState]);
+  function allowAction(): boolean {
+    // Guards against a double click landing before the new state arrives.
+    const now = typeof performance === "undefined" ? Date.now() : performance.now();
+    if (now - lastActionAtRef.current < 450) return false;
+    lastActionAtRef.current = now;
+    return true;
+  }
 
   useEffect(() => {
     if (canAct) return;
@@ -127,7 +125,7 @@ export function GameRoom({
   }, [canAct]);
 
   function playCard(idx: number) {
-    if (!me || !canAct || discardMode || sellMode) return;
+    if (!me || !canAct || isAnimating || discardMode || sellMode) return;
     const card = playableCards(me)[idx];
     if (!card) return;
     const definition = findCard(card.id);
@@ -172,7 +170,8 @@ export function GameRoom({
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || discardMode || sellMode || selectedCardIdxes.length === 0) return;
+    if (!me || !canAct || isAnimating || discardMode || sellMode || selectedCardIdxes.length === 0) return;
+    if (!allowAction()) return;
     const cards = selectedCardIdxes
       .map((idx) => playableCards(me)[idx])
       .filter((c): c is { id: string } => Boolean(c));
@@ -250,7 +249,8 @@ export function GameRoom({
   }
 
   function confirmExchange() {
-    if (!me || !exchangeDraft) return;
+    if (!me || !exchangeDraft || isAnimating) return;
+    if (!allowAction()) return;
     const mpDelta = exchangeDraft.mp - me.mp;
     const moneyDelta = exchangeDraft.money - me.money;
     if (mpDelta === 0 && moneyDelta === 0) return;
@@ -262,7 +262,8 @@ export function GameRoom({
   }
 
   function defend(cardIdxes: number[] = []) {
-    if (!me || !isDefending) return;
+    if (!me || !isDefending || isAnimating) return;
+    if (!allowAction()) return;
     const cardRefs = cardIdxes
       .map((idx) => me.hand[idx])
       .filter((card): card is { id: string } => Boolean(card))
@@ -272,7 +273,8 @@ export function GameRoom({
   }
 
   function endTurn() {
-    if (!canAct) return;
+    if (!canAct || isAnimating) return;
+    if (!allowAction()) return;
     setDiscardMode(false);
     setSellMode(false);
     setExchangeMode(false);
@@ -317,7 +319,8 @@ export function GameRoom({
   }
 
   function confirmDiscard() {
-    if (!me || !canAct || !discardMode || selectedDiscardIdxes.length === 0) return;
+    if (!me || !canAct || isAnimating || !discardMode || selectedDiscardIdxes.length === 0) return;
+    if (!allowAction()) return;
     const cardRefs = selectedDiscardIdxes
       .map((idx) => me.hand[idx])
       .filter((card): card is { id: string } => Boolean(card))
@@ -328,13 +331,15 @@ export function GameRoom({
   }
 
   function acceptBuy() {
-    if (!me || !gameState?.pendingBuy) return;
+    if (!me || !gameState?.pendingBuy || isAnimating) return;
+    if (!allowAction()) return;
     if (gameState.pendingBuy.sourceId !== playerId) return;
     send({ type: "confirm_buy", accept: true });
   }
 
   function declineBuy() {
-    if (!me || !gameState?.pendingBuy) return;
+    if (!me || !gameState?.pendingBuy || isAnimating) return;
+    if (!allowAction()) return;
     if (gameState.pendingBuy.sourceId !== playerId) return;
     send({ type: "confirm_buy", accept: false });
   }
@@ -496,7 +501,8 @@ export function GameRoom({
                 pendingBuy={myPendingBuy}
                 pendingSell={pendingSell}
                 canAffordBuy={canAffordBuy}
-                hitFlash={hitFlash}
+                interactionLocked={isAnimating}
+                battleEvent={presentation.current}
                 onSelectTarget={setSelectedTargetId}
                 onExecute={executeSelectedCard}
                 onAcceptBuy={acceptBuy}
@@ -511,7 +517,7 @@ export function GameRoom({
             <div className="gf-battle-row gf-battle-row-split">
               <HandArea
                 me={me}
-                canAct={canAct}
+                canAct={canAct && !isAnimating}
                 isDefending={isDefending}
                 selectedCardIdxes={selectedCardIdxes}
                 selectedDefenseIdxes={selectedDefenseIdxes}
@@ -553,6 +559,16 @@ export function GameRoom({
           </>
         )}
 
+        {gameStarted && presentation.current && (
+          <BattleEffects
+            current={presentation.current}
+            players={gameState.players}
+            viewerId={playerId}
+            reducedMotion={presentation.reducedMotion}
+            onSkip={presentation.skip}
+          />
+        )}
+
         {error && <div className="gf-toast">{error}</div>}
       </main>
 
@@ -566,10 +582,16 @@ export function GameRoom({
         {me && <span className="gf-tag">￥{me.money}</span>}
       </BottomBar>
 
-      {gameState.winner && (
+      {gameState.winner && !isAnimating && (
         <div className="gf-modal-backdrop">
-          <div className="gf-modal" style={{ alignItems: "center", textAlign: "center" }}>
-            <div style={{ fontSize: 56, lineHeight: 1 }}>
+          <div
+            className="gf-modal gf-victory-modal"
+            style={{ alignItems: "center", textAlign: "center" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={gameState.winner === playerId ? "勝利" : "敗北"}
+          >
+            <div className="gf-victory-icon" style={{ fontSize: 56, lineHeight: 1 }}>
               {gameState.winner === playerId ? "🏆" : "💀"}
             </div>
             <h2
@@ -644,7 +666,8 @@ function BattleField({
   pendingBuy,
   pendingSell,
   canAffordBuy,
-  hitFlash,
+  interactionLocked,
+  battleEvent,
   onSelectTarget,
   onExecute,
   onAcceptBuy,
@@ -673,7 +696,8 @@ function BattleField({
   pendingBuy: GameState["pendingBuy"];
   pendingSell: GameState["pendingSell"];
   canAffordBuy: boolean;
-  hitFlash: { amount: number; key: number } | null;
+  interactionLocked: boolean;
+  battleEvent: PresentedBattleEvent | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
   onAcceptBuy: () => void;
@@ -728,11 +752,13 @@ function BattleField({
     canPassDefense || (canEndTurn && displayedCards.length === 0 && !discardMode);
   const confirmDisabled = gameState.winner
     ? true
-    : exchangeMode
-      ? !exchangeDraft ||
-        (exchangeDraft.mp - (me?.mp ?? 0) === 0 &&
-          exchangeDraft.money - (me?.money ?? 0) === 0)
-      : !(canConfirmSelection || canConfirmEmpty);
+    : interactionLocked
+      ? true
+      : exchangeMode
+        ? !exchangeDraft ||
+          (exchangeDraft.mp - (me?.mp ?? 0) === 0 &&
+            exchangeDraft.money - (me?.money ?? 0) === 0)
+        : !(canConfirmSelection || canConfirmEmpty);
   const confirmLabel = isDefending
     ? defenseCards.length > 0
       ? `${defenseCards.length}枚 防${defensePower}`
@@ -750,9 +776,13 @@ function BattleField({
           : combinedAttackPower > 0
             ? `攻${combinedAttackPower}`
             : "確定";
+  const targetEffect =
+    battleEvent && targetPlayer && eventAffectsPlayer(battleEvent.event, targetPlayer.id)
+      ? { event: battleEvent.event, key: battleEvent.key }
+      : null;
 
   function confirmAction() {
-    if (gameState.winner) return;
+    if (gameState.winner || interactionLocked) return;
     if (exchangeMode) {
       onConfirmExchange();
       return;
@@ -799,11 +829,13 @@ function BattleField({
         pendingBuy={pendingBuy}
         pendingSell={pendingSell}
         targetPlayer={targetPlayer ?? null}
-        hitFlash={hitFlash}
+        effect={targetEffect}
       />
       <NameList
         players={players}
         playerId={playerId}
+        activePlayerId={activePlayer?.id ?? null}
+        activeEffect={battleEvent?.event ?? null}
         selectedTargetId={selectedTargetId}
         canSelect={canSelectTarget}
         onSelect={onSelectTarget}
