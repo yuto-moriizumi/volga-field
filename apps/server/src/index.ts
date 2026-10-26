@@ -464,15 +464,9 @@ function handlePlayCard(
     playerId: client.id,
     cardRef: { id: cardIds[0]! },
   });
-  if (resolveAiDefense(room) && room.gameState && !room.gameState.winner) {
-    const ended = endTurn(room.gameState, client.id, room.deck);
-    if (ended.ok) {
-      room.gameState = ended.state;
-      room.deck = ended.deck;
-      broadcastStateToAll(room);
-      runAiTurn(room);
-    }
-  }
+  // The attacker keeps the turn after a defense resolves, regardless of whether
+  // the defender is an AI. They can play more cards or declare end_turn.
+  resolveAiDefense(room);
 }
 
 function handleDefend(client: Client, cardIds: string[] = []): void {
@@ -696,11 +690,35 @@ function isClientMessage(value: unknown): value is ClientMessage {
   );
 }
 
-export async function startServer(): Promise<void> {
-  const { WebSocketServer } = await import("ws");
-  const wss = new WebSocketServer({ port: PORT });
+export interface ServerHandle {
+  port: number;
+  close: () => Promise<void>;
+}
 
-  log(`startup: listening on ws://localhost:${PORT}`);
+export async function startServer(
+  options: { port?: number } = {},
+): Promise<ServerHandle> {
+  const { WebSocketServer } = await import("ws");
+  const requestedPort = options.port ?? PORT;
+  const wss = new WebSocketServer({ port: requestedPort });
+
+  await new Promise<void>((resolve, reject) => {
+    const onListening = () => {
+      wss.off("error", onError);
+      resolve();
+    };
+    const onError = (err: Error) => {
+      wss.off("listening", onListening);
+      reject(err);
+    };
+    wss.once("listening", onListening);
+    wss.once("error", onError);
+  });
+
+  const address = wss.address();
+  const port = typeof address === "object" && address ? address.port : requestedPort;
+
+  log(`startup: listening on ws://localhost:${port}`);
 
   wss.on("connection", (ws, req) => {
     const id = genId("p");
@@ -739,11 +757,29 @@ export async function startServer(): Promise<void> {
     });
   });
 
-  setInterval(() => {
+  const statusTimer = setInterval(() => {
     if (clients.size > 0 || rooms.size > 0) {
       log(`status: clients=${clients.size} rooms=${rooms.size}`);
     }
   }, 30000);
+  statusTimer.unref();
+
+  return {
+    port,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        clearInterval(statusTimer);
+        for (const ws of wss.clients) {
+          ws.terminate();
+        }
+        wss.close((err) => {
+          clients.clear();
+          rooms.clear();
+          if (err) reject(err);
+          else resolve();
+        });
+      }),
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
