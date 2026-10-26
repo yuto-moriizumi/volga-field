@@ -616,6 +616,12 @@ test("playCard combines multiple attack_power cards together", () => {
   assert.equal(result.state.pendingAttack?.cardName, "計画経済+労働動員");
 });
 
+test("potion cards belong to the special category", () => {
+  for (const id of ["potion", "hi_potion", "poison"]) {
+    assert.equal(findCard(id)?.category, "special");
+  }
+});
+
 test("former colorless diplomatic cards are weapons and combine with other weapons", () => {
   assert.equal(findCard("concern_expressed")?.category, "weapon");
   assert.equal(findCard("condemn_strongest_terms")?.category, "weapon");

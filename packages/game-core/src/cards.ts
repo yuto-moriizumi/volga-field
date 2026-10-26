@@ -1185,7 +1185,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "potion",
     name: "回復薬",
-    category: "potion",
+    category: "special",
     emoji: "🧪",
     description: "HP+5",
     price: 4,
@@ -1201,7 +1201,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "hi_potion",
     name: "高級回復薬",
-    category: "potion",
+    category: "special",
     emoji: "🍷",
     description: "HP+10",
     price: 8,
@@ -1217,7 +1217,7 @@ export const BASE_CARDS: CardDefinition[] = [
   {
     id: "poison",
     name: "毒薬",
-    category: "potion",
+    category: "special",
     emoji: "☠️",
     description: "相手-3",
     price: 4,

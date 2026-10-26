@@ -177,6 +177,13 @@ function CardGridCatalog({
   );
 }
 
+/** 説明文にすでに含まれる数値ラベルは重複表示しない。 */
+function visibleStatLabels(card: CatalogCard): string[] {
+  return cardStatLabels(card).filter(
+    (stat) => !card.description.includes(stat),
+  );
+}
+
 function CardListCatalog({
   cards,
   note,
@@ -188,7 +195,7 @@ function CardListCatalog({
     <div className="gf-textbook-calamity">
       <div className="gf-textbook-calamity-grid">
         {cards.map((card) => {
-          const stats = cardStatLabels(card);
+          const stats = visibleStatLabels(card);
           return (
             <div key={card.id} className="gf-textbook-item-card">
               <div className="gf-textbook-calamity-icon">{card.emoji}</div>
