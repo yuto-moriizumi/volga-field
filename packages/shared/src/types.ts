@@ -6,7 +6,6 @@ export type CardCategory =
   | "weapon"
   | "shield"
   | "miracle"
-  | "special"
   | "trade"
   | "misc"
   | "party";

@@ -39,7 +39,7 @@ function defenseState(): GameState {
         mp: 0,
         maxMp: 10,
         money: 20,
-        hand: [{ id: "shield" }, { id: "leaf_shield" }, { id: "potion" }],
+        hand: [{ id: "shield" }, { id: "leaf_shield" }, { id: "nobori" }],
         learnedMiracles: [],
         party: null,
         ready: true,
@@ -78,7 +78,8 @@ function playState(): GameState {
       {
         ...state.players[0]!,
         hp: 12,
-        hand: [{ id: "potion" }],
+        mp: 10,
+        hand: [{ id: "heal" }],
       },
       {
         ...state.players[1]!,
@@ -100,21 +101,21 @@ test("defendAttack can use multiple defense cards at once", () => {
 
   const defender = result.state.players.find((p) => p.id === "defender");
   assert.equal(defender?.hp, 20);
-  assert.deepEqual(defender?.hand, [{ id: "potion" }]);
+  assert.deepEqual(defender?.hand, [{ id: "nobori" }]);
   assert.equal(result.state.phase, "play");
   assert.equal(result.state.pendingAttack, null);
   assert.equal(result.state.log.filter((entry) => entry.kind === "defense").length, 2);
 });
 
-test("playCard heals the player who uses a healing potion", () => {
-  const result = playCard(playState(), "attacker", { id: "potion" }, "defender");
+test("playCard heals the player who uses the ヒール miracle", () => {
+  const result = playCard(playState(), "attacker", { id: "heal" }, "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
 
   const attacker = result.state.players.find((p) => p.id === "attacker");
   const defender = result.state.players.find((p) => p.id === "defender");
-  assert.equal(attacker?.hp, 17);
+  assert.equal(attacker?.hp, 20);
   assert.equal(defender?.hp, 20);
 });
 
@@ -124,16 +125,17 @@ test("playCard healing is not capped by maxHp", () => {
     ...state.players[0]!,
     hp: 20,
     maxHp: 20,
-    hand: [{ id: "potion" }],
+    mp: 10,
+    hand: [{ id: "heal" }],
   };
 
-  const result = playCard(state, "attacker", { id: "potion" }, "defender");
+  const result = playCard(state, "attacker", { id: "heal" }, "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
 
   const attacker = result.state.players.find((p) => p.id === "attacker");
-  assert.equal(attacker?.hp, 25);
+  assert.equal(attacker?.hp, 28);
   assert.equal(attacker?.maxHp, 20);
 });
 
@@ -176,15 +178,15 @@ test("discardCards removes selected cards during the active player's turn", () =
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "potion" }, { id: "potion" }, { id: "axe" }],
+    hand: [{ id: "nobori" }, { id: "tasuki" }, { id: "axe" }],
   };
 
-  const result = discardCards(state, "attacker", [{ id: "potion" }, { id: "axe" }]);
+  const result = discardCards(state, "attacker", [{ id: "nobori" }, { id: "axe" }]);
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
-  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.deepEqual(attacker?.hand, [{ id: "tasuki" }]);
   assert.equal(result.state.log.at(-1)?.kind, "system");
 });
 
@@ -192,7 +194,7 @@ test("startBuy picks a random card from the target and consumes the buy card", (
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "buy" }, { id: "potion" }],
+    hand: [{ id: "buy" }, { id: "nobori" }],
   };
   state.players[1] = {
     ...state.players[1]!,
@@ -205,7 +207,7 @@ test("startBuy picks a random card from the target and consumes the buy card", (
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
   const defender = result.state.players.find((p) => p.id === "defender");
-  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.deepEqual(attacker?.hand, [{ id: "nobori" }]);
   assert.equal(result.state.pendingBuy?.sourceId, "attacker");
   assert.equal(result.state.pendingBuy?.targetId, "defender");
   assert.equal(defender?.hand.length, 2);
@@ -215,7 +217,7 @@ test("confirmBuy moves the card and money when accepted", () => {
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "buy" }, { id: "potion" }],
+    hand: [{ id: "buy" }, { id: "nobori" }],
     money: 20,
   };
   state.players[1] = {
@@ -245,7 +247,7 @@ test("confirmBuy cancels when buyer declines", () => {
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "buy" }, { id: "potion" }],
+    hand: [{ id: "buy" }, { id: "nobori" }],
     money: 20,
   };
   state.players[1] = {
@@ -273,7 +275,7 @@ test("sellCards transfers selected cards and money to the target", () => {
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "sell" }, { id: "potion" }, { id: "axe" }],
+    hand: [{ id: "sell" }, { id: "nobori" }, { id: "axe" }],
     money: 0,
   };
   state.players[1] = {
@@ -282,14 +284,14 @@ test("sellCards transfers selected cards and money to the target", () => {
     money: 20,
   };
 
-  const result = sellCards(state, "attacker", [{ id: "potion" }, { id: "axe" }], "defender");
+  const result = sellCards(state, "attacker", [{ id: "nobori" }, { id: "axe" }], "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
   const defender = result.state.players.find((p) => p.id === "defender");
-  assert.equal(attacker?.money, 9);
-  assert.equal(defender?.money, 20 - 9);
+  assert.equal(attacker?.money, 8);
+  assert.equal(defender?.money, 20 - 8);
   assert.equal(attacker?.hand.length, 0);
   assert.equal(defender?.hand.length, 2);
 });
@@ -298,7 +300,7 @@ test("sellCards drains money, then MP, then HP when target cannot pay", () => {
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "sell" }, { id: "hi_potion" }],
+    hand: [{ id: "sell" }, { id: "election_car" }],
     money: 0,
   };
   state.players[1] = {
@@ -309,15 +311,15 @@ test("sellCards drains money, then MP, then HP when target cannot pay", () => {
     hp: 20,
   };
 
-  const result = sellCards(state, "attacker", [{ id: "hi_potion" }], "defender");
+  const result = sellCards(state, "attacker", [{ id: "election_car" }], "defender");
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   const defender = result.state.players.find((p) => p.id === "defender");
   assert.equal(defender?.money, 0);
   assert.equal(defender?.mp, 0);
-  assert.equal(defender?.hp, 17);
-  assert.ok(defender?.hand.some((c) => c.id === "hi_potion"));
+  assert.equal(defender?.hp, 15);
+  assert.ok(defender?.hand.some((c) => c.id === "election_car"));
 });
 
 test("exchangeStats converts HP into MP and money", () => {
@@ -327,7 +329,7 @@ test("exchangeStats converts HP into MP and money", () => {
     hp: 20,
     mp: 0,
     money: 5,
-    hand: [{ id: "exchange" }, { id: "potion" }],
+    hand: [{ id: "exchange" }, { id: "nobori" }],
   };
 
   const result = exchangeStats(state, "attacker", 3, 7);
@@ -338,7 +340,7 @@ test("exchangeStats converts HP into MP and money", () => {
   assert.equal(attacker?.hp, 10);
   assert.equal(attacker?.mp, 3);
   assert.equal(attacker?.money, 12);
-  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.deepEqual(attacker?.hand, [{ id: "nobori" }]);
   assert.equal(result.state.log.at(-1)?.kind, "trade");
 });
 
@@ -403,7 +405,7 @@ test("exchangeStats rejects when exchange card is not in hand", () => {
     hp: 20,
     mp: 0,
     money: 0,
-    hand: [{ id: "potion" }],
+    hand: [{ id: "nobori" }],
   };
 
   const result = exchangeStats(state, "attacker", 1, 0);
@@ -476,7 +478,7 @@ test("playCard consumes the misc card from hand after use", () => {
     ...state.players[0]!,
     hp: 20,
     mp: 0,
-    hand: [{ id: "nobori" }, { id: "potion" }],
+    hand: [{ id: "nobori" }, { id: "tasuki" }],
   };
 
   const result = playCard(state, "attacker", { id: "nobori" }, "defender");
@@ -485,7 +487,7 @@ test("playCard consumes the misc card from hand after use", () => {
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
   assert.equal(attacker?.mp, 1);
-  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.deepEqual(attacker?.hand, [{ id: "tasuki" }]);
 });
 
 test("misc cards are political campaign items that recover MP", () => {
@@ -616,10 +618,17 @@ test("playCard combines multiple attack_power cards together", () => {
   assert.equal(result.state.pendingAttack?.cardName, "計画経済+労働動員");
 });
 
-test("potion cards belong to the special category", () => {
-  for (const id of ["potion", "hi_potion", "poison"]) {
-    assert.equal(findCard(id)?.category, "special");
+test("removed special cards are absent from the card data", () => {
+  for (const id of ["potion", "hi_potion", "poison", "sacrifice"]) {
+    assert.equal(findCard(id), undefined, `${id} should be removed`);
   }
+
+  const categories = new Set<string>(BASE_CARDS.map((card) => card.category));
+  assert.deepEqual(
+    [...categories].sort(),
+    ["miracle", "misc", "party", "shield", "trade", "weapon"],
+  );
+  assert.equal(categories.has("special"), false);
 });
 
 test("former colorless diplomatic cards are weapons and combine with other weapons", () => {
@@ -702,7 +711,7 @@ test("playCard joins the player's party when a party card is used", () => {
   const state = playState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "communist_party" }, { id: "potion" }],
+    hand: [{ id: "communist_party" }, { id: "nobori" }],
   };
 
   const result = playCard(state, "attacker", { id: "communist_party" }, "defender");
@@ -711,7 +720,7 @@ test("playCard joins the player's party when a party card is used", () => {
   if (!result.ok) return;
   const attacker = result.state.players.find((p) => p.id === "attacker");
   assert.equal(attacker?.party, "communist_party");
-  assert.deepEqual(attacker?.hand, [{ id: "potion" }]);
+  assert.deepEqual(attacker?.hand, [{ id: "nobori" }]);
   const joinLog = result.state.log.at(-1);
   assert.equal(joinLog?.kind, "special");
   assert.ok(joinLog?.message.includes("共産党"));
