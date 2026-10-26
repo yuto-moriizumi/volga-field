@@ -1,14 +1,9 @@
-import { BASE_CARDS } from "./cards.js";
+import { BASE_CARDS, DECK_SIZE } from "./cards.js";
 import type { CardRef } from "@volga/shared";
 
 export function buildDeck(seed: number): CardRef[] {
-  const ids = BASE_CARDS.map((c) => c.id);
-  const cards: CardRef[] = [];
-  for (let i = 0; i < 30; i++) {
-    const id = ids[(i + seed) % ids.length];
-    cards.push({ id });
-  }
-  return shuffle(cards, seed);
+  const cards: CardRef[] = BASE_CARDS.map((card) => ({ id: card.id }));
+  return shuffle(cards, seed).slice(0, DECK_SIZE);
 }
 
 export function shuffle<T>(arr: T[], seed: number): T[] {

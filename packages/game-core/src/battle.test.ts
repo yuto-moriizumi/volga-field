@@ -11,6 +11,8 @@ import {
   sellCards,
   startBuy,
 } from "./battle.js";
+import { BASE_CARDS, DECK_SIZE } from "./cards.js";
+import { buildDeck } from "./deck.js";
 
 function defenseState(): GameState {
   return {
@@ -114,6 +116,44 @@ test("playCard heals the player who uses a healing potion", () => {
   const defender = result.state.players.find((p) => p.id === "defender");
   assert.equal(attacker?.hp, 17);
   assert.equal(defender?.hp, 20);
+});
+
+test("playCard healing is not capped by maxHp", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hp: 20,
+    maxHp: 20,
+    hand: [{ id: "potion" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "potion" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.hp, 25);
+  assert.equal(attacker?.maxHp, 20);
+});
+
+test("buildDeck returns DECK_SIZE unique cards from BASE_CARDS", () => {
+  const deck = buildDeck(12345);
+  const ids = deck.map((card) => card.id);
+  const baseIds = new Set(BASE_CARDS.map((card) => card.id));
+
+  assert.equal(deck.length, DECK_SIZE);
+  assert.equal(new Set(ids).size, DECK_SIZE);
+  for (const id of ids) {
+    assert.ok(baseIds.has(id), `unknown card id: ${id}`);
+  }
+});
+
+test("buildDeck produces a different set for a different seed", () => {
+  const first = buildDeck(1).map((card) => card.id).sort();
+  const second = buildDeck(2).map((card) => card.id).sort();
+
+  assert.notDeepEqual(first, second);
 });
 
 test("playCard rejects defense cards on the attacker's turn", () => {
