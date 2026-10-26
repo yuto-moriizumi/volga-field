@@ -50,6 +50,22 @@ export function TextBook() {
         </aside>
 
         <section className="gf-textbook-body">
+          <div
+            role="note"
+            style={{
+              background: "var(--panel-cream)",
+              border: "1.5px solid var(--bar-teal)",
+              borderRadius: 10,
+              padding: "8px 12px",
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "var(--text-dark)",
+            }}
+          >
+            <strong>注意:</strong>{" "}
+            教典には構想段階・未実装の内容が含まれます。実装済みのカードとルールは{" "}
+            <code>packages/game-core/src/cards.ts</code> が正です。
+          </div>
           <CategoryView category={active} />
         </section>
       </main>

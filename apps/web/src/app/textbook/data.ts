@@ -305,6 +305,8 @@ export const ITEMS: ItemCard[] = [
 ];
 
 export const MIRACLES: MiracleCard[] = [
+  { id: "fire", name: "ファイア", emoji: "🔥", price: 5, description: "MP2 / 相手-4" },
+  { id: "thunder", name: "サンダー", emoji: "⚡", price: 6, description: "MP4 / 相手-3 / 自分も-1" },
   { id: "heal", name: "ヒール", emoji: "✨", price: 5, description: "HP+8" },
   {
     id: "tenbin",
@@ -320,6 +322,27 @@ export const MIRACLES: MiracleCard[] = [
     emoji: "💀",
     price: 7,
     description: "相手-8 / 自分も-5",
+  },
+];
+
+/** 実装済みの無属性カード（外交カード）。packages/game-core/src/cards.ts 準拠。 */
+export const COLORLESS: ItemCard[] = [
+  { id: "concern_expressed", name: "懸念を表明する", emoji: "🕊️", price: 1, description: "相手-1" },
+  { id: "strong_concern", name: "強い懸念を表明する", emoji: "📢", price: 2, description: "相手-2" },
+  { id: "deeply_concerned", name: "憂慮している", emoji: "😟", price: 3, description: "相手-3" },
+  { id: "gravely_concerned", name: "深く憂慮している", emoji: "😰", price: 4, description: "相手-4" },
+  { id: "regrettable", name: "遺憾である", emoji: "😔", price: 5, description: "相手-5" },
+  { id: "extremely_regrettable", name: "極めて遺憾である", emoji: "😠", price: 6, description: "相手-6" },
+  { id: "strongly_protest", name: "強く抗議する", emoji: "📣", price: 7, description: "相手-7" },
+  { id: "sternly_protest", name: "厳重に抗議する", emoji: "🚨", price: 8, description: "相手-8" },
+  { id: "unacceptable", name: "断じて受け入れられない", emoji: "⛔", price: 9, description: "相手-9" },
+  { id: "strongly_condemn", name: "強く非難する", emoji: "👊", price: 10, description: "相手-10" },
+  {
+    id: "condemn_strongest_terms",
+    name: "最も強い言葉で非難する",
+    emoji: "🔥",
+    price: 11,
+    description: "相手-11",
   },
 ];
 
@@ -552,6 +575,12 @@ export const CATEGORIES: TextbookCategory[] = [
     title: "雑貨",
     variant: "item-list",
     cards: ITEMS,
+  },
+  {
+    id: "mushokusei",
+    title: "無属性",
+    variant: "item-list",
+    cards: COLORLESS,
   },
   {
     id: "kiseki",
