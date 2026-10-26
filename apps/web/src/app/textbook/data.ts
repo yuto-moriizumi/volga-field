@@ -237,7 +237,7 @@ export const RULES: RuleSection[] = [
   {
     title: "カード",
     lines: [
-      "カテゴリは 武器 / 防具 / 薬 / 雑貨 / 奇跡 / 特殊 / 取引 / 政党。",
+      "カテゴリは 武器 / 防具 / 雑貨 / 奇跡 / 特殊 / 取引 / 政党。",
       "悪魔はカードではなく、終末の時に出現するイベント。",
       "雑貨は選挙運動の道具で、使うと MP を回復する。",
       DECK_NOTE,
@@ -302,13 +302,6 @@ export const CATEGORIES: TextbookCategory[] = [
     note: DECK_NOTE,
   },
   {
-    id: "kusuri",
-    title: "薬",
-    variant: "card-list",
-    cards: cardsByCategory("potion"),
-    note: DECK_NOTE,
-  },
-  {
     id: "zakka",
     title: "雑貨",
     variant: "card-list",
@@ -349,7 +342,6 @@ export const CATEGORIES: TextbookCategory[] = [
     variant: "devil-list",
     devils: DEVIL_CATALOG,
     rule: DEVIL_RULE,
-    note: DECK_NOTE,
   },
   {
     id: "rule",

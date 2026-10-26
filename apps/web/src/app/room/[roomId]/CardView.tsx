@@ -16,7 +16,6 @@ interface CardViewProps {
 const CATEGORY_COLORS: Record<string, { bg: string; ink: string; chip: string }> = {
   weapon: { bg: "#fde2d4", ink: "#7a2b1d", chip: "#d96b3e" },
   shield: { bg: "#d9eaf7", ink: "#1d4a72", chip: "#3b82c4" },
-  potion: { bg: "#dff3df", ink: "#1d5a32", chip: "#3a9b59" },
   miracle: { bg: "#e8dffa", ink: "#4a2e87", chip: "#8b5cf6" },
   special: { bg: "#fbeac9", ink: "#7a4d10", chip: "#e0a93e" },
   trade: { bg: "#fde7f1", ink: "#7a1d4d", chip: "#c66b8a" },

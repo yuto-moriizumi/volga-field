@@ -5,7 +5,6 @@ export type CardId = string;
 export type CardCategory =
   | "weapon"
   | "shield"
-  | "potion"
   | "miracle"
   | "special"
   | "trade"
