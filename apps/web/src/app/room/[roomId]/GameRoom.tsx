@@ -818,6 +818,8 @@ function BattleField({
       <SourceArea
         activePlayer={activePlayer}
         selectedCards={selectedCards}
+        isDefending={isDefending}
+        incomingAttack={pending}
         discardMode={discardMode}
         sellMode={sellMode}
         exchangeMode={exchangeMode}
@@ -825,7 +827,6 @@ function BattleField({
         confirmLabel={confirmLabel}
         confirmDisabled={confirmDisabled}
         canEndTurn={canEndTurn}
-        canPassDefense={canPassDefense}
         pendingBuy={pendingBuy}
         canAffordPendingBuy={canAffordBuy}
         onConfirm={confirmAction}
@@ -839,6 +840,11 @@ function BattleField({
         pendingSell={pendingSell}
         targetPlayer={targetPlayer ?? null}
         effect={targetEffect}
+        isDefending={isDefending}
+        defenseCards={defenseCards}
+        defensePower={defensePower}
+        defenseDisabled={confirmDisabled}
+        onConfirmDefense={confirmAction}
       />
       <NameList
         players={players}
