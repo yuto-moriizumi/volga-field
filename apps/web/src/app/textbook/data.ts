@@ -435,42 +435,48 @@ export const PARTIES: PartyCard[] = [
     id: "communist_party",
     name: "共産党",
     emoji: "🚩",
-    description: "使用すると社会主義の政党に所属する",
+    description:
+      "使用すると社会主義の政党に所属する。他者のターン終了時25%で 労働者の反撃(相手-3) / 団結(MP+2)",
     attribute: "fire",
   },
   {
     id: "ldp",
     name: "自民党",
     emoji: "🏛️",
-    description: "使用すると資本主義の政党に所属する",
+    description:
+      "使用すると資本主義の政党に所属する。他者のターン終了時25%で 経済成長(お金+3) / 市場の一撃(相手-2)",
     attribute: "water",
   },
   {
     id: "democratic_party",
     name: "民主党",
     emoji: "🗳️",
-    description: "使用すると共和主義の政党に所属する",
+    description:
+      "使用すると共和主義の政党に所属する。他者のターン終了時25%で 世論の追い風(MP+2) / 政策協力(HP+2)",
     attribute: "wood",
   },
   {
     id: "constitutional_imperial_party",
     name: "立憲帝政党",
     emoji: "👑",
-    description: "使用すると封建主義の政党に所属する",
+    description:
+      "使用すると封建主義の政党に所属する。他者のターン終了時25%で 王権の威光(相手-3) / 城塞の守り(HP+3)",
     attribute: "earth",
   },
   {
     id: "green_party",
     name: "緑の党",
     emoji: "🌿",
-    description: "使用すると環境主義の政党に所属する",
+    description:
+      "使用すると環境主義の政党に所属する。他者のターン終了時25%で 自然の恵み(HP+3) / 再生エネルギー(MP+2)",
     attribute: "light",
   },
   {
     id: "anarchist_party",
     name: "無政府党",
     emoji: "🪬",
-    description: "使用すると無政府主義の政党に所属する",
+    description:
+      "使用すると無政府主義の政党に所属する。他者のターン終了時25%で 直接行動(相手-2) / 略奪(お金を持つ相手から2円)",
     attribute: "dark",
   },
 ];

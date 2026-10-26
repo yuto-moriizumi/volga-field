@@ -18,6 +18,8 @@ import {
   PARTY_LABELS,
 } from "./cards.js";
 import { buildDeck, drawCards } from "./deck.js";
+import { resolvePartyActions } from "./parties.js";
+import type { Rng } from "./parties.js";
 import {
   chargePlayer,
   damagePlayer,
@@ -151,6 +153,50 @@ function applyDoomsdayEvent(
 function determineWinner(players: PlayerState[]): PlayerId | null {
   const alive = players.filter((p) => p.hp > 0);
   return alive.length === 1 ? alive[0]!.id : null;
+}
+
+function withVictoryLog(state: GameState, winner: PlayerId): GameState {
+  return {
+    ...state,
+    log: [
+      ...state.log,
+      {
+        turn: state.turn,
+        playerId: winner,
+        message: `${state.players.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
+        kind: "system",
+      },
+    ],
+  };
+}
+
+/**
+ * 政党行動で手番プレイヤーが倒れた場合に、生存している次のプレイヤーへ手番を移す。
+ * 勝敗が決している場合や手番プレイヤーが生存している場合は何もしない。
+ */
+function advanceToLivingPlayer(state: GameState): GameState {
+  const active = state.players[state.activePlayerIndex];
+  if (!active || active.hp > 0 || state.winner) return state;
+
+  for (let offset = 1; offset <= state.players.length; offset++) {
+    const index = (state.activePlayerIndex + offset) % state.players.length;
+    const candidate = state.players[index];
+    if (!candidate || candidate.hp <= 0) continue;
+    return {
+      ...state,
+      activePlayerIndex: index,
+      log: [
+        ...state.log,
+        {
+          turn: state.turn,
+          playerId: active.id,
+          message: `${active.name}は倒れ、${candidate.name}の手番になった`,
+          kind: "system",
+        },
+      ],
+    };
+  }
+  return state;
 }
 
 interface PairResult {
@@ -613,6 +659,7 @@ export function endTurn(
   state: GameState,
   playerId: PlayerId,
   deck: CardRef[],
+  rng: Rng = Math.random,
 ): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
@@ -670,7 +717,7 @@ export function endTurn(
   });
   const winner = determineWinner(finalPlayers);
 
-  const newState: GameState = {
+  let newState: GameState = {
     ...state,
     players: finalPlayers,
     activePlayerIndex: nextIdx,
@@ -685,12 +732,18 @@ export function endTurn(
   };
 
   if (winner) {
-    newState.log.push({
-      turn: newState.turn,
-      playerId: winner,
-      message: `${finalPlayers.find((p) => p.id === winner)?.name ?? "?"}の勝利!`,
-      kind: "system",
-    });
+    return { ok: true, state: withVictoryLog(newState, winner), deck: newDeck };
+  }
+
+  // ターン終了後、終了したプレイヤー以外の政党所属者が 25% で行動する。
+  const partyResult = resolvePartyActions(newState, playerId, newDeck, rng);
+  newDeck = partyResult.deck;
+  newState = partyResult.state;
+
+  if (newState.winner) {
+    newState = withVictoryLog(newState, newState.winner);
+  } else {
+    newState = advanceToLivingPlayer(newState);
   }
 
   return { ok: true, state: newState, deck: newDeck };
