@@ -14,6 +14,7 @@ import {
   INITIAL_MP,
   getCardPrice,
   getPartyId,
+  isDirectAttackCard,
   isPartyCard,
   PARTY_LABELS,
 } from "./cards.js";
@@ -293,6 +294,11 @@ export function playCard(
     }
   }
   if (totalMpCost > active.mp) return { ok: false, reason: "not enough MP" };
+
+  const directAttackCards = cards.filter((card) => isDirectAttackCard(card.id));
+  if (directAttackCards.length > 1) {
+    return { ok: false, reason: "only one attack card can be used per turn" };
+  }
 
   let nextLearnedMiracles = active.learnedMiracles;
   for (const card of cards) {

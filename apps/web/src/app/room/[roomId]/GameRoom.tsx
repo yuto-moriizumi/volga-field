@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { findCard, getCardPrice } from "@volga/game-core";
+import { findCard, getCardPrice, isDirectAttackCard } from "@volga/game-core";
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -151,10 +151,19 @@ export function GameRoom({
         if (current.includes(idx)) {
           return current.filter((i) => i !== idx);
         }
+        const playable = playableCards(me);
         const onlyWeapons = current.filter((i) => {
-          const other = playableCards(me)[i];
+          const other = playable[i];
           return other ? findCard(other.id)?.category === "weapon" : false;
         });
+        // 「攻N」は1回の攻撃につき1枚まで。「攻+N」は何枚でも重ねられる。
+        if (isDirectAttackCard(card.id)) {
+          const withoutOtherDirectAttacks = onlyWeapons.filter((i) => {
+            const other = playable[i];
+            return other ? !isDirectAttackCard(other.id) : false;
+          });
+          return [...withoutOtherDirectAttacks, idx];
+        }
         return [...onlyWeapons, idx];
       });
       if (selectedCardIdxes.length === 0) {

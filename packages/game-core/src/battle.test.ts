@@ -650,27 +650,67 @@ test("removed special cards are absent from the card data", () => {
   assert.equal(categories.has("special"), false);
 });
 
-test("former colorless diplomatic cards are weapons and combine with other weapons", () => {
+test("former colorless diplomatic cards are weapons and combine with attack power cards", () => {
   assert.equal(findCard("concern_expressed")?.category, "weapon");
   assert.equal(findCard("condemn_strongest_terms")?.category, "weapon");
 
   const state = attributeWeaponState();
   state.players[0] = {
     ...state.players[0]!,
-    hand: [{ id: "concern_expressed" }, { id: "sword" }],
+    hand: [{ id: "concern_expressed" }, { id: "socialist_power_1" }],
   };
 
   const result = playCard(
     state,
     "attacker",
-    [{ id: "concern_expressed" }, { id: "sword" }],
+    [{ id: "concern_expressed" }, { id: "socialist_power_1" }],
     "defender",
   );
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(result.state.pendingAttack?.amount, 4);
-  assert.equal(result.state.pendingAttack?.cardName, "懸念を表明する+剣");
+  assert.equal(result.state.pendingAttack?.amount, 2);
+  assert.equal(result.state.pendingAttack?.cardName, "懸念を表明する+団結");
+});
+
+test("playCard rejects combining two direct attack cards", () => {
+  const state = attributeWeaponState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "sword" }, { id: "spear" }],
+  };
+
+  const result = playCard(
+    state,
+    "attacker",
+    [{ id: "sword" }, { id: "spear" }],
+    "defender",
+  );
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "only one attack card can be used per turn");
+});
+
+test("playCard allows one direct attack card with multiple attack power cards", () => {
+  const result = playCard(
+    attributeWeaponState(),
+    "attacker",
+    [
+      { id: "socialist_strike_3" },
+      { id: "socialist_power_2" },
+      { id: "socialist_power_3" },
+    ],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.amount, 8);
+  assert.equal(
+    result.state.pendingAttack?.cardName,
+    "国有化攻勢+計画経済+労働動員",
+  );
 });
 
 test("playCard rejects when any selected card is missing from hand", () => {

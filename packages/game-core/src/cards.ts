@@ -1568,6 +1568,18 @@ export function findCard(id: string): CardDefinition | undefined {
   return BASE_CARDS.find((c) => c.id === id);
 }
 
+/**
+ * 相手に直接ダメージを与える「攻N」カードか。
+ * 攻撃力加算（「攻+N」= attack_power）は含まない。
+ */
+export function isDirectAttackCard(id: string): boolean {
+  return (
+    findCard(id)?.effects.some(
+      (effect) => effect.kind === "damage" && effect.target === "opponent",
+    ) ?? false
+  );
+}
+
 export function getCardsByTag(tag: string): CardDefinition[] {
   return BASE_CARDS.filter((c) => c.customTags?.includes(tag));
 }
