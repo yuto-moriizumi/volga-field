@@ -279,7 +279,6 @@ WebSocket はクライアント内の画面遷移では維持されるが、
 - 新規47枚は `packages/game-core/src/armors.ts` に定義し、`BASE_CARDS` へ展開している。
   すべて防御力=価格、`customTags: ["political"]`、説明は `防御力+N`。
 - デッキは全カードから30枚を選ぶため、防具の追加でデッキに占める防具の割合が上がる。
->>>>>>> feat/political-armors
 
 ## 追記: バトル演出を3秒に統一 (2026-10-27)
 
