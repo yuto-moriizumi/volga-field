@@ -20,7 +20,6 @@ const CATEGORY_COLORS: Record<string, { bg: string; ink: string; chip: string }>
   miracle: { bg: "#e8dffa", ink: "#4a2e87", chip: "#8b5cf6" },
   special: { bg: "#fbeac9", ink: "#7a4d10", chip: "#e0a93e" },
   trade: { bg: "#fde7f1", ink: "#7a1d4d", chip: "#c66b8a" },
-  colorless: { bg: "#ececec", ink: "#3a3a3a", chip: "#8a8a8a" },
   misc: { bg: "#e3f1f6", ink: "#1b4a5a", chip: "#3a8aa6" },
   party: { bg: "#fff5d6", ink: "#6b4a13", chip: "#d8a64a" },
 };
