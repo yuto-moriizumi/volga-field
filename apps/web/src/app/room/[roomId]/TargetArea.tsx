@@ -1,6 +1,6 @@
 "use client";
 
-import type { GameState, PlayerState } from "@volga/shared";
+import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import type { BattleEvent } from "./battleEvents";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
@@ -16,21 +16,45 @@ export function TargetArea({
   pendingSell,
   targetPlayer,
   effect,
+  isDefending,
+  defenseCards,
+  defensePower,
+  defenseDisabled,
+  onConfirmDefense,
 }: {
   pending: GameState["pendingAttack"];
   pendingBuy: GameState["pendingBuy"];
   pendingSell: GameState["pendingSell"];
   targetPlayer: PlayerState | null;
   effect: TargetBattleEffect | null;
+  isDefending: boolean;
+  defenseCards: CardRef[];
+  defensePower: number;
+  defenseDisabled: boolean;
+  onConfirmDefense: () => void;
 }) {
   const damageEffect =
     effect?.event.kind === "damage" ? effect.event : null;
   const showHit = Boolean(damageEffect && !damageEffect.blocked);
+  const defenseLabel =
+    defenseCards.length > 0
+      ? `防御を確定（${defenseCards.length}枚 防${defensePower}）`
+      : "許す（防御しない）";
 
   return (
     <div className="gf-target-area" aria-label="ターゲットエリア">
       <NamePlate
-        label={pending ? "攻撃対象" : pendingBuy ? "購入対象" : pendingSell ? "売却対象" : "ターゲット"}
+        label={
+          isDefending
+            ? "防御"
+            : pending
+              ? "攻撃対象"
+              : pendingBuy
+                ? "購入対象"
+                : pendingSell
+                  ? "売却対象"
+                  : "ターゲット"
+        }
         name={targetPlayer?.name ?? "未選択"}
         tone="blue"
         playerId={targetPlayer?.id}
@@ -42,19 +66,54 @@ export function TargetArea({
         data-hit={showHit ? "true" : undefined}
       >
         <div className="gf-action-stage">
-          {pendingBuy && (
-            <div className="gf-target-buy-card" aria-label="購入対象カード">
-              <div className="gf-buy-card-price">￥{pendingBuy.price}</div>
-              <LargeCard cardRef={pendingBuy.card} />
-            </div>
-          )}
-          {pendingSell && (
-            <div className="gf-target-sell-stack" aria-label="売却カード">
-              {pendingSell.cards.map((c, i) => (
-                <LargeCard key={`${c.id}-${i}`} cardRef={c} />
-              ))}
-              <div className="gf-sell-card-price">合計 ￥{pendingSell.price}</div>
-            </div>
+          {isDefending ? (
+            <button
+              type="button"
+              className="gf-defense-zone"
+              onClick={onConfirmDefense}
+              disabled={defenseDisabled}
+              aria-label={defenseLabel}
+            >
+              {defenseCards.length > 0 ? (
+                <>
+                  <div
+                    className="gf-confirm-card-stack gf-defense-card-stack"
+                    aria-label="選択中の防御カード"
+                  >
+                    {defenseCards.map((card, idx) => (
+                      <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
+                    ))}
+                  </div>
+                  <div className="gf-defense-summary">
+                    {defenseCards.length}枚 防{defensePower}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="gf-confirm-empty-action is-danger">許す</span>
+                  <span className="gf-defense-hint">
+                    防御カードを選ぶか、ここを押して攻撃を通す
+                  </span>
+                </>
+              )}
+            </button>
+          ) : (
+            <>
+              {pendingBuy && (
+                <div className="gf-target-buy-card" aria-label="購入対象カード">
+                  <div className="gf-buy-card-price">￥{pendingBuy.price}</div>
+                  <LargeCard cardRef={pendingBuy.card} />
+                </div>
+              )}
+              {pendingSell && (
+                <div className="gf-target-sell-stack" aria-label="売却カード">
+                  {pendingSell.cards.map((c, i) => (
+                    <LargeCard key={`${c.id}-${i}`} cardRef={c} />
+                  ))}
+                  <div className="gf-sell-card-price">合計 ￥{pendingSell.price}</div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -1,12 +1,15 @@
 "use client";
 
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
+import { findCard } from "@volga/game-core";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
 
 export function SourceArea({
   activePlayer,
   selectedCards,
+  isDefending,
+  incomingAttack,
   discardMode,
   sellMode,
   exchangeMode,
@@ -14,7 +17,6 @@ export function SourceArea({
   confirmLabel,
   confirmDisabled,
   canEndTurn,
-  canPassDefense,
   pendingBuy,
   canAffordPendingBuy,
   onConfirm,
@@ -24,6 +26,8 @@ export function SourceArea({
 }: {
   activePlayer: PlayerState | null;
   selectedCards: CardRef[];
+  isDefending: boolean;
+  incomingAttack: GameState["pendingAttack"];
   discardMode: boolean;
   sellMode: boolean;
   exchangeMode: boolean;
@@ -31,7 +35,6 @@ export function SourceArea({
   confirmLabel: string;
   confirmDisabled: boolean;
   canEndTurn: boolean;
-  canPassDefense: boolean;
   pendingBuy: GameState["pendingBuy"];
   canAffordPendingBuy: boolean;
   onConfirm: () => void;
@@ -39,6 +42,32 @@ export function SourceArea({
   onDeclineBuy: () => void;
   onAdjustExchange: (stat: "mp" | "money", delta: number) => void;
 }) {
+  if (isDefending) {
+    return (
+      <div className="gf-source-area" aria-label="相手のフィールド">
+        <div className="gf-status-stack">
+          <NamePlate
+            label="攻撃"
+            name={activePlayer?.name ?? "?"}
+            tone="teal"
+            playerId={activePlayer?.id}
+          />
+        </div>
+        <div className="gf-incoming-attack" aria-label="相手の攻撃カード">
+          {incomingAttack && (
+            <>
+              <LargeCard cardRef={incomingAttack.card} />
+              {incomingAttack.cardName !== findCard(incomingAttack.card.id)?.name && (
+                <div className="gf-incoming-attack-name">
+                  {incomingAttack.cardName}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
   if (pendingBuy) {
     return (
       <div className="gf-source-area" aria-label="ソースエリア">
@@ -110,8 +139,6 @@ export function SourceArea({
           <span className="gf-confirm-empty-action is-danger">{confirmLabel}</span>
         ) : canEndTurn ? (
           <span className="gf-confirm-empty-action">ターン終了</span>
-        ) : canPassDefense ? (
-          <span className="gf-confirm-empty-action is-danger">許す</span>
         ) : (
           <span className="gf-confirm-placeholder" />
         )}
