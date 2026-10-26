@@ -1183,54 +1183,6 @@ export const BASE_CARDS: CardDefinition[] = [
     ],
   },
   {
-    id: "potion",
-    name: "回復薬",
-    category: "special",
-    emoji: "🧪",
-    description: "HP+5",
-    price: 4,
-    effects: [
-      {
-        kind: "heal",
-        amount: 5,
-        target: "self",
-        description: "HP+5",
-      },
-    ],
-  },
-  {
-    id: "hi_potion",
-    name: "高級回復薬",
-    category: "special",
-    emoji: "🍷",
-    description: "HP+10",
-    price: 8,
-    effects: [
-      {
-        kind: "heal",
-        amount: 10,
-        target: "self",
-        description: "HP+10",
-      },
-    ],
-  },
-  {
-    id: "poison",
-    name: "毒薬",
-    category: "special",
-    emoji: "☠️",
-    description: "相手-3",
-    price: 4,
-    effects: [
-      {
-        kind: "damage",
-        amount: 3,
-        target: "opponent",
-        description: "相手-3",
-      },
-    ],
-  },
-  {
     id: "fire",
     name: "ファイア",
     category: "miracle",
@@ -1284,28 +1236,6 @@ export const BASE_CARDS: CardDefinition[] = [
         amount: 8,
         target: "self",
         description: "HP+8",
-      },
-    ],
-  },
-  {
-    id: "sacrifice",
-    name: "自己犠牲",
-    category: "special",
-    emoji: "💀",
-    description: "相手-8 / 自分も-5",
-    price: 7,
-    effects: [
-      {
-        kind: "damage",
-        amount: 8,
-        target: "opponent",
-        description: "相手-8",
-      },
-      {
-        kind: "damage",
-        amount: 5,
-        target: "self",
-        description: "自分も-5",
       },
     ],
   },
