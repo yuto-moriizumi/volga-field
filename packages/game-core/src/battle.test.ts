@@ -190,6 +190,25 @@ test("discardCards removes selected cards during the active player's turn", () =
   assert.equal(result.state.log.at(-1)?.kind, "system");
 });
 
+test("discardCards also discards trade cards", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "buy" }, { id: "sell" }, { id: "exchange" }, { id: "nobori" }],
+  };
+
+  const result = discardCards(state, "attacker", [
+    { id: "buy" },
+    { id: "sell" },
+    { id: "exchange" },
+  ]);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.deepEqual(attacker?.hand, [{ id: "nobori" }]);
+});
+
 test("startBuy picks a random card from the target and consumes the buy card", () => {
   const state = playState();
   state.players[0] = {

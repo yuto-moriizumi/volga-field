@@ -52,7 +52,7 @@ export function HandArea({
           const isLearned = idx >= me.hand.length;
           const hasEnoughMp = !definition?.mpCost || me.mp >= definition.mpCost;
           const canPlayCard = canAct && hasEnoughMp && !isDefenseOnlyCard(card.id);
-          const canDiscardCard = discardMode && !isLearned && !isTradeCard(card.id);
+          const canDiscardCard = discardMode && !isLearned;
           const canSellCard =
             sellMode && !isLearned && !isSellCardItself(card.id) && !isBuyCardItself(card.id);
           return (
@@ -126,10 +126,6 @@ function isDefenseOnlyCard(cardId: string): boolean {
   if (!card) return false;
   if (card.effects.length === 0) return false;
   return card.effects.every((effect) => effect.kind === "defense");
-}
-
-function isTradeCard(cardId: string): boolean {
-  return cardId === "buy" || cardId === "sell";
 }
 
 function isSellCardItself(cardId: string): boolean {
