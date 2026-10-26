@@ -52,6 +52,7 @@ export default function HomePage() {
                 filter: "blur(2px)",
                 opacity: 0.85,
                 zIndex: 0,
+                pointerEvents: "none",
               }}
             />
             <h1 className="gf-title" style={{ position: "relative", zIndex: 1 }}>
@@ -61,6 +62,8 @@ export default function HomePage() {
 
           <div
             style={{
+              position: "relative",
+              zIndex: 1,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
