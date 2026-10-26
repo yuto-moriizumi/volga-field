@@ -1,4 +1,5 @@
 import type { CardCategory, PartyId } from "@volga/shared";
+import { POLITICAL_ARMORS } from "./armors.js";
 
 export type Target = "self" | "opponent" | "either";
 
@@ -1136,11 +1137,12 @@ export const BASE_CARDS: CardDefinition[] = [
   },
   {
     id: "shield",
-    name: "盾",
+    name: "選挙事務所",
     category: "shield",
-    emoji: "🛡️",
+    emoji: "🏢",
     description: "防御力+3",
     price: 3,
+    customTags: ["political"],
     effects: [
       {
         kind: "defense",
@@ -1152,11 +1154,12 @@ export const BASE_CARDS: CardDefinition[] = [
   },
   {
     id: "great_shield",
-    name: "大盾",
+    name: "官邸の鉄壁",
     category: "shield",
-    emoji: "🛡️",
-    description: "防御力+6 (攻撃時-3)",
+    emoji: "🏛️",
+    description: "防御力+6",
     price: 6,
+    customTags: ["political"],
     effects: [
       {
         kind: "defense",
@@ -1168,11 +1171,12 @@ export const BASE_CARDS: CardDefinition[] = [
   },
   {
     id: "leaf_shield",
-    name: "木の葉盾",
+    name: "広報誌",
     category: "shield",
-    emoji: "🍃",
+    emoji: "📰",
     description: "防御力+1",
     price: 1,
+    customTags: ["political"],
     effects: [
       {
         kind: "defense",
@@ -1182,6 +1186,7 @@ export const BASE_CARDS: CardDefinition[] = [
       },
     ],
   },
+  ...POLITICAL_ARMORS,
   {
     id: "potion",
     name: "回復薬",
