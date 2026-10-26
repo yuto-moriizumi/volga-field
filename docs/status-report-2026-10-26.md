@@ -280,3 +280,15 @@ WebSocket はクライアント内の画面遷移では維持されるが、
   すべて防御力=価格、`customTags: ["political"]`、説明は `防御力+N`。
 - デッキは全カードから30枚を選ぶため、防具の追加でデッキに占める防具の割合が上がる。
 >>>>>>> feat/political-armors
+
+## 追記: バトル演出を3秒に統一 (2026-10-27)
+
+- 演出キュー間隔を `BATTLE_EVENT_DURATION = 3000`（ms）に統一した
+  (`apps/web/src/app/room/[roomId]/battleEvents.ts`)。attack / damage / heal /
+  mpRecover / money / turn / draw のすべてが 3000ms になる。
+- `globals.css` に `--gf-effect-duration: 3s` を追加し、攻撃ランジ（順方向・逆方向）・
+  軌跡・キャプション・衝撃・シールド・ダメージ数値・ラベル・支援系・きらめき・
+  ターンバナー・ドローの各アニメーションをこの変数で駆動するようにした。
+- きらめきのずらしは負のディレイ（-0.1s / -0.05s / 0s）に変更し、最後のきらめきも
+  3秒以内に終わるようにした。ドローのカードは 82% まで表示を保持してから消える。
+- スキップ（クリック / Space）と `prefers-reduced-motion` の短縮表示（160ms）は変更なし。

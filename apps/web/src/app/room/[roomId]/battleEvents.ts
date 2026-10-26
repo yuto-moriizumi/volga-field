@@ -77,14 +77,24 @@ export interface PresentedBattleEvent {
   key: number;
 }
 
+/**
+ * How long a single queued battle event is presented, in milliseconds.
+ *
+ * Every kind uses the same value so the overlay animations have room to play
+ * out. Keep this in sync with `--gf-effect-duration` in `globals.css`; the
+ * queue timer and the CSS animation must end together. Reduced motion is
+ * handled separately in `useBattlePresentation`.
+ */
+export const BATTLE_EVENT_DURATION = 3000;
+
 const EVENT_DURATION: Record<BattleEvent["kind"], number> = {
-  attack: 620,
-  damage: 720,
-  heal: 650,
-  mpRecover: 650,
-  money: 600,
-  turn: 750,
-  draw: 520,
+  attack: BATTLE_EVENT_DURATION,
+  damage: BATTLE_EVENT_DURATION,
+  heal: BATTLE_EVENT_DURATION,
+  mpRecover: BATTLE_EVENT_DURATION,
+  money: BATTLE_EVENT_DURATION,
+  turn: BATTLE_EVENT_DURATION,
+  draw: BATTLE_EVENT_DURATION,
 };
 
 export function battleEventDuration(event: BattleEvent): number {
