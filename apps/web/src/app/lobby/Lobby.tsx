@@ -48,11 +48,23 @@ export function Lobby() {
   const [trainingPlayerCount, setTrainingPlayerCount] = useState<TrainingPlayerCount>(2);
   const [showTrainingSettings, setShowTrainingSettings] = useState(false);
   const [prophetCount, setProphetCount] = useState(0);
+  const [showNameInput, setShowNameInput] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("volga-player-name");
-    if (stored) setName(stored);
+    const stored = localStorage.getItem("volga-player-name")?.trim();
+    if (stored) {
+      setName(stored);
+    } else {
+      setShowNameInput(true);
+    }
   }, []);
+
+  useEffect(() => {
+    const trimmed = name.trim();
+    if (trimmed) {
+      localStorage.setItem("volga-player-name", trimmed);
+    }
+  }, [name]);
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -166,6 +178,35 @@ export function Lobby() {
             width: "100%",
           }}
         >
+          {showNameInput && (
+            <section
+              className="gf-card"
+              style={{
+                padding: 16,
+                width: "min(360px, 92%)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div className="gf-section-title">預言者の名前</div>
+              <input
+                className="gf-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="あなたの名前"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && name.trim()) {
+                    setShowNameInput(false);
+                  }
+                }}
+              />
+              <div style={{ fontSize: 12, color: "var(--text-dark-soft)" }}>
+                名前を入力するとモードを開始できます
+              </div>
+            </section>
+          )}
+
           {MODES.map((m) => (
             <button
               key={m.id}
