@@ -4,6 +4,7 @@ import { PARTY_LABELS, findCard } from "@volga/game-core";
 import type { PlayerState } from "@volga/shared";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { eventAffectsPlayer, type BattleEvent } from "./battleEvents";
+import type { PlayerStats } from "./battleSequence";
 
 interface NameListProps {
   players: PlayerState[];
@@ -12,6 +13,10 @@ interface NameListProps {
   activeEffect: BattleEvent | null;
   selectedTargetId: string | null;
   canSelect: boolean;
+  /** Frozen HP/MP/money from before the duel, until its effect step. */
+  statsOverride?: Record<string, PlayerStats> | null;
+  /** The duel effect step, used for the same pill flash as the overlay. */
+  duelEffect?: { playerId: string; blocked: boolean } | null;
   onSelect: (playerId: string) => void;
 }
 
@@ -22,6 +27,8 @@ export function NameList({
   activeEffect,
   selectedTargetId,
   canSelect,
+  statsOverride,
+  duelEffect,
   onSelect,
 }: NameListProps) {
   return (
@@ -33,8 +40,15 @@ export function NameList({
           activeEffect && eventAffectsPlayer(activeEffect, p.id)
             ? activeEffect
             : null;
-        const effectClass =
-          effect?.kind === "damage"
+        const duelClass =
+          duelEffect?.playerId === p.id
+            ? duelEffect.blocked
+              ? " is-effect-blocked"
+              : " is-effect-hit"
+            : "";
+        const effectClass = duelClass
+          ? duelClass
+          : effect?.kind === "damage"
             ? effect.blocked
               ? " is-effect-blocked"
               : " is-effect-hit"
@@ -44,6 +58,7 @@ export function NameList({
                 effect?.kind === "draw"
               ? " is-effect-buffed"
               : "";
+        const stats = statsOverride?.[p.id] ?? p;
         return (
           <button
             className={`gf-target-pill${isActive ? " is-active-turn" : ""}${effectClass}`}
@@ -55,7 +70,8 @@ export function NameList({
             }}
             data-selected={selectedTargetId === p.id}
             data-player-id={p.id}
-            data-effect={effect?.kind}
+            data-effect={effect?.kind ?? (duelClass ? "damage" : undefined)}
+            data-frozen={statsOverride?.[p.id] ? "true" : undefined}
             aria-current={isActive ? "true" : undefined}
           >
             <span className="gf-target-dot" />
@@ -73,9 +89,9 @@ export function NameList({
               </span>
             )}
             <span className="gf-target-stats">
-              <b>HP</b> <AnimatedNumber value={p.hp} /> <b>MP</b>{" "}
-              <AnimatedNumber value={p.mp} /> <b>￥</b>{" "}
-              <AnimatedNumber value={p.money} />
+              <b>HP</b> <AnimatedNumber value={stats.hp} /> <b>MP</b>{" "}
+              <AnimatedNumber value={stats.mp} /> <b>￥</b>{" "}
+              <AnimatedNumber value={stats.money} />
             </span>
           </button>
         );

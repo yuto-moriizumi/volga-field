@@ -15,7 +15,8 @@ import { NameList } from "./NameList";
 import { SourceArea, type ExchangeDraft } from "./SourceArea";
 import { TargetArea } from "./TargetArea";
 import { eventAffectsPlayer, type PresentedBattleEvent } from "./battleEvents";
-import { useBattlePresentation } from "./useBattlePresentation";
+import type { DuelPresentation } from "./battleSequence";
+import { useBattleSequence } from "./useBattleSequence";
 
 export function GameRoom({
   params,
@@ -116,8 +117,16 @@ export function GameRoom({
       setSelectedTargetId(null);
     }
   }
-  const presentation = useBattlePresentation(gameState, playerId);
-  const isAnimating = presentation.isAnimating;
+  const presentation = useBattleSequence(gameState, playerId);
+  const duel = presentation.duel;
+  const interactionLocked = presentation.interactionLocked;
+  // The defense UI only appears once the sequence has shown the target name;
+  // while the attack card is still entering, the player cannot react.
+  const defenseStepOpen =
+    isDefending &&
+    (duel
+      ? duel.awaitingDefense
+      : presentation.defenseFallback && presentation.overlay === null);
 
   function allowAction(): boolean {
     // Guards against a double click landing before the new state arrives.
@@ -128,7 +137,7 @@ export function GameRoom({
   }
 
   function playCard(idx: number) {
-    if (!me || !canAct || isAnimating || discardMode || sellMode) return;
+    if (!me || !canAct || interactionLocked || discardMode || sellMode) return;
     const card = playableCards(me)[idx];
     if (!card) return;
     const definition = findCard(card.id);
@@ -182,7 +191,7 @@ export function GameRoom({
   }
 
   function executeSelectedCard() {
-    if (!me || !canAct || isAnimating || discardMode || sellMode || selectedCardIdxes.length === 0) return;
+    if (!me || !canAct || interactionLocked || discardMode || sellMode || selectedCardIdxes.length === 0) return;
     if (!allowAction()) return;
     const cards = selectedCardIdxes
       .map((idx) => playableCards(me)[idx])
@@ -261,7 +270,7 @@ export function GameRoom({
   }
 
   function confirmExchange() {
-    if (!me || !exchangeDraft || isAnimating) return;
+    if (!me || !exchangeDraft || interactionLocked) return;
     if (!allowAction()) return;
     const mpDelta = exchangeDraft.mp - me.mp;
     const moneyDelta = exchangeDraft.money - me.money;
@@ -274,18 +283,26 @@ export function GameRoom({
   }
 
   function defend(cardIdxes: number[] = []) {
-    if (!me || !isDefending || isAnimating) return;
+    if (!me || !isDefending || !defenseStepOpen) return;
     if (!allowAction()) return;
-    const cardRefs = cardIdxes
+    const cards = cardIdxes
       .map((idx) => me.hand[idx])
-      .filter((card): card is { id: string } => Boolean(card))
-      .map((card) => ({ id: card.id }));
+      .filter((card): card is { id: string } => Boolean(card));
+    const cardRefs = cards.map((card) => ({ id: card.id }));
+    // Start the local "clear → 100ms → card" steps immediately; the damage
+    // itself waits for the resolution state.
+    presentation.notifyDefense(
+      cards.map((card) => ({
+        id: card.id,
+        name: findCard(card.id)?.name ?? card.id,
+      })),
+    );
     send({ type: "defend", cardRefs });
     setSelectedDefenseIdxes([]);
   }
 
   function endTurn() {
-    if (!canAct || isAnimating) return;
+    if (!canAct || interactionLocked) return;
     if (!allowAction()) return;
     setDiscardMode(false);
     setSellMode(false);
@@ -331,7 +348,7 @@ export function GameRoom({
   }
 
   function confirmDiscard() {
-    if (!me || !canAct || isAnimating || !discardMode || selectedDiscardIdxes.length === 0) return;
+    if (!me || !canAct || interactionLocked || !discardMode || selectedDiscardIdxes.length === 0) return;
     if (!allowAction()) return;
     const cardRefs = selectedDiscardIdxes
       .map((idx) => me.hand[idx])
@@ -343,14 +360,14 @@ export function GameRoom({
   }
 
   function acceptBuy() {
-    if (!me || !gameState?.pendingBuy || isAnimating) return;
+    if (!me || !gameState?.pendingBuy || interactionLocked) return;
     if (!allowAction()) return;
     if (gameState.pendingBuy.sourceId !== playerId) return;
     send({ type: "confirm_buy", accept: true });
   }
 
   function declineBuy() {
-    if (!me || !gameState?.pendingBuy || isAnimating) return;
+    if (!me || !gameState?.pendingBuy || interactionLocked) return;
     if (!allowAction()) return;
     if (gameState.pendingBuy.sourceId !== playerId) return;
     send({ type: "confirm_buy", accept: false });
@@ -513,8 +530,10 @@ export function GameRoom({
                 pendingBuy={myPendingBuy}
                 pendingSell={pendingSell}
                 canAffordBuy={canAffordBuy}
-                interactionLocked={isAnimating}
-                battleEvent={presentation.current}
+                defenseStepOpen={defenseStepOpen}
+                interactionLocked={presentation.interactionLocked}
+                battleEvent={presentation.overlay}
+                duel={duel}
                 onSelectTarget={setSelectedTargetId}
                 onExecute={executeSelectedCard}
                 onAcceptBuy={acceptBuy}
@@ -529,8 +548,8 @@ export function GameRoom({
             <div className="gf-battle-row gf-battle-row-split">
               <HandArea
                 me={me}
-                canAct={canAct && !isAnimating}
-                isDefending={isDefending}
+                canAct={canAct && !interactionLocked}
+                isDefending={defenseStepOpen}
                 selectedCardIdxes={selectedCardIdxes}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
@@ -571,9 +590,9 @@ export function GameRoom({
           </>
         )}
 
-        {gameStarted && presentation.current && (
+        {gameStarted && presentation.overlay && (
           <BattleEffects
-            current={presentation.current}
+            current={presentation.overlay}
             players={gameState.players}
             viewerId={playerId}
             reducedMotion={presentation.reducedMotion}
@@ -594,7 +613,7 @@ export function GameRoom({
         {me && <span className="gf-tag">￥{me.money}</span>}
       </BottomBar>
 
-      {gameState.winner && !isAnimating && (
+      {gameState.winner && !presentation.isAnimating && (
         <div className="gf-modal-backdrop">
           <div
             className="gf-modal gf-victory-modal"
@@ -678,8 +697,10 @@ function BattleField({
   pendingBuy,
   pendingSell,
   canAffordBuy,
+  defenseStepOpen,
   interactionLocked,
   battleEvent,
+  duel,
   onSelectTarget,
   onExecute,
   onAcceptBuy,
@@ -708,8 +729,10 @@ function BattleField({
   pendingBuy: GameState["pendingBuy"];
   pendingSell: GameState["pendingSell"];
   canAffordBuy: boolean;
+  defenseStepOpen: boolean;
   interactionLocked: boolean;
   battleEvent: PresentedBattleEvent | null;
+  duel: DuelPresentation | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
   onAcceptBuy: () => void;
@@ -732,7 +755,9 @@ function BattleField({
         .filter((card): card is { id: string } => Boolean(card))
     : [];
   const pending = gameState.pendingAttack;
-  const isDefending = gameState.phase === "defense" && pending?.defenderId === playerId;
+  // The defense UI (legacy or in-sequence) is only usable once the sequence
+  // has revealed the target; before that the field shows the incoming attack.
+  const isDefending = defenseStepOpen;
   const targetPlayerId =
     pending?.defenderId ??
     pendingBuy?.targetId ??
@@ -819,6 +844,7 @@ function BattleField({
   return (
     <>
       <SourceArea
+        duel={duel}
         activePlayer={activePlayer}
         selectedCards={selectedCards}
         isDefending={isDefending}
@@ -838,6 +864,7 @@ function BattleField({
         onAdjustExchange={onAdjustExchange}
       />
       <TargetArea
+        duel={duel}
         pending={pending}
         pendingBuy={pendingBuy}
         pendingSell={pendingSell}
@@ -854,6 +881,12 @@ function BattleField({
         playerId={playerId}
         activePlayerId={activePlayer?.id ?? null}
         activeEffect={battleEvent?.event ?? null}
+        statsOverride={duel?.statsBefore ?? null}
+        duelEffect={
+          duel?.showEffect && duel.effect
+            ? { playerId: duel.defenderId, blocked: duel.effect.blocked }
+            : null
+        }
         selectedTargetId={selectedTargetId}
         canSelect={canSelectTarget}
         onSelect={onSelectTarget}
