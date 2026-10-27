@@ -13,12 +13,12 @@
     "@volga/shared": "*",
     "@volga/game-core": "*",
     "next": "^15.0.3",
-    "react": "^19.0.0",
+    "react": "^19.3.1",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.6.3",
     "eslint": "^9.15.0",
