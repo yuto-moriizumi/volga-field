@@ -12,7 +12,7 @@
   "dependencies": {
     "@volga/shared": "*",
     "@volga/game-core": "*",
-    "next": "^15.0.3",
+    "next": "^16.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.3.1"
   },
