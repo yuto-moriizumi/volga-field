@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --import tsx src/app/room/battleSequence.test.ts"
+    "test": "node --test --import tsx src/app/room/battleSequence.test.ts src/app/room/cardSelection.test.ts"
   },
   "dependencies": {
     "@volga/game-core": "*",

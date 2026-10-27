@@ -45,7 +45,7 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
                 : isHeal
                   ? "HP+"
                   : isAttackPower
-                    ? "+"
+                    ? "攻+"
                     : "攻"}
           {power ?? ""}
           {typeof card.price === "number" && card.price > 0 && (

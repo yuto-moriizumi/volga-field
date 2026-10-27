@@ -16,6 +16,7 @@ import { SourceArea, type ExchangeDraft } from "./SourceArea";
 import { TargetArea } from "./TargetArea";
 import { eventAffectsPlayer, type PresentedBattleEvent } from "./battleEvents";
 import type { DuelPresentation } from "./battleSequence";
+import { defaultTargetId, isAttackCard } from "./cardSelection";
 import { useBattleSequence } from "./useBattleSequence";
 
 export function GameRoom({
@@ -159,29 +160,40 @@ export function GameRoom({
     }
 
     if (category === "weapon") {
-      setSelectedCardIdxes((current) => {
-        if (current.includes(idx)) {
-          return current.filter((i) => i !== idx);
-        }
-        const playable = playableCards(me);
-        const onlyWeapons = current.filter((i) => {
-          const other = playable[i];
-          return other ? findCard(other.id)?.category === "weapon" : false;
-        });
+      const playable = playableCards(me);
+      const onlyWeapons = selectedCardIdxes.filter((i) => {
+        const other = playable[i];
+        return other ? findCard(other.id)?.category === "weapon" : false;
+      });
+      let nextIndexes: number[];
+      if (selectedCardIdxes.includes(idx)) {
+        nextIndexes = selectedCardIdxes.filter((i) => i !== idx);
+      } else if (isDirectAttackCard(card.id)) {
         // 「攻N」は1回の攻撃につき1枚まで。「攻+N」は何枚でも重ねられる。
-        if (isDirectAttackCard(card.id)) {
-          const withoutOtherDirectAttacks = onlyWeapons.filter((i) => {
+        nextIndexes = [
+          ...onlyWeapons.filter((i) => {
             const other = playable[i];
             return other ? !isDirectAttackCard(other.id) : false;
-          });
-          return [...withoutOtherDirectAttacks, idx];
-        }
-        return [...onlyWeapons, idx];
+          }),
+          idx,
+        ];
+      } else {
+        nextIndexes = [...onlyWeapons, idx];
+      }
+      setSelectedCardIdxes(nextIndexes);
+      // 攻N も 攻+N も同じ攻撃の一部なので、対象は常に他プレイヤーにする。
+      const attacks = nextIndexes.some((i) => {
+        const other = playable[i];
+        return other ? isAttackCard(other.id) : false;
       });
-      if (selectedCardIdxes.length === 0) {
-        setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
-      } else if (!selectedTargetId) {
-        setSelectedTargetId(defaultTargetId(card.id, me.id, opponent?.id ?? null) ?? null);
+      if (attacks) {
+        setSelectedTargetId(opponent?.id ?? null);
+      } else {
+        setSelectedTargetId(
+          selectedTargetId ??
+            defaultTargetId(card.id, me.id, opponent?.id ?? null) ??
+            null,
+        );
       }
       return;
     }
@@ -893,24 +905,6 @@ function BattleField({
       />
     </>
   );
-}
-
-function isAttackCard(cardId: string): boolean {
-  return (
-    findCard(cardId)?.effects.some(
-      (effect) => effect.kind === "damage" && effect.target === "opponent",
-    ) ?? false
-  );
-}
-
-function defaultTargetId(
-  cardId: string,
-  selfId: string,
-  opponentId: string | null,
-): string | undefined {
-  const card = findCard(cardId);
-  if (card?.category === "trade") return opponentId ?? undefined;
-  return isAttackCard(cardId) ? (opponentId ?? undefined) : selfId;
 }
 
 function getDefensePower(cardId: string): number {
