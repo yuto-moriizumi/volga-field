@@ -139,13 +139,17 @@ function pickAiDefenseCards(room: Room, aiId: PlayerId): CardRef[] {
   return selected;
 }
 
-function finishActiveAiTurn(room: Room): boolean {
-  const ai = activePlayer(room);
-  if (!ai?.ai || !room.gameState || room.gameState.winner || room.gameState.phase === "defense") {
-    return false;
-  }
+/**
+ * 手番プレイヤーのターンを終了する。攻撃カードの防御解決後にも使うため AI 限定ではない。
+ * 勝敗が決している場合と防御待ちの場合は何もしない（endTurn が失敗しても false を返す）。
+ * テストから勝敗確定時の挙動を確認できるよう export している。
+ */
+export function finishTurn(room: Room): boolean {
+  const acting = activePlayer(room);
+  if (!acting || !room.gameState) return false;
+  if (room.gameState.winner || room.gameState.phase === "defense") return false;
 
-  const ended = endTurn(room.gameState, ai.id, room.deck);
+  const ended = endTurn(room.gameState, acting.id, room.deck);
   if (!ended.ok) return false;
   room.gameState = ended.state;
   room.deck = ended.deck;
@@ -185,7 +189,7 @@ function runAiTurn(room: Room): void {
 
     resolveAiDefense(room);
     if (!room.gameState || room.gameState.winner) return;
-    if (!finishActiveAiTurn(room)) return;
+    if (!finishTurn(room)) return;
   }
 }
 
@@ -464,9 +468,14 @@ function handlePlayCard(
     playerId: client.id,
     cardRef: { id: cardIds[0]! },
   });
-  // The attacker keeps the turn after a defense resolves, regardless of whether
-  // the defender is an AI. They can play more cards or declare end_turn.
-  resolveAiDefense(room);
+  // 攻撃カードの防御が解決したら、攻撃者のターンは自動で終了する。
+  // AI が防御した場合はここで即解決し、人間が防御する場合は handleDefend 側で終了する。
+  // 防御解決の state とターン終了後の state は別々に broadcast する（クライアントの演出用）。
+  if (room.gameState.pendingAttack && resolveAiDefense(room)) {
+    if (finishTurn(room)) {
+      runAiTurn(room);
+    }
+  }
 }
 
 function handleDefend(client: Client, cardIds: string[] = []): void {
@@ -484,7 +493,8 @@ function handleDefend(client: Client, cardIds: string[] = []): void {
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
-  if (finishActiveAiTurn(room)) {
+  // 防御が解決したので攻撃者のターンを終了する。勝敗が決していれば進めない。
+  if (finishTurn(room)) {
     runAiTurn(room);
   }
 }
