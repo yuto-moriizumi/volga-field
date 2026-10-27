@@ -56,15 +56,16 @@ export function SourceArea({
         data-duel-stage={duel.stage}
       >
         <div className="gf-status-stack">
-          {duel.showAttackCard && (
-            <NamePlate
-              label="攻撃"
-              name={duel.attackerName}
-              tone="teal"
-              playerId={duel.attackerId}
-              dataStep="attacker-name"
-            />
-          )}
+          {/* The attacker stays named while the field is still empty: whose
+              turn it is never changes mid-duel, and the name blinking out and
+              back reads as a glitch. */}
+          <NamePlate
+            label="攻撃"
+            name={duel.attackerName}
+            tone="teal"
+            playerId={duel.attackerId}
+            dataStep={duel.showAttackCard ? "attacker-name" : undefined}
+          />
         </div>
         {duel.showAttackCard ? (
           <div className="gf-duel-slot is-filled" data-step="attack-card">
