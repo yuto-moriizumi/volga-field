@@ -9,6 +9,7 @@ import {
   type PresentedBattleEvent,
 } from "./battleEvents";
 import {
+  DUEL_CLEAR_MS,
   DUEL_DEFENSE_STEP_MS,
   DUEL_STEP_MS,
   DUEL_TURN_HOLD_MS,
@@ -244,7 +245,7 @@ export function useBattleSequence(
       };
       runRef.current = run;
       publish(run);
-      after(DUEL_STEP_MS, epoch, () => {
+      after(DUEL_CLEAR_MS, epoch, () => {
         if (runRef.current !== run) return;
         run.stage = "attack";
         publish(run);

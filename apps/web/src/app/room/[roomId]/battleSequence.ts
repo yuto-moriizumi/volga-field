@@ -19,6 +19,12 @@ import type {
 
 export const DUEL_STEP_MS = 1_000;
 /**
+ * The field is cleared first so the played card arrives on an empty stage. That
+ * empty beat is deliberately shorter than a normal step: it carries no
+ * information, and a full second of blank field feels like a stall.
+ */
+export const DUEL_CLEAR_MS = 500;
+/**
  * Own defense confirmation: clear the centre field, then reveal the card. Kept
  * at 100ms because the player already committed by pressing the button, and
  * waiting half a second there makes the confirmation feel unresponsive.
