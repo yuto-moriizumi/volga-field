@@ -11,3 +11,6 @@ coverage/
 .opencode/goals/
 .playwright-mcp/
 .worktrees
+
+# Next.js 16 が next dev のたびに生成するエージェント向けルール
+apps/web/AGENTS.md
