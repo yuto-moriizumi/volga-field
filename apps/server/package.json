@@ -13,11 +13,11 @@
   "dependencies": {
     "@volga/shared": "*",
     "@volga/game-core": "*",
-    "ws": "^8.18.0"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^24",
-    "@types/ws": "^8.5.13",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^5.6.3"
   }
