@@ -39,10 +39,15 @@
     }
   },
   "mcp": {
-    "playwright": {
-      "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp"],
-      "enabled": true
+    "servers": {
+      "playwright": {
+        "type": "local",
+        "command": [
+          "bash",
+          "-lc",
+          "exec npx -y @playwright/mcp --headless --executable-path $(find $HOME/.cache/ms-playwright -path \"*/chrome-linux64/chrome\" -type f | sort | tail -1)"
+        ]
+      }
     }
   }
 }
