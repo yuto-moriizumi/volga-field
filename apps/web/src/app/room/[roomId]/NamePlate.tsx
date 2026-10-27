@@ -8,6 +8,7 @@ export function NamePlate({
   playerId,
   active = false,
   flash = false,
+  dataStep,
 }: {
   label: string;
   name: string;
@@ -16,6 +17,7 @@ export function NamePlate({
   playerId?: string;
   active?: boolean;
   flash?: boolean;
+  dataStep?: string;
 }) {
   return (
     <div
@@ -23,6 +25,7 @@ export function NamePlate({
       data-player-id={playerId}
       data-active={active ? "true" : undefined}
       data-flash={flash ? "true" : undefined}
+      data-step={dataStep}
     >
       <span className="gf-name-dot" />
       <span className="gf-name-label">{label}</span>

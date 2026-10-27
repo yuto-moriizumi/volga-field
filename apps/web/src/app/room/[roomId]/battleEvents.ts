@@ -83,7 +83,7 @@ export interface PresentedBattleEvent {
  * Every kind uses the same value so the overlay animations have room to play
  * out. Keep this in sync with `--gf-effect-duration` in `globals.css`; the
  * queue timer and the CSS animation must end together. Reduced motion is
- * handled separately in `useBattlePresentation`.
+ * handled separately in `useBattleSequence`.
  */
 export const BATTLE_EVENT_DURATION = 3000;
 
@@ -243,6 +243,24 @@ export function deriveBattleEvents(
         cardName: parseDamageCardName(attack.entry.message) ?? "攻撃",
         amount: null,
       });
+    } else {
+      // A fully blocked defense produces no damage entry, so the attack entry
+      // and the defense entries are the only hints that an attack happened.
+      const attackEntry = newEntries.find(
+        (entry) =>
+          entry.kind === "attack" && !entry.damage && /攻撃/.test(entry.message),
+      );
+      const defenseEntry = defenseEntries[0];
+      if (attackEntry && defenseEntry) {
+        flights.push({
+          kind: "attack",
+          attackerId: attackEntry.playerId,
+          defenderId: defenseEntry.playerId,
+          cardId: null,
+          cardName: parseAttackCardName(attackEntry.message) ?? "攻撃",
+          amount: null,
+        });
+      }
     }
   }
 

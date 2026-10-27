@@ -4,6 +4,8 @@ import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { findCard } from "@volga/game-core";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
+import { DuelCardView } from "./DuelStage";
+import type { DuelPresentation } from "./battleSequence";
 
 export function SourceArea({
   activePlayer,
@@ -19,6 +21,7 @@ export function SourceArea({
   canEndTurn,
   pendingBuy,
   canAffordPendingBuy,
+  duel,
   onConfirm,
   onAcceptBuy,
   onDeclineBuy,
@@ -37,11 +40,45 @@ export function SourceArea({
   canEndTurn: boolean;
   pendingBuy: GameState["pendingBuy"];
   canAffordPendingBuy: boolean;
+  duel: DuelPresentation | null;
   onConfirm: () => void;
   onAcceptBuy: () => void;
   onDeclineBuy: () => void;
   onAdjustExchange: (stat: "mp" | "money", delta: number) => void;
 }) {
+  // During a duel the left field belongs to the attacker: empty at first, then
+  // the card that was played. No controls live here until the sequence ends.
+  if (duel) {
+    return (
+      <div
+        className="gf-source-area"
+        aria-label="攻撃側の場"
+        data-duel-stage={duel.stage}
+      >
+        <div className="gf-status-stack">
+          {duel.showAttackCard && (
+            <NamePlate
+              label="攻撃"
+              name={duel.attackerName}
+              tone="teal"
+              playerId={duel.attackerId}
+              dataStep="attacker-name"
+            />
+          )}
+        </div>
+        {duel.showAttackCard ? (
+          <div className="gf-duel-slot is-filled" data-step="attack-card">
+            <DuelCardView card={duel.attackCard} tone="attack" />
+            {duel.attackAmount !== null && duel.attackAmount > 0 && (
+              <div className="gf-duel-power">攻{duel.attackAmount}</div>
+            )}
+          </div>
+        ) : (
+          <div className="gf-duel-slot" aria-hidden="true" />
+        )}
+      </div>
+    );
+  }
   if (isDefending) {
     return (
       <div className="gf-source-area" aria-label="相手のフィールド">

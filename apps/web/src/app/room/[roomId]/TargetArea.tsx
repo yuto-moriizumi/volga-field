@@ -2,8 +2,16 @@
 
 import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import type { BattleEvent } from "./battleEvents";
+import type { DuelPresentation } from "./battleSequence";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
+import {
+  DuelAnnouncer,
+  DuelDefenseView,
+  DuelDrawChip,
+  DuelEffectView,
+  DuelTurnView,
+} from "./DuelStage";
 
 export interface TargetBattleEffect {
   event: BattleEvent;
@@ -20,6 +28,7 @@ export function TargetArea({
   defenseCards,
   defensePower,
   defenseDisabled,
+  duel,
   onConfirmDefense,
 }: {
   pending: GameState["pendingAttack"];
@@ -31,15 +40,65 @@ export function TargetArea({
   defenseCards: CardRef[];
   defensePower: number;
   defenseDisabled: boolean;
+  duel: DuelPresentation | null;
   onConfirmDefense: () => void;
 }) {
+  // The centre field carries the target name, the defense card and the effect
+  // while a duel plays out. The name plate and the step content appear on their
+  // own timer, so the field is empty until the name step.
+  if (duel) {
+    const hit =
+      duel.showEffect && duel.effect !== null && !duel.effect.blocked;
+    return (
+      <div
+        className="gf-target-area"
+        aria-label="使用先の場"
+        data-duel-stage={duel.stage}
+      >
+        <NamePlate
+          label={duel.isSelfDefender ? "防御" : "使用先"}
+          name={duel.showTargetName ? duel.defenderName : ""}
+          tone="blue"
+          playerId={duel.showTargetName ? duel.defenderId : undefined}
+          flash={Boolean(duel.showEffect && duel.effect)}
+          dataStep={duel.showTargetName ? "target-name" : undefined}
+        />
+        <div className="gf-stage-wrap" data-hit={hit ? "true" : undefined}>
+          <div className="gf-action-stage gf-duel-stage">
+            {duel.awaitingDefense && (
+              <DefenseZone
+                defenseCards={defenseCards}
+                defensePower={defensePower}
+                disabled={defenseDisabled}
+                onConfirm={onConfirmDefense}
+              />
+            )}
+            {duel.showDefense && duel.defenseCards && (
+              <DuelDefenseView cards={duel.defenseCards} />
+            )}
+            {duel.showEffect && duel.effect && (
+              <DuelEffectView
+                effect={duel.effect}
+                defenderName={duel.defenderName}
+                recoil={duel.recoil}
+                attackerName={duel.attackerName}
+              />
+            )}
+            {duel.showTurn && duel.turn && <DuelTurnView turn={duel.turn} />}
+            {duel.drawCount > 0 &&
+              (duel.showTurn || (duel.showEffect && !duel.turn)) && (
+                <DuelDrawChip count={duel.drawCount} />
+              )}
+          </div>
+        </div>
+        <DuelAnnouncer duel={duel} />
+      </div>
+    );
+  }
+
   const damageEffect =
     effect?.event.kind === "damage" ? effect.event : null;
   const showHit = Boolean(damageEffect && !damageEffect.blocked);
-  const defenseLabel =
-    defenseCards.length > 0
-      ? `防御を確定（${defenseCards.length}枚 防${defensePower}）`
-      : "許す（防御しない）";
 
   return (
     <div className="gf-target-area" aria-label="ターゲットエリア">
@@ -67,36 +126,12 @@ export function TargetArea({
       >
         <div className="gf-action-stage">
           {isDefending ? (
-            <button
-              type="button"
-              className="gf-defense-zone"
-              onClick={onConfirmDefense}
+            <DefenseZone
+              defenseCards={defenseCards}
+              defensePower={defensePower}
               disabled={defenseDisabled}
-              aria-label={defenseLabel}
-            >
-              {defenseCards.length > 0 ? (
-                <>
-                  <div
-                    className="gf-confirm-card-stack gf-defense-card-stack"
-                    aria-label="選択中の防御カード"
-                  >
-                    {defenseCards.map((card, idx) => (
-                      <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
-                    ))}
-                  </div>
-                  <div className="gf-defense-summary">
-                    {defenseCards.length}枚 防{defensePower}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="gf-confirm-empty-action is-danger">許す</span>
-                  <span className="gf-defense-hint">
-                    防御カードを選ぶか、ここを押して攻撃を通す
-                  </span>
-                </>
-              )}
-            </button>
+              onConfirm={onConfirmDefense}
+            />
           ) : (
             <>
               {pendingBuy && (
@@ -118,5 +153,55 @@ export function TargetArea({
         </div>
       </div>
     </div>
+  );
+}
+
+function DefenseZone({
+  defenseCards,
+  defensePower,
+  disabled,
+  onConfirm,
+}: {
+  defenseCards: CardRef[];
+  defensePower: number;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const label =
+    defenseCards.length > 0
+      ? `防御を確定（${defenseCards.length}枚 防${defensePower}）`
+      : "許す（防御しない）";
+  return (
+    <button
+      type="button"
+      className="gf-defense-zone"
+      onClick={onConfirm}
+      disabled={disabled}
+      aria-label={label}
+      data-step="defense-zone"
+    >
+      {defenseCards.length > 0 ? (
+        <>
+          <div
+            className="gf-confirm-card-stack gf-defense-card-stack"
+            aria-label="選択中の防御カード"
+          >
+            {defenseCards.map((card, idx) => (
+              <LargeCard key={`${card.id}-${idx}`} cardRef={card} />
+            ))}
+          </div>
+          <div className="gf-defense-summary">
+            {defenseCards.length}枚 防{defensePower}
+          </div>
+        </>
+      ) : (
+        <>
+          <span className="gf-confirm-empty-action is-danger">許す</span>
+          <span className="gf-defense-hint">
+            防御カードを選ぶか、ここを押して攻撃を通す
+          </span>
+        </>
+      )}
+    </button>
   );
 }
