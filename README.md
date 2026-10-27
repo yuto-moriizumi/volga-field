@@ -21,6 +21,8 @@ npm run dev
 - Web: http://localhost:3000
 - Server: ws://localhost:4000
 
+本番のサーバーは Cloud Run で運用している（詳細: [docs/deploy/gcp.md](docs/deploy/gcp.md)）。
+
 ## 身内ネタの追加方法
 
 `packages/game-core/src/cards.ts` の `BASE_CARDS` 配列にカードを追加するだけで
