@@ -1,0 +1,96 @@
+name: Deploy server to Cloud Run
+
+# サーバー (apps/server) とそれが依存する packages だけを対象にする。
+# フロント (apps/web) は Vercel が担当するのでここではビルドしない。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/server/**"
+      - "packages/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "scripts/deploy-cloudrun.sh"
+      - ".github/workflows/deploy-server.yml"
+  workflow_dispatch:
+
+# シークレットは使わない。GitHub OIDC -> Workload Identity Federation のみ。
+permissions:
+  contents: read
+  id-token: write
+
+# 同時デプロイを直列化(Cloud Run のリビジョンが競合しないように)。
+concurrency:
+  group: deploy-server-cloud-run
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: volga-field-prod
+  PROJECT_NUMBER: "886229712395"
+  REGION: asia-northeast1
+  AR_REPOSITORY: volga
+  SERVICE_NAME: volga-field-server
+  RUNTIME_SA: volga-runtime@volga-field-prod.iam.gserviceaccount.com
+  DEPLOYER_SA: github-deployer@volga-field-prod.iam.gserviceaccount.com
+  WIF_PROVIDER: projects/886229712395/locations/global/workloadIdentityPools/github/providers/github-oidc
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth print-access-token \
+            | docker login -u oauth2accesstoken --password-stdin "https://${REGION}-docker.pkg.dev"
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.SERVICE_NAME }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::12}"
+          echo "IMAGE=${IMAGE}:${SHORT_SHA}" >> "$GITHUB_ENV"
+          docker buildx create --use --name volga-field-builder --driver docker-container 2>/dev/null || docker buildx use volga-field-builder
+          docker buildx build \
+            --push \
+            --platform linux/amd64 \
+            --tag "${IMAGE}:${SHORT_SHA}" \
+            --tag "${IMAGE}:latest" \
+            .
+
+      - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ env.PROJECT_ID }}
+          REGION: ${{ env.REGION }}
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
+          RUNTIME_SA: ${{ env.RUNTIME_SA }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/deploy-cloudrun.sh
+          ./scripts/deploy-cloudrun.sh --image "${IMAGE}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy server to Cloud Run"
+            echo
+            echo "- project: \`${PROJECT_ID}\`"
+            echo "- region: \`${REGION}\`"
+            echo "- service: \`${SERVICE_NAME}\`"
+            echo "- image: \`${IMAGE:-n/a}\`"
+            echo "- commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
