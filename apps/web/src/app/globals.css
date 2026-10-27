@@ -2967,48 +2967,6 @@ a {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .gf-attack-fly,
-  .gf-attack-trail,
-  .gf-attack-caption,
-  .gf-impact-burst,
-  .gf-defense-shield,
-  .gf-damage-number,
-  .gf-damage-target,
-  .gf-damage-note,
-  .gf-support-effect,
-  .gf-support-glow,
-  .gf-support-value,
-  .gf-sparkles span,
-  .gf-turn-banner,
-  .gf-turn-banner-sub,
-  .gf-draw-effect,
-  .gf-effect-skip-hint,
-  .gf-duel-slot.is-filled,
-  .gf-duel-defense,
-  .gf-duel-none,
-  .gf-duel-effect,
-  .gf-duel-turn,
-  .gf-stage-wrap[data-hit="true"],
-  .gf-target-pill.is-effect-hit,
-  .gf-target-pill.is-effect-blocked,
-  .gf-target-pill.is-effect-buffed,
-  .gf-victory-modal,
-  .gf-victory-icon {
-    animation: none !important;
-  }
-
-  .gf-turn-banner-sub,
-  .gf-damage-target,
-  .gf-damage-note {
-    opacity: 1;
-  }
-
-  .gf-battle-effects .gf-attack-fly {
-    opacity: 1;
-  }
-}
-
 .gf-duel-effect-recoil {
   padding: 2px 10px;
   border: 2px solid #8a3fa8;
@@ -3017,27 +2975,4 @@ a {
   color: #6a2b84;
   font-size: 13px;
   font-weight: 900;
-}
-
-/* Reduced motion keeps the 500ms step cadence and drops every movement, but a
-   completely static swap reads as a hard cut. These opacity-only fades are
-   declared after the `animation: none !important` block above so they win by
-   source order (same specificity, same importance). No transform is used. */
-@keyframes gf-duel-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gf-duel-slot.is-filled,
-  .gf-duel-defense,
-  .gf-duel-none,
-  .gf-duel-effect,
-  .gf-duel-turn {
-    animation: gf-duel-fade 0.16s ease both !important;
-  }
 }

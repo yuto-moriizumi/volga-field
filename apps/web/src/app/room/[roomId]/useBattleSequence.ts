@@ -50,7 +50,6 @@ export interface BattleSequence {
    */
   defenseFallback: boolean;
   interactionLocked: boolean;
-  reducedMotion: boolean;
   skip: () => void;
   notifyDefense: (cards: DuelCard[]) => void;
 }
@@ -69,7 +68,6 @@ export function useBattleSequence(
 ): BattleSequence {
   const [duel, setDuel] = useState<DuelPresentation | null>(null);
   const [overlay, setOverlay] = useState<PresentedBattleEvent | null>(null);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const [defenseFallback, setDefenseFallback] = useState(false);
 
   const runRef = useRef<DuelRun | null>(null);
@@ -93,14 +91,6 @@ export function useBattleSequence(
   const advanceToEffectRef = useRef<(run: DuelRun, epoch: number) => void>(
     () => {},
   );
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -494,7 +484,6 @@ export function useBattleSequence(
     canDefend: duel?.awaitingDefense ?? false,
     defenseFallback,
     interactionLocked,
-    reducedMotion,
     skip,
     notifyDefense,
   };

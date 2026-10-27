@@ -18,7 +18,6 @@ interface BattleEffectsProps {
   current: PresentedBattleEvent | null;
   players: PlayerState[];
   viewerId: PlayerId | null;
-  reducedMotion: boolean;
   onSkip: () => void;
 }
 
@@ -26,7 +25,6 @@ export function BattleEffects({
   current,
   players,
   viewerId,
-  reducedMotion,
   onSkip,
 }: BattleEffectsProps) {
   if (!current) return null;
@@ -36,7 +34,7 @@ export function BattleEffects({
   const text = battleEventText(current.event, resolveName);
 
   return (
-    <div className={`gf-battle-effects${reducedMotion ? " is-reduced" : ""}`}>
+    <div className="gf-battle-effects">
       <button
         type="button"
         className="gf-effect-skip-layer"

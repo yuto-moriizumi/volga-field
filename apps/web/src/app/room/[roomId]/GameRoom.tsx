@@ -607,7 +607,6 @@ export function GameRoom({
             current={presentation.overlay}
             players={gameState.players}
             viewerId={playerId}
-            reducedMotion={presentation.reducedMotion}
             onSkip={presentation.skip}
           />
         )}
