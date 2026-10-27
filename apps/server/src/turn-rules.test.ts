@@ -147,9 +147,10 @@ function pickNonAttackCard(player: PlayerState): string | null {
     player.hand.find((cardRef) => {
       const card = findCard(cardRef.id);
       if (!card) return false;
+      if (card.category === "party") return false;
       if (attackPower(cardRef.id) > 0) return false;
-      // 入党も攻撃ではないので、ターンは続く。
-      if (card.category === "party") return true;
+      // 自傷で決着してしまうカードは避ける（ターン終了の検証にならない）。
+      if (selfDamage(cardRef.id) > 0) return false;
       return isPlayable(cardRef.id, player.mp);
     })?.id ?? null
   );
@@ -160,13 +161,15 @@ interface TrainingRoomInfo {
   humanId: string;
   aiId: string;
   humanIndex: number;
+  aiIndex: number;
 }
 
-async function createTrainingRoom(
+async function findTrainingRoom(
   client: TestClient,
-  selectCard: (human: PlayerState) => string | null,
-): Promise<TrainingRoomInfo & { cardId: string }> {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  check: (human: PlayerState, ai: PlayerState) => boolean,
+  attempts = 400,
+): Promise<TrainingRoomInfo> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     client.send({ type: "create_room", playerName: "Human", mode: "training" });
     const created = await client.next((msg) => msg.type === "room_created");
     assert.equal(created.type, "room_created");
@@ -176,30 +179,38 @@ async function createTrainingRoom(
     const humanIndex = state.activePlayerIndex;
     const human = state.players[humanIndex]!;
     const ai = state.players.find((player) => player.id !== human.id)!;
-    const cardId = selectCard(human);
-    if (cardId) {
-      return { state, humanId: human.id, aiId: ai.id, humanIndex, cardId };
+    if (check(human, ai)) {
+      return {
+        state,
+        humanId: human.id,
+        aiId: ai.id,
+        humanIndex,
+        aiIndex: state.players.findIndex((player) => player.id === ai.id),
+      };
     }
 
     client.send({ type: "leave_room" });
     await client.ping();
+    // デッキのシードは Date.now() なので、同じミリ秒に作ると同じ手札になる。
+    // 連続リトライで同じ手札を引き続けないよう、少し待つ。
+    await new Promise((resolve) => setTimeout(resolve, 3));
   }
-  assert.fail("could not find the required card in the opening hand");
+  assert.fail("could not find a training room matching the required setup");
 }
 
-async function expectStillActive(
+async function createTrainingRoom(
   client: TestClient,
-  message: string,
-): Promise<void> {
-  client.send({ type: "play_card", cardRef: { id: "__missing_card__" } });
-  const error = await client.next((msg) => msg.type === "error");
-  assert.equal(error.type, "error");
-  if (error.type !== "error") return;
-  assert.equal(
-    error.message,
-    "unknown card",
-    `${message}: expected the human to remain active, got "${error.message}"`,
-  );
+  selectCard: (human: PlayerState) => string | null,
+): Promise<TrainingRoomInfo & { cardId: string }> {
+  let selected: string | null = null;
+  const room = await findTrainingRoom(client, (human) => {
+    const cardId = selectCard(human);
+    if (!cardId) return false;
+    selected = cardId;
+    return true;
+  });
+  assert.ok(selected, "could not find the required card in the opening hand");
+  return { ...room, cardId: selected! };
 }
 
 interface VersusRoomInfo {
@@ -234,7 +245,17 @@ async function openVersusRoom(
   if (aStarted.type !== "game_started" || bStarted.type !== "game_started") {
     throw new Error("unreachable");
   }
-  return { aState: aStarted.gameState, bState: bStarted.gameState };
+  // 開始直後の game_state も消費して、クライアントの受信キューを空にしておく。
+  const [aInitial, bInitial] = await Promise.all([
+    a.next((msg) => msg.type === "game_state" && msg.gameState.phase === "play"),
+    b.next((msg) => msg.type === "game_state" && msg.gameState.phase === "play"),
+  ]);
+  assert.equal(aInitial.type, "game_state");
+  assert.equal(bInitial.type, "game_state");
+  if (aInitial.type !== "game_state" || bInitial.type !== "game_state") {
+    throw new Error("unreachable");
+  }
+  return { aState: aInitial.gameState, bState: bInitial.gameState };
 }
 
 async function closeVersusRoom(a: TestClient, b: TestClient): Promise<void> {
@@ -297,7 +318,7 @@ test("training mode ends the attacker's turn after the AI defender resolves", as
   assert.equal(ended.gameState.winner, null);
 });
 
-test("non-attack cards keep the turn active", async (t) => {
+test("non-attack cards also end the turn", async (t) => {
   const server = await startServer({ port: 0 });
   const client = await TestClient.connect(server.port);
   t.after(async () => {
@@ -310,17 +331,185 @@ test("non-attack cards keep the turn active", async (t) => {
 
   client.send({ type: "play_card", cardRef: { id: room.cardId } });
 
-  const afterPlay = await client.next(
-    (msg) => msg.type === "game_state" && msg.gameState.pendingAttack === null,
+  // 1通目: 効果解決直後。まだ手番は人間のまま。
+  const effect = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn &&
+      msg.gameState.pendingAttack === null,
   );
-  assert.equal(afterPlay.type, "game_state");
-  if (afterPlay.type !== "game_state") return;
-  assert.equal(afterPlay.gameState.phase, "play");
-  assert.equal(afterPlay.gameState.activePlayerIndex, room.humanIndex);
-  assert.equal(afterPlay.gameState.actionTurn, initialActionTurn);
+  assert.equal(effect.type, "game_state");
+  if (effect.type !== "game_state") return;
+  assert.equal(effect.gameState.phase, "play");
+  assert.equal(effect.gameState.activePlayerIndex, room.humanIndex);
 
-  // 攻撃以外のカードの後は、続けてカードを使える。
-  await expectStillActive(client, "after a non-attack card");
+  // 2通目: ターン終了後。手番が移り、手札が5枚以上に補充される。
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  assert.equal(ended.gameState.winner, null);
+  assert.ok(
+    ended.gameState.players[room.humanIndex]!.hand.length >= HAND_SIZE,
+    "the hand should be refilled after the action",
+  );
+});
+
+test("join-party cards end the turn", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const room = await createTrainingRoom(client, (human) =>
+    human.hand.find((cardRef) => findCard(cardRef.id)?.category === "party")?.id ?? null,
+  );
+  const initialActionTurn = room.state.actionTurn;
+
+  client.send({ type: "play_card", cardRef: { id: room.cardId } });
+
+  const effect = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn &&
+      msg.gameState.pendingAttack === null,
+  );
+  assert.equal(effect.type, "game_state");
+  if (effect.type !== "game_state") return;
+  assert.ok(
+    effect.gameState.players[room.humanIndex]!.party,
+    "the human should have joined a party",
+  );
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  assert.equal(ended.gameState.winner, null);
+});
+
+test("discarding cards ends the turn", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const room = await findTrainingRoom(client, () => true);
+  const initialActionTurn = room.state.actionTurn;
+  const hand = room.state.players[room.humanIndex]!.hand;
+  assert.ok(hand.length > 0);
+
+  client.send({ type: "discard_cards", cardRefs: [{ id: hand[0]!.id }] });
+
+  const effect = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn &&
+      msg.gameState.players[room.humanIndex]!.hand.length === hand.length - 1,
+  );
+  assert.equal(effect.type, "game_state");
+  if (effect.type !== "game_state") return;
+  assert.equal(effect.gameState.activePlayerIndex, room.humanIndex);
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  assert.ok(ended.gameState.players[room.humanIndex]!.hand.length >= HAND_SIZE);
+});
+
+test("exchanging stats ends the turn", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const room = await createTrainingRoom(client, (human) =>
+    human.hand.find((cardRef) => cardRef.id === "exchange")?.id ?? null,
+  );
+  const initialActionTurn = room.state.actionTurn;
+
+  client.send({ type: "exchange_stats", mpDelta: 1, moneyDelta: 0 });
+
+  const effect = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn &&
+      msg.gameState.pendingAttack === null,
+  );
+  assert.equal(effect.type, "game_state");
+  if (effect.type !== "game_state") return;
+  assert.equal(effect.gameState.activePlayerIndex, room.humanIndex);
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  assert.equal(ended.gameState.winner, null);
+});
+
+test("buying ends the turn after the confirmation", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const room = await createTrainingRoom(client, (human) =>
+    human.hand.find((cardRef) => cardRef.id === "buy")?.id ?? null,
+  );
+  const initialActionTurn = room.state.actionTurn;
+
+  client.send({
+    type: "buy_card",
+    cardRef: { id: room.cardId },
+    targetPlayerId: room.aiId,
+  });
+
+  // 買うカードを使っただけではまだターンは終わらない（購入者の決定待ち）。
+  const pending = await client.next(
+    (msg) => msg.type === "game_state" && msg.gameState.pendingBuy !== null,
+  );
+  assert.equal(pending.type, "game_state");
+  if (pending.type !== "game_state") return;
+  assert.equal(pending.gameState.actionTurn, initialActionTurn);
+  assert.equal(pending.gameState.activePlayerIndex, room.humanIndex);
+
+  client.send({ type: "confirm_buy", accept: false });
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.pendingBuy === null &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  assert.equal(ended.gameState.winner, null);
 });
 
 test("a resolved attack ends the attacker's turn in versus mode", async (t) => {

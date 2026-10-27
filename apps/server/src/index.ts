@@ -157,6 +157,13 @@ export function finishTurn(room: Room): boolean {
   return true;
 }
 
+/** 1行動の解決後にターンを終了し、次が AI ならその手番を進める。 */
+function finishTurnAndContinue(room: Room): void {
+  if (finishTurn(room)) {
+    runAiTurn(room);
+  }
+}
+
 function resolveAiDefense(room: Room): boolean {
   const pending = room.gameState?.pendingAttack;
   if (!pending || room.gameState?.phase !== "defense") return false;
@@ -468,14 +475,16 @@ function handlePlayCard(
     playerId: client.id,
     cardRef: { id: cardIds[0]! },
   });
-  // 攻撃カードの防御が解決したら、攻撃者のターンは自動で終了する。
+  // 攻撃カードは防御が解決したら、それ以外のカードは効果解決後すぐにターン終了。
   // AI が防御した場合はここで即解決し、人間が防御する場合は handleDefend 側で終了する。
-  // 防御解決の state とターン終了後の state は別々に broadcast する（クライアントの演出用）。
-  if (room.gameState.pendingAttack && resolveAiDefense(room)) {
-    if (finishTurn(room)) {
-      runAiTurn(room);
+  // 効果解決の state とターン終了後の state は別々に broadcast する（クライアントの演出用）。
+  if (room.gameState.pendingAttack) {
+    if (resolveAiDefense(room)) {
+      finishTurnAndContinue(room);
     }
+    return;
   }
+  finishTurnAndContinue(room);
 }
 
 function handleDefend(client: Client, cardIds: string[] = []): void {
@@ -494,9 +503,7 @@ function handleDefend(client: Client, cardIds: string[] = []): void {
   room.gameState = result.state;
   broadcastStateToAll(room);
   // 防御が解決したので攻撃者のターンを終了する。勝敗が決していれば進めない。
-  if (finishTurn(room)) {
-    runAiTurn(room);
-  }
+  finishTurnAndContinue(room);
 }
 
 function handleDiscardCards(client: Client, cardIds: string[] = []): void {
@@ -514,6 +521,8 @@ function handleDiscardCards(client: Client, cardIds: string[] = []): void {
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
+  // 捨ても1行動なので、解決後にターン終了。
+  finishTurnAndContinue(room);
 }
 
 function handleBuyCard(
@@ -541,6 +550,9 @@ function handleConfirmBuy(client: Client, accept: boolean): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
+  // 買い物は buy_card → confirm_buy の2段階。confirm で1行動が完了する。
+  // 念のため、confirm した人が今も手番プレイヤーのときだけターンを終了する。
+  const activeId = room.gameState.players[room.gameState.activePlayerIndex]?.id;
   const result = confirmBuy(room.gameState, client.id, accept);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
@@ -548,6 +560,9 @@ function handleConfirmBuy(client: Client, accept: boolean): void {
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
+  if (activeId === client.id) {
+    finishTurnAndContinue(room);
+  }
 }
 
 function handleSellCards(
@@ -570,6 +585,8 @@ function handleSellCards(
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
+  // 売買も1行動なので、解決後にターン終了。
+  finishTurnAndContinue(room);
 }
 
 function handleExchangeStats(
@@ -587,6 +604,8 @@ function handleExchangeStats(
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
+  // 両替も1行動なので、解決後にターン終了。
+  finishTurnAndContinue(room);
 }
 
 function handleEndTurn(client: Client): void {
