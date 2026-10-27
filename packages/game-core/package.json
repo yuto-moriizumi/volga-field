@@ -21,7 +21,7 @@
     "@volga/shared": "*"
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
+    "typescript": "^7.0.2",
     "tsx": "^4.23.15"
   }
 }
