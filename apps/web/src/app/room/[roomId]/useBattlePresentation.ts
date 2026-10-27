@@ -9,8 +9,6 @@ import {
   type PresentedBattleEvent,
 } from "./battleEvents";
 
-const REDUCED_MOTION_DURATION = 160;
-
 export interface BattlePresentation {
   current: PresentedBattleEvent | null;
   isAnimating: boolean;
@@ -24,6 +22,11 @@ export interface BattlePresentation {
  * The hook only reacts to `gameState` changes, so the first state after mount
  * (or after joining a room) is never animated. Each event owns a timer that is
  * cleaned up on unmount, and `skip` advances the queue immediately.
+ *
+ * Reduced motion does not shorten the presentation time: every event keeps the
+ * full `battleEventDuration` so the text stays readable. Only the movement is
+ * disabled, which `globals.css` handles for the `prefers-reduced-motion`
+ * media query. `reducedMotion` is still exposed so the overlay can report it.
  */
 export function useBattlePresentation(
   gameState: GameState | null,
@@ -115,14 +118,11 @@ export function useBattlePresentation(
 
   useEffect(() => {
     if (!current) return;
-    const duration = reducedMotion
-      ? REDUCED_MOTION_DURATION
-      : battleEventDuration(current.event);
     const timer = window.setTimeout(() => {
       if (currentRef.current?.key === current.key) advanceRef.current();
-    }, duration);
+    }, battleEventDuration(current.event));
     return () => window.clearTimeout(timer);
-  }, [current, reducedMotion]);
+  }, [current]);
 
   useEffect(() => {
     if (!current) return;
