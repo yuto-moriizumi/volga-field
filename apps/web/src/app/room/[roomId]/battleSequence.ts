@@ -11,17 +11,21 @@ import type {
  * A duel is one attack (and its defense/damage) presented step by step inside
  * the field instead of as a full-screen overlay.
  *
- * The whole presentation is a fixed 300ms cadence: the data may arrive all at
+ * The whole presentation is a fixed 500ms cadence: the data may arrive all at
  * once, but the steps are only advanced by the hook's timers. The only input
  * that can pause the cadence is the local defense decision (the defender has to
  * pick cards first) and a not-yet-arrived damage resolution.
  */
 
-export const DUEL_STEP_MS = 300;
-/** Own defense confirmation: clear the centre field, then reveal the card. */
+export const DUEL_STEP_MS = 500;
+/**
+ * Own defense confirmation: clear the centre field, then reveal the card. Kept
+ * at 100ms because the player already committed by pressing the button, and
+ * waiting half a second there makes the confirmation feel unresponsive.
+ */
 export const DUEL_DEFENSE_STEP_MS = 100;
 /** How long the turn banner stays up before the normal UI comes back. */
-export const DUEL_TURN_HOLD_MS = 300;
+export const DUEL_TURN_HOLD_MS = 500;
 /**
  * When the resolution arrived very recently, wait a little for a follow-up
  * state before deciding that the turn did not change. The server may broadcast

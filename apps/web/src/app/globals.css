@@ -2708,7 +2708,7 @@ a {
 }
 
 .gf-duel-slot.is-filled {
-  animation: gf-duel-in 0.24s ease both;
+  animation: gf-duel-in 0.3s ease both;
 }
 
 .gf-duel-card {
@@ -2792,7 +2792,7 @@ a {
   gap: 6px;
   width: 100%;
   max-width: 300px;
-  animation: gf-duel-in 0.24s ease both;
+  animation: gf-duel-in 0.3s ease both;
 }
 
 .gf-duel-defense .gf-large-card {
@@ -2810,7 +2810,7 @@ a {
   color: #5a6b68;
   font-size: 22px;
   font-weight: 900;
-  animation: gf-duel-in 0.24s ease both;
+  animation: gf-duel-in 0.3s ease both;
 }
 
 .gf-duel-effect {
@@ -2818,7 +2818,7 @@ a {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  animation: gf-duel-effect-in 0.26s cubic-bezier(0.2, 0.8, 0.25, 1.1) both;
+  animation: gf-duel-effect-in 0.3s cubic-bezier(0.2, 0.8, 0.25, 1.1) both;
 }
 
 .gf-duel-effect-shield {
@@ -2880,7 +2880,7 @@ a {
   );
   box-shadow: 0 10px 22px rgba(31, 91, 80, 0.3);
   text-align: center;
-  animation: gf-duel-turn-in 0.16s cubic-bezier(0.2, 0.8, 0.3, 1.12) both;
+  animation: gf-duel-turn-in 0.2s cubic-bezier(0.2, 0.8, 0.3, 1.12) both;
 }
 
 .gf-duel-turn.is-self {
@@ -3017,4 +3017,27 @@ a {
   color: #6a2b84;
   font-size: 13px;
   font-weight: 900;
+}
+
+/* Reduced motion keeps the 500ms step cadence and drops every movement, but a
+   completely static swap reads as a hard cut. These opacity-only fades are
+   declared after the `animation: none !important` block above so they win by
+   source order (same specificity, same importance). No transform is used. */
+@keyframes gf-duel-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gf-duel-slot.is-filled,
+  .gf-duel-defense,
+  .gf-duel-none,
+  .gf-duel-effect,
+  .gf-duel-turn {
+    animation: gf-duel-fade 0.16s ease both !important;
+  }
 }

@@ -61,7 +61,7 @@ export interface BattleSequence {
  * Only one presentation is active at a time: duels and the legacy overlays
  * share a single queue, so the two can never be shown together. Steps are
  * advanced by timers, never by the arrival of new data, which keeps the cadence
- * at 300ms even when the server sends the attack and its resolution together.
+ * at 500ms even when the server sends the attack and its resolution together.
  */
 export function useBattleSequence(
   gameState: GameState | null,
