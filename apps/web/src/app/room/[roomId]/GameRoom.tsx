@@ -2,8 +2,9 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
+import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
 import { findCard, getCardPrice, isDirectAttackCard } from "@volga/game-core";
-import type { CardRef, GameState, PlayerState } from "@volga/shared";
+import type { CardRef, GameState, PlayerState, ServerMessage } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
 import { BattleEffects } from "./BattleEffects";
@@ -43,15 +44,25 @@ export function GameRoom({
   const [selectedDiscardIdxes, setSelectedDiscardIdxes] = useState<number[]>([]);
   const [lastHoveredCard, setLastHoveredCard] = useState<CardRef | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [name, setName] = useState("");
+  const { name, setName } = useStoredPlayerName();
   const [joinRequested, setJoinRequested] = useState(
     ctxGameState?.roomId === roomId && !!playerId,
   );
+  const [handledMessage, setHandledMessage] = useState<ServerMessage | null>(null);
+  const [handledGameState, setHandledGameState] = useState<GameState | null>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("volga-player-name");
-    if (stored) setName(stored);
-  }, []);
+  if (lastMessage !== handledMessage) {
+    setHandledMessage(lastMessage);
+    if (lastMessage?.type === "error") {
+      setError(lastMessage.message);
+      setJoinRequested(false);
+    }
+  }
+
+  if (gameState !== handledGameState) {
+    setHandledGameState(gameState);
+    if (gameState) setError(null);
+  }
 
   useEffect(() => {
     if (status !== "connected") return;
@@ -61,17 +72,6 @@ export function GameRoom({
     setJoinRequested(true);
     send({ type: "join_room", roomId, playerName: name.trim() });
   }, [status, gameState, joinRequested, name, roomId, send]);
-
-  useEffect(() => {
-    if (!lastMessage || lastMessage.type !== "error") return;
-    setError(lastMessage.message);
-    setJoinRequested(false);
-  }, [lastMessage]);
-
-  useEffect(() => {
-    if (!gameState) return;
-    setError(null);
-  }, [gameState]);
 
   function submitName() {
     const trimmed = name.trim();
@@ -101,6 +101,21 @@ export function GameRoom({
     gameState?.players[gameState.activePlayerIndex]?.id === playerId;
   const isDefending = gameState?.phase === "defense" && gameState.pendingAttack?.defenderId === playerId;
   const canAct = Boolean(isMyTurn && gameState?.phase !== "defense" && !gameState.winner);
+  const [prevCanAct, setPrevCanAct] = useState(canAct);
+  // Reset transient card selections as soon as acting becomes impossible.
+  if (canAct !== prevCanAct) {
+    setPrevCanAct(canAct);
+    if (!canAct) {
+      setDiscardMode(false);
+      setSellMode(false);
+      setExchangeMode(false);
+      setExchangeDraft(null);
+      setSelectedDiscardIdxes([]);
+      setSelectedSellIdxes([]);
+      setSelectedCardIdxes([]);
+      setSelectedTargetId(null);
+    }
+  }
   const presentation = useBattlePresentation(gameState, playerId);
   const isAnimating = presentation.isAnimating;
 
@@ -111,18 +126,6 @@ export function GameRoom({
     lastActionAtRef.current = now;
     return true;
   }
-
-  useEffect(() => {
-    if (canAct) return;
-    setDiscardMode(false);
-    setSellMode(false);
-    setExchangeMode(false);
-    setExchangeDraft(null);
-    setSelectedDiscardIdxes([]);
-    setSelectedSellIdxes([]);
-    setSelectedCardIdxes([]);
-    setSelectedTargetId(null);
-  }, [canAct]);
 
   function playCard(idx: number) {
     if (!me || !canAct || isAnimating || discardMode || sellMode) return;

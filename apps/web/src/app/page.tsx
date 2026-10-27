@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
 import { BottomBar } from "./_components/BottomBar";
 import { TopBar } from "./_components/TopBar";
 
 export default function HomePage() {
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("volga-player-name");
-    if (stored) setName(stored);
-  }, []);
+  const { name, setName } = useStoredPlayerName();
 
   function persistName(next: string) {
     setName(next);

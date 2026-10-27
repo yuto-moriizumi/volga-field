@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DoomsdayTurn, TrainingPlayerCount } from "@volga/shared";
+import type {
+  DoomsdayTurn,
+  ServerMessage,
+  TrainingPlayerCount,
+} from "@volga/shared";
 import { useGameSocket } from "@/lib/useGameSocket";
+import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 
@@ -40,7 +45,7 @@ const MODES: {
 export function Lobby() {
   const router = useRouter();
   const { status, send, lastMessage } = useGameSocket();
-  const [name, setName] = useState("");
+  const { storedName, name, setName } = useStoredPlayerName();
   const [error, setError] = useState<string | null>(null);
   const [hostMode, setHostMode] = useState<ModeId | null>(null);
   const [hostPassword, setHostPassword] = useState("");
@@ -48,16 +53,24 @@ export function Lobby() {
   const [trainingPlayerCount, setTrainingPlayerCount] = useState<TrainingPlayerCount>(2);
   const [showTrainingSettings, setShowTrainingSettings] = useState(false);
   const [prophetCount, setProphetCount] = useState(0);
-  const [showNameInput, setShowNameInput] = useState(false);
+  // `null` until localStorage has been read on the client.
+  const [showNameInput, setShowNameInput] = useState<boolean | null>(null);
+  const [handledMessage, setHandledMessage] = useState<ServerMessage | null>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("volga-player-name")?.trim();
-    if (stored) {
-      setName(stored);
-    } else {
-      setShowNameInput(true);
+  if (showNameInput === null && storedName !== null) {
+    setShowNameInput(storedName.trim() === "");
+  }
+
+  if (lastMessage !== handledMessage) {
+    setHandledMessage(lastMessage);
+    if (lastMessage?.type === "error") {
+      setError(lastMessage.message);
+      setHostMode(null);
+      setShowTrainingSettings(false);
+    } else if (lastMessage?.type === "rooms_list") {
+      setProphetCount(lastMessage.playerCount);
     }
-  }, []);
+  }
 
   useEffect(() => {
     const trimmed = name.trim();
@@ -68,11 +81,6 @@ export function Lobby() {
 
   useEffect(() => {
     if (!lastMessage) return;
-    if (lastMessage.type === "error") {
-      setError(lastMessage.message);
-      setHostMode(null);
-      setShowTrainingSettings(false);
-    }
     if (lastMessage.type === "room_created") {
       localStorage.setItem("volga-player-name", name.trim());
       router.push(`/room/${lastMessage.roomId}`);
@@ -80,9 +88,6 @@ export function Lobby() {
     if (lastMessage.type === "room_joined") {
       localStorage.setItem("volga-player-name", name.trim());
       router.push(`/room/${lastMessage.gameState.roomId}`);
-    }
-    if (lastMessage.type === "rooms_list") {
-      setProphetCount(lastMessage.playerCount);
     }
   }, [lastMessage, router, name]);
 
