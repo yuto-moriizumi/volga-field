@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 const DURATION = 420;
 
@@ -12,17 +12,8 @@ const DURATION = 420;
  * on every animation frame.
  */
 export function AnimatedNumber({ value }: { value: number }) {
-  const [reducedMotion, setReducedMotion] = useState(false);
   const elementRef = useRef<HTMLSpanElement>(null);
   const previousRef = useRef(value);
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReducedMotion(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
 
   useEffect(() => {
     const element = elementRef.current;
@@ -30,7 +21,7 @@ export function AnimatedNumber({ value }: { value: number }) {
     previousRef.current = value;
     if (!element) return;
 
-    if (from === value || reducedMotion) {
+    if (from === value) {
       element.textContent = String(value);
       return;
     }
@@ -48,7 +39,7 @@ export function AnimatedNumber({ value }: { value: number }) {
       cancelAnimationFrame(frame);
       element.textContent = String(value);
     };
-  }, [value, reducedMotion]);
+  }, [value]);
 
   return <span ref={elementRef}>{value}</span>;
 }
