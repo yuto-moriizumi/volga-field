@@ -91,13 +91,12 @@ function broadcastStateToAll(room: Room): void {
 function startGame(room: Room): void {
   if (room.players.length < 2) return;
   if (room.started) return;
-  const { state, deck } = createGame(
+  const { state } = createGame(
     room.id,
     room.players.map((p) => ({ id: p.id, name: p.name })),
     { doomsdayTurn: room.doomsdayTurn },
   );
   room.gameState = state;
-  room.deck = deck;
   room.started = true;
   for (const p of room.players) {
     if (!p.ws) continue;
@@ -144,24 +143,33 @@ function pickAiDefenseCards(room: Room, aiId: PlayerId): CardRef[] {
  * 勝敗が決している場合と防御待ちの場合は何もしない（endTurn が失敗しても false を返す）。
  * テストから勝敗確定時の挙動を確認できるよう export している。
  */
-export function finishTurn(room: Room): boolean {
+export function finishTurn(room: Room, cardsUsed = 0): boolean {
   const acting = activePlayer(room);
   if (!acting || !room.gameState) return false;
   if (room.gameState.winner || room.gameState.phase === "defense") return false;
 
-  const ended = endTurn(room.gameState, acting.id, room.deck);
+  const ended = endTurn(room.gameState, acting.id, cardsUsed);
   if (!ended.ok) return false;
   room.gameState = ended.state;
-  room.deck = ended.deck;
+  room.pendingCardsUsed = 0;
   broadcastStateToAll(room);
   return true;
 }
 
 /** 1行動の解決後にターンを終了し、次が AI ならその手番を進める。 */
-function finishTurnAndContinue(room: Room): void {
-  if (finishTurn(room)) {
+function finishTurnAndContinue(room: Room, cardsUsed = 0): void {
+  if (finishTurn(room, cardsUsed)) {
     runAiTurn(room);
   }
+}
+
+/**
+ * 手札が減った枚数（使った枚数）を返す。買い物のように手札が増える行動は 0 枚扱い。
+ */
+function handDelta(state: GameState, playerId: PlayerId, handBefore: number): number {
+  const handAfter =
+    state.players.find((p) => p.id === playerId)?.hand.length ?? 0;
+  return Math.max(0, handBefore - handAfter);
 }
 
 function resolveAiDefense(room: Room): boolean {
@@ -170,7 +178,11 @@ function resolveAiDefense(room: Room): boolean {
   const defender = room.players.find((p) => p.id === pending.defenderId);
   if (!defender?.ai) return false;
 
-  const defended = defendAttack(room.gameState, defender.id, pickAiDefenseCards(room, defender.id));
+  const defended = defendAttack(
+    room.gameState,
+    defender.id,
+    pickAiDefenseCards(room, defender.id),
+  );
   if (!defended.ok) return false;
   room.gameState = defended.state;
   broadcastStateToAll(room);
@@ -185,18 +197,20 @@ function runAiTurn(room: Room): void {
     const aiState = room.gameState.players.find((p) => p.id === ai.id);
     const target = room.gameState.players.find((p) => p.id !== ai.id && p.hp > 0);
     const card = aiState?.hand.find((c) => findCard(c.id)?.category !== "trade");
+    const handBefore = aiState?.hand.length ?? 0;
     if (card) {
-      const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id, room.deck);
+      const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id);
       if (played.ok) {
         room.gameState = played.state;
-        room.deck = played.deck;
         broadcastStateToAll(room);
       }
     }
+    const cardsUsed = handDelta(room.gameState, ai.id, handBefore);
+    room.pendingCardsUsed = cardsUsed;
 
     resolveAiDefense(room);
     if (!room.gameState || room.gameState.winner) return;
-    if (!finishTurn(room)) return;
+    if (!finishTurn(room, cardsUsed)) return;
   }
 }
 
@@ -318,7 +332,6 @@ function placeholderState(
       party: null,
       ready: p.ready,
     })),
-    deckSize: 0,
     turn: 0,
     actionTurn: 0,
     doomsdayTurn,
@@ -456,19 +469,20 @@ function handlePlayCard(
     send(client.ws, { type: "error", message: "no card to play" });
     return;
   }
+  const handBefore =
+    room.gameState.players.find((p) => p.id === client.id)?.hand.length ?? 0;
   const result = playCard(
     room.gameState,
     client.id,
     cardIds.map((id) => ({ id })),
     targetPlayerId,
-    room.deck,
   );
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
     return;
   }
   room.gameState = result.state;
-  room.deck = result.deck;
+  const cardsUsed = handDelta(room.gameState, client.id, handBefore);
   broadcastStateToAll(room);
   broadcastRoom(room, {
     type: "card_played",
@@ -479,12 +493,15 @@ function handlePlayCard(
   // AI が防御した場合はここで即解決し、人間が防御する場合は handleDefend 側で終了する。
   // 効果解決の state とターン終了後の state は別々に broadcast する（クライアントの演出用）。
   if (room.gameState.pendingAttack) {
+    // 人間が防御する場合は handleDefend 側で攻撃者のターンを終えるため、
+    // 使った枚数を保持しておく。
+    room.pendingCardsUsed = cardsUsed;
     if (resolveAiDefense(room)) {
-      finishTurnAndContinue(room);
+      finishTurnAndContinue(room, cardsUsed);
     }
     return;
   }
-  finishTurnAndContinue(room);
+  finishTurnAndContinue(room, cardsUsed);
 }
 
 function handleDefend(client: Client, cardIds: string[] = []): void {
@@ -503,13 +520,15 @@ function handleDefend(client: Client, cardIds: string[] = []): void {
   room.gameState = result.state;
   broadcastStateToAll(room);
   // 防御が解決したので攻撃者のターンを終了する。勝敗が決していれば進めない。
-  finishTurnAndContinue(room);
+  finishTurnAndContinue(room, room.pendingCardsUsed);
 }
 
 function handleDiscardCards(client: Client, cardIds: string[] = []): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
+  const handBefore =
+    room.gameState.players.find((p) => p.id === client.id)?.hand.length ?? 0;
   const result = discardCards(
     room.gameState,
     client.id,
@@ -521,8 +540,8 @@ function handleDiscardCards(client: Client, cardIds: string[] = []): void {
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
-  // 捨ても1行動なので、解決後にターン終了。
-  finishTurnAndContinue(room);
+  // 捨ても1行動なので、解決後にターン終了。捨てた枚数ぶん引く。
+  finishTurnAndContinue(room, handDelta(room.gameState, client.id, handBefore));
 }
 
 function handleBuyCard(
@@ -553,6 +572,8 @@ function handleConfirmBuy(client: Client, accept: boolean): void {
   // 買い物は buy_card → confirm_buy の2段階。confirm で1行動が完了する。
   // 念のため、confirm した人が今も手番プレイヤーのときだけターンを終了する。
   const activeId = room.gameState.players[room.gameState.activePlayerIndex]?.id;
+  const handBefore =
+    room.gameState.players.find((p) => p.id === client.id)?.hand.length ?? 0;
   const result = confirmBuy(room.gameState, client.id, accept);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
@@ -561,7 +582,8 @@ function handleConfirmBuy(client: Client, accept: boolean): void {
   room.gameState = result.state;
   broadcastStateToAll(room);
   if (activeId === client.id) {
-    finishTurnAndContinue(room);
+    // 買い物は手札が増える（または変わらない）ので 0 枚使用扱い → 最低1枚引く。
+    finishTurnAndContinue(room, handDelta(room.gameState, client.id, handBefore));
   }
 }
 
@@ -586,7 +608,8 @@ function handleSellCards(
   room.gameState = result.state;
   broadcastStateToAll(room);
   // 売買も1行動なので、解決後にターン終了。
-  finishTurnAndContinue(room);
+  // 「売る」カード自体は行動のコストなので枚数に含めず、売却した枚数ぶん引く。
+  finishTurnAndContinue(room, cardIds.length);
 }
 
 function handleExchangeStats(
@@ -597,6 +620,8 @@ function handleExchangeStats(
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
+  const handBefore =
+    room.gameState.players.find((p) => p.id === client.id)?.hand.length ?? 0;
   const result = exchangeStats(room.gameState, client.id, mpDelta, moneyDelta);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
@@ -604,21 +629,21 @@ function handleExchangeStats(
   }
   room.gameState = result.state;
   broadcastStateToAll(room);
-  // 両替も1行動なので、解決後にターン終了。
-  finishTurnAndContinue(room);
+  // 両替も1行動なので、解決後にターン終了。使ったカード枚数ぶん引く。
+  finishTurnAndContinue(room, handDelta(room.gameState, client.id, handBefore));
 }
 
 function handleEndTurn(client: Client): void {
   if (!client.roomId) return;
   const room = rooms.get(client.roomId);
   if (!room || !room.gameState) return;
-  const result = endTurn(room.gameState, client.id, room.deck);
+  // 何もせずターン終了 → 攻撃ターンの最低1枚ドロー。
+  const result = endTurn(room.gameState, client.id, 0);
   if (!result.ok) {
     send(client.ws, { type: "error", message: result.reason });
     return;
   }
   room.gameState = result.state;
-  room.deck = result.deck;
   broadcastStateToAll(room);
   runAiTurn(room);
 }

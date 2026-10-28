@@ -1,4 +1,4 @@
-import type { CardRef, DoomsdayTurn, GameState, PlayerId, RoomId } from "@volga/shared";
+import type { DoomsdayTurn, GameState, PlayerId, RoomId } from "@volga/shared";
 
 export interface RoomPlayer {
   id: PlayerId;
@@ -15,7 +15,8 @@ export interface Room {
   hostId: PlayerId;
   players: RoomPlayer[];
   gameState: GameState | null;
-  deck: CardRef[];
+  /** 攻撃が防御待ちの間、攻撃者がこのターンに使ったカード枚数を保持する。 */
+  pendingCardsUsed: number;
   started: boolean;
   mode: RoomMode;
   doomsdayTurn: DoomsdayTurn | null;
@@ -35,7 +36,7 @@ export function createRoom(
     hostId: host.id,
     players: [host],
     gameState: null,
-    deck: [],
+    pendingCardsUsed: 0,
     started: false,
     mode,
     doomsdayTurn,

@@ -1,12 +1,12 @@
 import {
   BASE_CARDS,
-  DECK_SIZE,
   DOOMSDAY_DEVIL_RATE,
   DOOMSDAY_DEVILS,
-  HAND_SIZE,
+  INITIAL_HAND_SIZE,
   INITIAL_HP,
   INITIAL_MONEY,
   INITIAL_MP,
+  MAX_HAND_SIZE,
   PARTY_ACTION_CHANCE,
   PARTY_ACTIONS,
   PARTY_IDEOLOGIES,
@@ -184,7 +184,7 @@ export const DEVIL_WEIGHT_TOTAL = DOOMSDAY_DEVILS.reduce(
   0,
 );
 
-export const DEVIL_RULE = `終末の時、手札を補充するために1枚引くたびに ${Math.round(
+export const DEVIL_RULE = `終末の時、ターン終了時にカードを引くたびに ${Math.round(
   DOOMSDAY_DEVIL_RATE * 100,
 )}% の確率で悪魔が出現します。出現する悪魔は重み付き抽選で決まり、重みの合計は ${DEVIL_WEIGHT_TOTAL} です。悪魔は手番プレイヤーに効果を与えます。`;
 
@@ -192,7 +192,7 @@ export const PARTY_RULE = `他のプレイヤーのターン終了時、所属�
   PARTY_ACTION_CHANCE * 100,
 )}% で政党行動を起こします。行動は政党ごとの重み付き抽選で決まります。`;
 
-export const DECK_NOTE = `デッキは全カードから${DECK_SIZE}枚を選んで構成します。カードごとの出現率は設定していません。`;
+export const CARD_DRAW_NOTE = `手札は開始時${INITIAL_HAND_SIZE}枚、上限は${MAX_HAND_SIZE}枚。引くのは実装されている全カードからのランダム抽選（復元抽出）で、引いても候補は減らないため同じカードが重複することもある。`;
 
 export interface RuleSection {
   title: string;
@@ -206,7 +206,10 @@ export const RULES: RuleSection[] = [
       `HPは${INITIAL_HP}で開始。回復に上限はなく、${INITIAL_HP}を超えて増える。`,
       `MPは${INITIAL_MP}で開始。回復は最大MPまで。`,
       `所持金は${INITIAL_MONEY}で開始。取引カードで増減する。`,
-      `手札は${HAND_SIZE}枚。山札から自動で補充する。`,
+      `手札は開始時${INITIAL_HAND_SIZE}枚、上限は${MAX_HAND_SIZE}枚。`,
+      `自分のターンに使った枚数ぶん、ターン終了時に引く（攻撃ターンは最低1枚）。捨てる・売る・両替で減った枚数も数え、買いは0枚扱い。`,
+      `防衛では使った防御カードの枚数ぶん引く（0枚なら引かない）。`,
+      `引くカードは実装されている全カードからランダムに選ぶ。同じカードが重複することもある。`,
     ],
   },
   {
@@ -240,7 +243,7 @@ export const RULES: RuleSection[] = [
       "カテゴリは 武器 / 防具 / 雑貨 / 奇跡 / 取引 / 政党。",
       "悪魔はカードではなく、終末の時に出現するイベント。",
       "雑貨は選挙運動の道具で、使うと MP を回復する。",
-      DECK_NOTE,
+      CARD_DRAW_NOTE,
     ],
   },
 ];
@@ -292,28 +295,28 @@ export const CATEGORIES: TextbookCategory[] = [
     title: "武器",
     variant: "card-grid",
     cards: cardsByCategory("weapon"),
-    note: DECK_NOTE,
+    note: CARD_DRAW_NOTE,
   },
   {
     id: "bugu",
     title: "防具",
     variant: "card-grid",
     cards: cardsByCategory("shield"),
-    note: DECK_NOTE,
+    note: CARD_DRAW_NOTE,
   },
   {
     id: "zakka",
     title: "雑貨",
     variant: "card-list",
     cards: cardsByCategory("misc"),
-    note: `雑貨は選挙運動の道具で、使うと MP を回復します。${DECK_NOTE}`,
+    note: `雑貨は選挙運動の道具で、使うと MP を回復します。${CARD_DRAW_NOTE}`,
   },
   {
     id: "kiseki",
     title: "奇跡",
     variant: "card-list",
     cards: cardsByCategory("miracle"),
-    note: DECK_NOTE,
+    note: CARD_DRAW_NOTE,
   },
   {
     id: "torihiki",

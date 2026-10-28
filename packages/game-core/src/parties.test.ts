@@ -27,7 +27,6 @@ function gameState(players: PlayerState[], activePlayerIndex = 0): GameState {
   return {
     roomId: "room",
     players,
-    deckSize: 0,
     turn: 1,
     actionTurn: 1,
     doomsdayTurn: null,
@@ -66,7 +65,7 @@ test("party actions use a 25% trigger chance", () => {
 test("a failed 25% roll produces no action or log", () => {
   const state = gameState([withParty("voter", "communist_party"), player("other")]);
 
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.9]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.9]));
 
   assert.deepEqual(result.logs, []);
   assert.deepEqual(result.state.players, state.players);
@@ -77,7 +76,7 @@ test("communist party deals damage to a random living opponent", () => {
   const state = gameState([withParty("voter", "communist_party"), player("other")]);
 
   // chance 0.1 -> success, action 0.1 -> 労働者の反撃 (60/100), target 0.0 -> other
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.1, 0.0]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.1, 0.0]));
 
   const other = result.state.players.find((p) => p.id === "other");
   assert.equal(other?.hp, 17);
@@ -98,7 +97,7 @@ test("democratic party heals itself beyond the base HP", () => {
   ]);
 
   // chance 0.1 -> success, action 0.9 -> 政策協力 (heal 2)
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.9]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.9]));
 
   const voter = result.state.players.find((p) => p.id === "voter");
   assert.equal(voter?.hp, 22);
@@ -113,7 +112,7 @@ test("democratic party recovers MP and caps at maxMp", () => {
   ]);
 
   // chance 0.1 -> success, action 0.1 -> 世論の追い風 (MP+2)
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.1]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.1]));
   assert.equal(result.state.players.find((p) => p.id === "voter")?.mp, 7);
 
   const capped = gameState([
@@ -124,7 +123,6 @@ test("democratic party recovers MP and caps at maxMp", () => {
   const cappedResult = resolvePartyActions(
     capped,
     "other",
-    [],
     sequenceRng([0.1, 0.9]),
   );
   assert.equal(cappedResult.state.players.find((p) => p.id === "voter")?.mp, 10);
@@ -138,7 +136,7 @@ test("ldp gains money", () => {
   ]);
 
   // chance 0.1 -> success, action 0.1 -> 経済成長 (money +3)
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.1]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.1]));
 
   assert.equal(result.state.players.find((p) => p.id === "voter")?.money, 23);
   assert.ok(result.logs[0]?.message.includes("経済成長"));
@@ -151,7 +149,7 @@ test("anarchist party steals money from an opponent who has money", () => {
   ]);
 
   // chance 0.1 -> success, action 0.9 -> 略奪 (45%), target 0.0 -> other
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.9, 0.0]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.9, 0.0]));
 
   assert.equal(result.state.players.find((p) => p.id === "voter")?.money, 22);
   assert.equal(result.state.players.find((p) => p.id === "other")?.money, 3);
@@ -166,7 +164,7 @@ test("steal is skipped when no opponent has money", () => {
   ]);
 
   // chance 0.1 -> success, action 0.9 -> 略奪, but there is no valid target.
-  const result = resolvePartyActions(state, "other", [], sequenceRng([0.1, 0.9]));
+  const result = resolvePartyActions(state, "other", sequenceRng([0.1, 0.9]));
 
   assert.deepEqual(result.logs, []);
   assert.deepEqual(result.state.players, state.players);
@@ -175,7 +173,7 @@ test("steal is skipped when no opponent has money", () => {
 test("players without a party never act", () => {
   const state = gameState([player("voter"), player("other")]);
 
-  const result = resolvePartyActions(state, "other", [], sequenceRng([]));
+  const result = resolvePartyActions(state, "other", sequenceRng([]));
 
   assert.deepEqual(result.logs, []);
 });
@@ -183,7 +181,7 @@ test("players without a party never act", () => {
 test("the player whose turn ended does not roll their own party", () => {
   const state = gameState([withParty("ender", "communist_party"), player("other")]);
 
-  const result = resolvePartyActions(state, "ender", [], sequenceRng([]));
+  const result = resolvePartyActions(state, "ender", sequenceRng([]));
 
   assert.deepEqual(result.logs, []);
   assert.deepEqual(result.state.players, state.players);
@@ -196,7 +194,7 @@ test("a dead party owner does not act", () => {
     player("other"),
   ]);
 
-  const result = resolvePartyActions(state, "ender", [], sequenceRng([]));
+  const result = resolvePartyActions(state, "ender", sequenceRng([]));
 
   assert.deepEqual(result.logs, []);
 });
@@ -207,10 +205,9 @@ test("endTurn advances to the next living player when party damage kills the act
     player("active", { hp: 3 }),
     withParty("voter", "communist_party"),
   ]);
-  const deck = [{ id: "sword" }];
-
-  // chance 0.1 -> success, action 0.1 -> 労働者の反撃, target 0.9 -> active (index 1 of 2)
-  const result = endTurn(state, "ender", deck, sequenceRng([0.1, 0.1, 0.9]));
+  // 0.0 はターン終了時のドロー、chance 0.1 -> success, action 0.1 -> 労働者の反撃,
+  // target 0.9 -> active (index 1 of 2)
+  const result = endTurn(state, "ender", 1, sequenceRng([0.0, 0.1, 0.1, 0.9]));
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -218,7 +215,6 @@ test("endTurn advances to the next living player when party damage kills the act
   assert.equal(result.state.activePlayerIndex, 2);
   assert.equal(result.state.winner, null);
   assert.ok(result.state.log.some((entry) => entry.message.includes("activeは倒れ")));
-  assert.deepEqual(result.deck, deck);
 });
 
 test("endTurn sets the winner when party damage leaves only one player alive", () => {
@@ -226,10 +222,9 @@ test("endTurn sets the winner when party damage leaves only one player alive", (
     player("ender", { hp: 3 }),
     withParty("voter", "communist_party"),
   ]);
-  const deck: { id: string }[] = [];
-
-  // chance 0.1 -> success, action 0.1 -> 労働者の反撃, target 0.0 -> ender
-  const result = endTurn(state, "ender", deck, sequenceRng([0.1, 0.1, 0.0]));
+  // 0.0 はターン終了時のドロー、chance 0.1 -> success, action 0.1 -> 労働者の反撃,
+  // target 0.0 -> ender
+  const result = endTurn(state, "ender", 1, sequenceRng([0.0, 0.1, 0.1, 0.0]));
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -246,7 +241,7 @@ test("party actions are not resolved when the game is already won", () => {
   ]);
   state.winner = "voter";
 
-  const result = resolvePartyActions(state, "ender", [], sequenceRng([]));
+  const result = resolvePartyActions(state, "ender", sequenceRng([]));
 
   assert.deepEqual(result.logs, []);
   assert.equal(result.state, state);

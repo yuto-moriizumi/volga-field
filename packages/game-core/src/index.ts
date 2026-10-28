@@ -1,5 +1,5 @@
 export * from "./cards.js";
-export * from "./deck.js";
+export * from "./draw.js";
 export * from "./player.js";
 export {
   PARTY_ACTION_CHANCE,
@@ -37,5 +37,7 @@ export {
   confirmBuy,
   sellCards,
   exchangeStats,
+  INITIAL_HAND_SIZE,
+  MAX_HAND_SIZE,
   MAX_PLAYERS,
 } from "./battle.js";

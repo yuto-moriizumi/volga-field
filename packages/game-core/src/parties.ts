@@ -1,6 +1,5 @@
 import type {
   BattleLogEntry,
-  CardRef,
   GameState,
   PartyId,
   PlayerId,
@@ -53,7 +52,6 @@ export const PARTY_ACTIONS: Record<PartyId, readonly PartyAction[]> = {
 
 export interface PartyActionResolution {
   state: GameState;
-  deck: CardRef[];
   logs: BattleLogEntry[];
 }
 
@@ -87,11 +85,10 @@ function livingOpponents(players: PlayerState[], actorId: PlayerId): PlayerState
 export function resolvePartyActions(
   state: GameState,
   endingPlayerId: PlayerId,
-  deck: CardRef[] = [],
   rng: Rng = Math.random,
 ): PartyActionResolution {
   const logs: BattleLogEntry[] = [];
-  if (state.winner) return { state, deck, logs };
+  if (state.winner) return { state, logs };
 
   let players = state.players;
   let winner = state.winner;
@@ -194,7 +191,6 @@ export function resolvePartyActions(
       winner,
       log: logs.length > 0 ? [...state.log, ...logs] : state.log,
     },
-    deck,
     logs,
   };
 }

@@ -3,16 +3,20 @@ import test from "node:test";
 import type { GameState } from "@volga/shared";
 import {
   confirmBuy,
+  createGame,
   defendAttack,
   discardCards,
+  endTurn,
   exchangeStats,
+  INITIAL_HAND_SIZE,
+  MAX_HAND_SIZE,
   joinParty,
   playCard,
   sellCards,
   startBuy,
 } from "./battle.js";
-import { BASE_CARDS, DECK_SIZE, findCard } from "./cards.js";
-import { buildDeck } from "./deck.js";
+import { BASE_CARDS, findCard } from "./cards.js";
+import { drawRandomCards } from "./draw.js";
 
 function defenseState(): GameState {
   return {
@@ -45,7 +49,6 @@ function defenseState(): GameState {
         ready: true,
       },
     ],
-    deckSize: 0,
     turn: 1,
     actionTurn: 1,
     doomsdayTurn: null,
@@ -101,7 +104,9 @@ test("defendAttack can use multiple defense cards at once", () => {
 
   const defender = result.state.players.find((p) => p.id === "defender");
   assert.equal(defender?.hp, 20);
-  assert.deepEqual(defender?.hand, [{ id: "nobori" }]);
+  // 使った防御カード2枚ぶん引き直すので、残り1枚 + 2枚 = 3枚。
+  assert.equal(defender?.hand.length, 3);
+  assert.ok(defender?.hand.some((card) => card.id === "nobori"));
   assert.equal(result.state.phase, "play");
   assert.equal(result.state.pendingAttack, null);
   assert.equal(result.state.log.filter((entry) => entry.kind === "defense").length, 2);
@@ -139,23 +144,173 @@ test("playCard healing is not capped by maxHp", () => {
   assert.equal(attacker?.maxHp, 20);
 });
 
-test("buildDeck returns DECK_SIZE unique cards from BASE_CARDS", () => {
-  const deck = buildDeck(12345);
-  const ids = deck.map((card) => card.id);
+test("drawRandomCards draws the requested number of cards from BASE_CARDS", () => {
+  const drawn = drawRandomCards(7);
   const baseIds = new Set(BASE_CARDS.map((card) => card.id));
 
-  assert.equal(deck.length, DECK_SIZE);
-  assert.equal(new Set(ids).size, DECK_SIZE);
-  for (const id of ids) {
-    assert.ok(baseIds.has(id), `unknown card id: ${id}`);
+  assert.equal(drawn.length, 7);
+  for (const card of drawn) {
+    assert.ok(baseIds.has(card.id), `unknown card id: ${card.id}`);
   }
 });
 
-test("buildDeck produces a different set for a different seed", () => {
-  const first = buildDeck(1).map((card) => card.id).sort();
-  const second = buildDeck(2).map((card) => card.id).sort();
+test("drawRandomCards draws with replacement, so the same card can repeat", () => {
+  // rng が常に同じ値を返すため、毎回同じカードが選ばれる。
+  const drawn = drawRandomCards(5, () => 0);
+  const ids = drawn.map((card) => card.id);
 
-  assert.notDeepEqual(first, second);
+  assert.equal(drawn.length, 5);
+  assert.equal(new Set(ids).size, 1);
+  assert.equal(ids[0], BASE_CARDS[0]!.id);
+});
+
+test("drawRandomCards never depletes the candidate pool", () => {
+  const first = drawRandomCards(30, () => 0.999);
+  const second = drawRandomCards(30, () => 0.999);
+  const lastId = BASE_CARDS[BASE_CARDS.length - 1]!.id;
+
+  assert.ok(first.every((card) => card.id === lastId));
+  assert.ok(second.every((card) => card.id === lastId));
+});
+
+test("drawRandomCards returns an empty array when asked for no cards", () => {
+  let calls = 0;
+  const rng = () => {
+    calls += 1;
+    return 0.5;
+  };
+
+  assert.deepEqual(drawRandomCards(0, rng), []);
+  assert.equal(calls, 0);
+});
+
+test("createGame deals the initial hand from BASE_CARDS", () => {
+  const { state } = createGame("room", [
+    { id: "p1", name: "A" },
+    { id: "p2", name: "B" },
+  ]);
+  const baseIds = new Set(BASE_CARDS.map((card) => card.id));
+
+  for (const player of state.players) {
+    assert.equal(player.hand.length, INITIAL_HAND_SIZE);
+    for (const card of player.hand) {
+      assert.ok(baseIds.has(card.id), `unknown card id: ${card.id}`);
+    }
+  }
+  assert.equal("deckSize" in state, false);
+});
+
+test("playing one card from the 9-card opening hand leaves 8 cards", () => {
+  const { state } = createGame("room", [
+    { id: "p1", name: "A" },
+    { id: "p2", name: "B" },
+  ]);
+  const openingHand = Array.from({ length: INITIAL_HAND_SIZE }, () => ({ id: "sword" }));
+  state.players[0] = { ...state.players[0]!, hand: openingHand };
+
+  const result = playCard(state, "p1", { id: "sword" }, "p2");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const player = result.state.players.find((p) => p.id === "p1");
+  assert.equal(player?.hand.length, INITIAL_HAND_SIZE - 1);
+  assert.ok(player!.hand.every((card) => card.id === "sword"));
+});
+
+function handOf(state: GameState, playerId: string): number {
+  return state.players.find((p) => p.id === playerId)?.hand.length ?? 0;
+}
+
+test("endTurn draws one card after a turn with no cards used", () => {
+  const { state } = createGame("room", [
+    { id: "p1", name: "A" },
+    { id: "p2", name: "B" },
+  ]);
+
+  const result = endTurn(state, "p1", 0, () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(handOf(result.state, "p1"), INITIAL_HAND_SIZE + 1);
+  assert.ok(result.state.log.some((entry) => entry.message.includes("1枚ドロー")));
+});
+
+test("endTurn draws as many cards as were used during the turn", () => {
+  const { state } = createGame("room", [
+    { id: "p1", name: "A" },
+    { id: "p2", name: "B" },
+  ]);
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "sword" }, { id: "sword" }, { id: "sword" }],
+  };
+
+  const result = endTurn(state, "p1", 2, () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(handOf(result.state, "p1"), 5);
+  assert.ok(result.state.log.some((entry) => entry.message.includes("2枚ドロー")));
+});
+
+test("endTurn does not draw beyond the 18-card hand limit", () => {
+  const { state } = createGame("room", [
+    { id: "p1", name: "A" },
+    { id: "p2", name: "B" },
+  ]);
+  const fullHand = Array.from({ length: MAX_HAND_SIZE }, () => ({ id: "sword" }));
+  state.players[0] = { ...state.players[0]!, hand: fullHand };
+
+  const result = endTurn(state, "p1", 3, () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(handOf(result.state, "p1"), MAX_HAND_SIZE);
+  assert.ok(!result.state.log.some((entry) => entry.message.includes("枚ドロー")));
+});
+
+test("defendAttack draws nothing when the defender passes", () => {
+  const state = defenseState();
+  const before = handOf(state, "defender");
+
+  const result = defendAttack(state, "defender", []);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(handOf(result.state, "defender"), before);
+});
+
+test("defendAttack draws as many cards as the defender used", () => {
+  const result = defendAttack(
+    defenseState(),
+    "defender",
+    [{ id: "shield" }, { id: "leaf_shield" }],
+    () => 0,
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  // 3枚 - 2枚使用 + 2枚ドロー = 3枚
+  assert.equal(handOf(result.state, "defender"), 3);
+  assert.ok(result.state.log.some((entry) => entry.message.includes("2枚ドロー")));
+});
+
+test("defendAttack never pushes the hand beyond the 18-card limit", () => {
+  const state = defenseState();
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [
+      ...Array.from({ length: MAX_HAND_SIZE - 1 }, () => ({ id: "sword" })),
+      { id: "shield" },
+    ],
+  };
+
+  const result = defendAttack(state, "defender", [{ id: "shield" }], () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  // 18枚から1枚使って17枚、1枚引いて18枚。上限は超えない。
+  assert.equal(handOf(result.state, "defender"), MAX_HAND_SIZE);
 });
 
 test("playCard rejects defense cards on the attacker's turn", () => {
@@ -570,7 +725,6 @@ function attributeWeaponState(): GameState {
         ready: true,
       },
     ],
-    deckSize: 0,
     turn: 1,
     actionTurn: 1,
     doomsdayTurn: null,
