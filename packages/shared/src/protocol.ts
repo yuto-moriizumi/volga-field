@@ -29,6 +29,7 @@ export type ClientMessage =
   | { type: "sell_cards"; cardRefs: CardRef[]; targetPlayerId: PlayerId }
   | { type: "exchange_stats"; mpDelta: number; moneyDelta: number }
   | { type: "end_turn" }
+  | { type: "debug_shuffle_hand" }
   | { type: "list_rooms" }
   | { type: "ping" };
 
@@ -60,6 +61,7 @@ export const CLIENT_MESSAGE_TYPES: ClientMessage["type"][] = [
   "sell_cards",
   "exchange_stats",
   "end_turn",
+  "debug_shuffle_hand",
   "list_rooms",
   "ping",
 ];

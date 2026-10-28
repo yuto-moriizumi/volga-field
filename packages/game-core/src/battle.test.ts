@@ -13,6 +13,7 @@ import {
   joinParty,
   playCard,
   sellCards,
+  shuffleHand,
   startBuy,
 } from "./battle.js";
 import { BASE_CARDS, findCard } from "./cards.js";
@@ -958,4 +959,34 @@ test("joinParty replaces the previous party affiliation", () => {
   assert.equal(joinLog?.kind, "special");
   assert.ok(joinLog?.message.includes("自民党"));
   assert.ok(joinLog?.message.includes("無政府党"));
+});
+
+test("shuffleHand replaces the whole hand with the same number of cards", () => {
+  const { state } = createGame("room", [
+    { id: "attacker", name: "Attacker" },
+    { id: "defender", name: "Defender" },
+  ]);
+  const before = state.players[0]!;
+  // 常に先頭のカードを引く rng。手札がすべて同じカードになれば引き直しが効いている。
+  const result = shuffleHand(state, "attacker", () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const after = result.state.players.find((p) => p.id === "attacker")!;
+  assert.equal(after.hand.length, before.hand.length);
+  assert.ok(after.hand.every((card) => card.id === BASE_CARDS[0]!.id));
+  // 手番は消費しない。
+  assert.equal(result.state.activePlayerIndex, state.activePlayerIndex);
+  assert.equal(result.state.turn, state.turn);
+  assert.equal(result.state.actionTurn, state.actionTurn);
+  assert.ok(result.state.log.at(-1)?.message.includes("引き直した"));
+});
+
+test("shuffleHand refuses an empty hand", () => {
+  const state = playState();
+  state.players[0] = { ...state.players[0]!, hand: [] };
+
+  const result = shuffleHand(state, "attacker");
+
+  assert.equal(result.ok, false);
 });
