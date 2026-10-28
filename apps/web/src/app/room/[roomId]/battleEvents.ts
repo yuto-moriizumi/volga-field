@@ -76,8 +76,6 @@ export interface TurnEvent {
   playerId: PlayerId;
   playerName: string;
   isSelf: boolean;
-  /** A full round was coalesced into one state update (turns were skipped). */
-  continuation: boolean;
 }
 
 export interface DrawEvent {
@@ -573,21 +571,17 @@ export function deriveBattleEvents(
       const activeChanged =
         previous.activePlayerIndex !== next.activePlayerIndex ||
         previousActive?.id !== active.id;
-      if (activeChanged) {
+      // With one action per turn every turn end advances `actionTurn`, even
+      // when no log entry describes the switch (a passed turn). A coalesced
+      // delta can therefore end on the same active player: the round wrapped
+      // around (or dead players were skipped) and this is a fresh turn, so it
+      // gets the plain turn banner, never a "continued" one.
+      if (activeChanged || next.actionTurn > previous.actionTurn) {
         turns.push({
           kind: "turn",
           playerId: active.id,
           playerName: active.name,
           isSelf: active.id === viewerId,
-          continuation: false,
-        });
-      } else if (next.actionTurn > previous.actionTurn) {
-        turns.push({
-          kind: "turn",
-          playerId: active.id,
-          playerName: active.name,
-          isSelf: active.id === viewerId,
-          continuation: true,
         });
       }
     }

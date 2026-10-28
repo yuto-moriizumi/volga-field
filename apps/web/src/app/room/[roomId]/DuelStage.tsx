@@ -120,7 +120,7 @@ export function DuelTurnView({ turn }: { turn: DuelTurn }) {
     >
       <div className="gf-duel-turn-main">{duelTurnText(turn)}</div>
       <div className="gf-duel-turn-sub">
-        {turn.isSelf ? `あなた（${turn.continuation ? "継続" : "手番"}）` : turn.playerName}
+        {turn.isSelf ? "あなた（手番）" : turn.playerName}
       </div>
     </div>
   );

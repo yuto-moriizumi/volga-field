@@ -77,7 +77,6 @@ export interface DuelTurn {
   playerId: PlayerId;
   playerName: string;
   isSelf: boolean;
-  continuation: boolean;
 }
 
 export interface PlayerStats {
@@ -252,7 +251,6 @@ function changedTurn(
     playerId: active.id,
     playerName: active.name,
     isSelf: active.id === viewerId,
-    continuation: false,
   };
 }
 
@@ -423,7 +421,6 @@ export function planDuels(
             playerId: turnPlayer.id,
             playerName: turnPlayer.name,
             isSelf: turnPlayer.id === viewerId,
-            continuation: false,
           }
         : null,
       drawCount: draws,

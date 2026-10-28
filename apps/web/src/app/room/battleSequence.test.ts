@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BASE_CARDS } from "@volga/game-core";
 import type { GameState, PlayerState } from "@volga/shared";
-import { deriveBattleEvents } from "./[roomId]/battleEvents";
+import { battleEventText, deriveBattleEvents } from "./[roomId]/battleEvents";
 import {
   buildDuelPresentation,
   defenseCardsFromLog,
@@ -171,7 +171,7 @@ test("turn change arriving as a separate state after the resolution is picked up
     endedEvents,
   );
   assert.equal(second.model.turn?.playerId, "p2");
-  assert.equal(second.model.turn?.continuation, false);
+  assert.equal(second.model.turn?.playerName, "ボブ");
 });
 
 test("no turn event is derived when the attacker keeps the turn", () => {
@@ -591,5 +591,75 @@ test("special logs that are not a join do not become party events", () => {
   assert.equal(
     events.some((event) => event.kind === "party"),
     false,
+  );
+});
+
+const P1_DRAW_LOG = {
+  turn: 3,
+  playerId: "p1",
+  message: "アリスが1枚ドロー",
+  kind: "system" as const,
+};
+
+const P2_DRAW_LOG = {
+  turn: 3,
+  playerId: "p2",
+  message: "ボブが1枚ドロー",
+  kind: "system" as const,
+};
+
+test("both draws of a coalesced pass-and-pass delta keep their own player", () => {
+  // Two passed turns arrive as one state: my turn-end draw, the opponent's
+  // turn-end draw, and the turn coming back to me. Each draw must stay owned
+  // by the player who drew it, otherwise the two overlays read as one player
+  // drawing twice.
+  const previous = state();
+  const next = state({
+    players: [
+      player("p1", "アリス", { hand: [{ id: "attack" }] }),
+      player("p2", "ボブ", { hand: [{ id: "shield" }] }),
+    ],
+    actionTurn: 5,
+    log: [P1_DRAW_LOG, P2_DRAW_LOG],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ["draw", "draw", "turn"],
+  );
+
+  const draws = events.filter((event) => event.kind === "draw");
+  assert.deepEqual(
+    draws.map((event) => [event.playerId, event.count]),
+    [
+      ["p1", 1],
+      ["p2", 1],
+    ],
+  );
+
+  const turn = events[2];
+  assert.equal(turn?.kind === "turn" ? turn.playerId : null, "p1");
+  assert.equal(turn?.kind === "turn" ? turn.isSelf : null, true);
+  assert.equal(
+    turn ? battleEventText(turn, (id) => (id === "p1" ? "アリス" : "ボブ")) : null,
+    "あなたのターン",
+  );
+});
+
+test("a round that comes back to the viewer is a fresh turn, not a continuation", () => {
+  // actionTurn advanced without the active player changing: the round wrapped
+  // around. The banner must not claim the turn is still the same one.
+  const previous = state({ actionTurn: 3, activePlayerIndex: 0 });
+  const next = state({ actionTurn: 5, activePlayerIndex: 0, log: [] });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.equal(events.length, 1);
+  const turn = events[0]!;
+  assert.equal(turn.kind, "turn");
+  assert.equal("continuation" in turn, false);
+  assert.equal(
+    battleEventText(turn, (id) => (id === "p1" ? "アリス" : "ボブ")),
+    "あなたのターン",
   );
 });
