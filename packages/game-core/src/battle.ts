@@ -18,7 +18,7 @@ import {
   isPartyCard,
   PARTY_LABELS,
 } from "./cards.js";
-import { buildDeck, drawCards } from "./deck.js";
+import { drawRandomCards } from "./draw.js";
 import { applyDoomsdayDevil, rollDoomsdayDevil } from "./devils.js";
 import { resolvePartyActions } from "./parties.js";
 import type { Rng } from "./parties.js";
@@ -31,7 +31,8 @@ import {
   transferMoney,
 } from "./player.js";
 
-export const HAND_SIZE = 5;
+export const INITIAL_HAND_SIZE = 9;
+export const MAX_HAND_SIZE = 18;
 export const INITIAL_HP = 20;
 export const MAX_PLAYERS = 9;
 
@@ -39,13 +40,9 @@ export function createGame(
   roomId: string,
   players: { id: PlayerId; name: string }[],
   options: { doomsdayTurn?: DoomsdayTurn | null } = {},
-): { state: GameState; deck: CardRef[] } {
-  const seed = Date.now();
-  let deck = buildDeck(seed);
+): { state: GameState } {
   const initialStates: PlayerState[] = [];
   for (const p of players) {
-    const { drawn, deck: next } = drawCards(deck, HAND_SIZE);
-    deck = next;
     initialStates.push({
       id: p.id,
       name: p.name,
@@ -54,7 +51,7 @@ export function createGame(
       mp: INITIAL_MP,
       maxMp: INITIAL_MP,
       money: INITIAL_MONEY,
-      hand: drawn,
+      hand: drawRandomCards(INITIAL_HAND_SIZE),
       learnedMiracles: [],
       party: null,
       ready: false,
@@ -63,7 +60,6 @@ export function createGame(
   const state: GameState = {
     roomId,
     players: initialStates,
-    deckSize: deck.length,
     turn: 1,
     actionTurn: 1,
     doomsdayTurn: options.doomsdayTurn ?? null,
@@ -85,7 +81,7 @@ export function createGame(
     winner: null,
     startedAt: Date.now(),
   };
-  return { state, deck };
+  return { state };
 }
 
 function determineWinner(players: PlayerState[]): PlayerId | null {
@@ -243,8 +239,7 @@ export function playCard(
   playerId: PlayerId,
   cardRef: CardRef | CardRef[],
   targetPlayerId?: PlayerId,
-  deck: CardRef[] = [],
-): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
+): { ok: true; state: GameState } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
@@ -258,7 +253,7 @@ export function playCard(
   if (cardRefs.length === 1 && isPartyCard(cardRefs[0]!.id)) {
     const joined = joinParty(state, playerId, cardRefs[0]!);
     if (!joined.ok) return joined;
-    return { ok: true, state: joined.state, deck };
+    return { ok: true, state: joined.state };
   }
 
   const cards: CardDefinition[] = [];
@@ -315,7 +310,6 @@ export function playCard(
     { ...active, hand: newHand, learnedMiracles: nextLearnedMiracles },
     totalMpCost,
   );
-  let newDeck = deck;
   const miracleLogs: BattleLogEntry[] = [];
   for (const card of cards) {
     const learned = active.learnedMiracles.some((c) => c.id === card.id);
@@ -333,17 +327,6 @@ export function playCard(
           turn: state.turn,
           playerId,
           message: `${active.name}がMP${card.mpCost}を消費 (${card.name})`,
-          kind: "miracle",
-        });
-      }
-      if (newDeck.length > 0 && self.hand.length < HAND_SIZE) {
-        const result = drawCards(newDeck, 1);
-        newDeck = result.deck;
-        self = { ...self, hand: [...self.hand, ...result.drawn] };
-        miracleLogs.push({
-          turn: state.turn,
-          playerId,
-          message: `${active.name}が奇跡の効果で神器を1枚授かった`,
           kind: "miracle",
         });
       }
@@ -401,7 +384,6 @@ export function playCard(
       state: {
         ...state,
         players: finalPlayers,
-        deckSize: newDeck.length,
         phase: "defense",
         pendingAttack: {
           attackerId: playerId,
@@ -421,7 +403,6 @@ export function playCard(
           },
         ],
       },
-      deck: newDeck,
     };
   }
 
@@ -456,7 +437,6 @@ export function playCard(
   const newState: GameState = {
     ...state,
     players: finalPlayers,
-    deckSize: newDeck.length,
     phase: "play",
     pendingAttack: null,
     log: [...state.log, ...logs],
@@ -472,13 +452,14 @@ export function playCard(
     });
   }
 
-  return { ok: true, state: newState, deck: newDeck };
+  return { ok: true, state: newState };
 }
 
 export function defendAttack(
   state: GameState,
   playerId: PlayerId,
   cardRefs: CardRef | CardRef[] = [],
+  rng: Rng = Math.random,
 ): { ok: true; state: GameState } | { ok: false; reason: string } {
   const pending = state.pendingAttack;
   if (!pending || state.phase !== "defense") {
@@ -526,6 +507,22 @@ export function defendAttack(
   );
   defender = damaged;
   logs.push(...log);
+
+  // 防衛で使った枚数ぶん引き直す（0枚なら何もしない）。
+  const defenseDraw = Math.min(
+    selectedCardRefs.length,
+    Math.max(0, MAX_HAND_SIZE - defender.hand.length),
+  );
+  if (defenseDraw > 0) {
+    const drawn = drawRandomCards(defenseDraw, rng);
+    defender = { ...defender, hand: [...defender.hand, ...drawn] };
+    logs.push({
+      turn: state.turn,
+      playerId,
+      message: `${defender.name}が${drawn.length}枚ドロー`,
+      kind: "system",
+    });
+  }
 
   const finalPlayers = state.players.map((p) => {
     if (p.id === attacker!.id) return attacker!;
@@ -598,12 +595,18 @@ export function discardCards(
   };
 }
 
+/**
+ * ターンを終了し、このターンに使った枚数ぶん引き直す。
+ *
+ * 攻撃ターンは最低1枚引く（cardsUsed が 0 でも1枚）。
+ * 手札が MAX_HAND_SIZE に達している場合、あふれた分は引かない。
+ */
 export function endTurn(
   state: GameState,
   playerId: PlayerId,
-  deck: CardRef[],
+  cardsUsed = 0,
   rng: Rng = Math.random,
-): { ok: true; state: GameState; deck: CardRef[] } | { ok: false; reason: string } {
+): { ok: true; state: GameState } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
   if (state.winner) return { ok: false, reason: "game already finished" };
@@ -614,12 +617,12 @@ export function endTurn(
     state.players.find((p) => p.id !== playerId) ?? state.players[0]!;
   const logs: BattleLogEntry[] = [];
 
-  let newDeck = deck;
-  let drawn: CardRef[] = [];
-  const deficit = HAND_SIZE - self.hand.length;
-  if (deficit > 0 && newDeck.length > 0) {
+  const drawCount = Math.max(1, cardsUsed);
+  const capacity = Math.max(0, MAX_HAND_SIZE - self.hand.length);
+  const toDraw = Math.min(drawCount, capacity);
+  if (toDraw > 0) {
     if (state.doomsdayActive) {
-      for (let i = 0; i < deficit; i++) {
+      for (let i = 0; i < toDraw; i++) {
         const devil = rollDoomsdayDevil(rng);
         if (!devil) continue;
         const result = applyDoomsdayDevil(devil, self, state.turn);
@@ -627,9 +630,7 @@ export function endTurn(
         logs.push(result.log);
       }
     }
-    const result = drawCards(newDeck, deficit);
-    drawn = result.drawn;
-    newDeck = result.deck;
+    const drawn = drawRandomCards(toDraw, rng);
     self = { ...self, hand: [...self.hand, ...drawn] };
     logs.push({
       turn: state.turn,
@@ -669,7 +670,6 @@ export function endTurn(
     turn: newTurn,
     actionTurn: newActionTurn,
     doomsdayActive,
-    deckSize: newDeck.length,
     phase: "play",
     pendingAttack: null,
     log: [...state.log, ...logs],
@@ -677,12 +677,11 @@ export function endTurn(
   };
 
   if (winner) {
-    return { ok: true, state: withVictoryLog(newState, winner), deck: newDeck };
+    return { ok: true, state: withVictoryLog(newState, winner) };
   }
 
   // ターン終了後、終了したプレイヤー以外の政党所属者が 25% で行動する。
-  const partyResult = resolvePartyActions(newState, playerId, newDeck, rng);
-  newDeck = partyResult.deck;
+  const partyResult = resolvePartyActions(newState, playerId, rng);
   newState = partyResult.state;
 
   if (newState.winner) {
@@ -691,7 +690,7 @@ export function endTurn(
     newState = advanceToLivingPlayer(newState);
   }
 
-  return { ok: true, state: newState, deck: newDeck };
+  return { ok: true, state: newState };
 }
 
 export function listPlayers(state: GameState): PlayerState[] {
@@ -847,8 +846,9 @@ export function sellCards(
   if (state.pendingSell) return { ok: false, reason: "sell pending" };
   if (cardRefs.length === 0) return { ok: false, reason: "no cards selected" };
 
-  const sellIdx = active.hand.findIndex((c) => c.id === "sell");
-  if (sellIdx === -1) return { ok: false, reason: "sell card not in hand" };
+  if (!active.hand.some((c) => c.id === "sell")) {
+    return { ok: false, reason: "sell card not in hand" };
+  }
 
   const target = state.players.find((p) => p.id === targetPlayerId);
   if (!target) return { ok: false, reason: "target not found" };
@@ -865,7 +865,10 @@ export function sellCards(
     sellable.push({ id: cardRef.id });
     sellableNames.push(findCard(cardRef.id)?.name ?? cardRef.id);
   }
-  nextHand.splice(sellIdx, 1);
+  // 売却分を取り除いた後の手札から売るカードを探す（元の index はずれている）。
+  const sellHandIdx = nextHand.findIndex((c) => c.id === "sell");
+  if (sellHandIdx === -1) return { ok: false, reason: "sell card not in hand" };
+  nextHand.splice(sellHandIdx, 1);
 
   const totalPrice = sellable.reduce((sum, c) => sum + getCardPrice(c.id), 0);
 

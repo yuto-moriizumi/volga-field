@@ -1,5 +1,5 @@
 import type { PlayerId, PlayerState } from "@volga/shared";
-import { HAND_SIZE, INITIAL_HP, INITIAL_MONEY, INITIAL_MP } from "./cards.js";
+import { INITIAL_HP, INITIAL_MONEY, INITIAL_MP } from "./cards.js";
 
 export function createPlayer(
   id: PlayerId,
@@ -23,14 +23,6 @@ export function createPlayer(
 
 export function isAlive(p: PlayerState): boolean {
   return p.hp > 0;
-}
-
-export function handSize(p: PlayerState): number {
-  return p.hand.length;
-}
-
-export function needsDraw(p: PlayerState): boolean {
-  return p.hand.length < HAND_SIZE;
 }
 
 export function damagePlayer(p: PlayerState, amount: number): PlayerState {

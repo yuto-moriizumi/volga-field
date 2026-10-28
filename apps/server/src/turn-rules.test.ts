@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { WebSocket } from "ws";
-import { HAND_SIZE, createGame, findCard } from "@volga/game-core";
+import { INITIAL_HAND_SIZE, createGame, findCard } from "@volga/game-core";
 import type { GameState, PlayerState, ServerMessage } from "@volga/shared";
 import { finishTurn, startServer } from "./index.js";
 import { createRoom, type Room } from "./room.js";
@@ -191,8 +191,7 @@ async function findTrainingRoom(
 
     client.send({ type: "leave_room" });
     await client.ping();
-    // デッキのシードは Date.now() なので、同じミリ秒に作ると同じ手札になる。
-    // 連続リトライで同じ手札を引き続けないよう、少し待つ。
+    // 初期手札はランダム抽選なので、条件に合う手札を引けるまで少し待って作り直す。
     await new Promise((resolve) => setTimeout(resolve, 3));
   }
   assert.fail("could not find a training room matching the required setup");
@@ -303,7 +302,7 @@ test("training mode ends the attacker's turn after the AI defender resolves", as
   assert.equal(resolved.gameState.players[room.humanIndex]!.id, room.humanId);
   assert.equal(resolved.gameState.winner, null);
 
-  // 2通目: ターン終了後。手番が人間から移り、手札が補充されている。
+  // 2通目: ターン終了後。手番が人間から移り、使った1枚ぶん引かれている。
   const ended = await client.next(
     (msg) =>
       msg.type === "game_state" &&
@@ -314,7 +313,11 @@ test("training mode ends the attacker's turn after the AI defender resolves", as
   assert.notEqual(ended.gameState.activePlayerIndex, room.humanIndex);
   assert.equal(ended.gameState.actionTurn, initialActionTurn + 1);
   assert.equal(ended.gameState.players[room.humanIndex]!.id, room.humanId);
-  assert.equal(ended.gameState.players[room.humanIndex]!.hand.length, HAND_SIZE);
+  // 初期手札は9枚。1枚使ったので1枚引いて9枚に戻る。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE,
+  );
   assert.equal(ended.gameState.winner, null);
 });
 
@@ -343,7 +346,7 @@ test("non-attack cards also end the turn", async (t) => {
   assert.equal(effect.gameState.phase, "play");
   assert.equal(effect.gameState.activePlayerIndex, room.humanIndex);
 
-  // 2通目: ターン終了後。手番が移り、手札が5枚以上に補充される。
+  // 2通目: ターン終了後。手番が移り、使った1枚ぶん引かれる。
   const ended = await client.next(
     (msg) =>
       msg.type === "game_state" &&
@@ -353,9 +356,10 @@ test("non-attack cards also end the turn", async (t) => {
   assert.equal(ended.type, "game_state");
   if (ended.type !== "game_state") return;
   assert.equal(ended.gameState.winner, null);
-  assert.ok(
-    ended.gameState.players[room.humanIndex]!.hand.length >= HAND_SIZE,
-    "the hand should be refilled after the action",
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE,
+    "one card was used, so one card is drawn",
   );
 });
 
@@ -409,15 +413,18 @@ test("discarding cards ends the turn", async (t) => {
   const room = await findTrainingRoom(client, () => true);
   const initialActionTurn = room.state.actionTurn;
   const hand = room.state.players[room.humanIndex]!.hand;
-  assert.ok(hand.length > 0);
+  assert.ok(hand.length >= 3);
 
-  client.send({ type: "discard_cards", cardRefs: [{ id: hand[0]!.id }] });
+  client.send({
+    type: "discard_cards",
+    cardRefs: hand.slice(0, 3).map((card) => ({ id: card.id })),
+  });
 
   const effect = await client.next(
     (msg) =>
       msg.type === "game_state" &&
       msg.gameState.actionTurn === initialActionTurn &&
-      msg.gameState.players[room.humanIndex]!.hand.length === hand.length - 1,
+      msg.gameState.players[room.humanIndex]!.hand.length === hand.length - 3,
   );
   assert.equal(effect.type, "game_state");
   if (effect.type !== "game_state") return;
@@ -431,7 +438,14 @@ test("discarding cards ends the turn", async (t) => {
   );
   assert.equal(ended.type, "game_state");
   if (ended.type !== "game_state") return;
-  assert.ok(ended.gameState.players[room.humanIndex]!.hand.length >= HAND_SIZE);
+  // 3枚捨てたので3枚引く。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("3枚ドロー")),
+  );
 });
 
 test("exchanging stats ends the turn", async (t) => {
@@ -467,6 +481,14 @@ test("exchanging stats ends the turn", async (t) => {
   );
   assert.equal(ended.type, "game_state");
   if (ended.type !== "game_state") return;
+  // 両替カード1枚を使ったので1枚引く。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("1枚ドロー")),
+  );
   assert.equal(ended.gameState.winner, null);
 });
 
@@ -498,7 +520,7 @@ test("buying ends the turn after the confirmation", async (t) => {
   assert.equal(pending.gameState.actionTurn, initialActionTurn);
   assert.equal(pending.gameState.activePlayerIndex, room.humanIndex);
 
-  client.send({ type: "confirm_buy", accept: false });
+  client.send({ type: "confirm_buy", accept: true });
 
   const ended = await client.next(
     (msg) =>
@@ -509,7 +531,56 @@ test("buying ends the turn after the confirmation", async (t) => {
   );
   assert.equal(ended.type, "game_state");
   if (ended.type !== "game_state") return;
+  // 買いは0枚使用扱いなので、攻撃ターンの最低1枚が引かれる。
+  // 買う札は buy_card の時点で手札から出て、買ったカード1枚が加わる。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE + 1,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("1枚ドロー")),
+  );
   assert.equal(ended.gameState.winner, null);
+});
+
+test("selling two cards draws two cards", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const room = await createTrainingRoom(client, (human) => {
+    const hasSell = human.hand.some((cardRef) => cardRef.id === "sell");
+    return hasSell && human.hand.length >= 4 ? "sell" : null;
+  });
+  const initialActionTurn = room.state.actionTurn;
+  const hand = room.state.players[room.humanIndex]!.hand;
+  const sold = hand.filter((card) => card.id !== "sell").slice(0, 2);
+
+  client.send({
+    type: "sell_cards",
+    cardRefs: sold.map((card) => ({ id: card.id })),
+    targetPlayerId: room.aiId,
+  });
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  // 9枚 - 売った2枚 - 売るカード1枚 + 2枚ドロー = 8枚
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE - 1,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("2枚ドロー")),
+  );
 });
 
 test("a resolved attack ends the attacker's turn in versus mode", async (t) => {
@@ -576,7 +647,8 @@ test("a resolved attack ends the attacker's turn in versus mode", async (t) => {
   if (ended.type !== "game_state") return;
   assert.equal(ended.gameState.activePlayerIndex, 1);
   assert.equal(ended.gameState.players[1]!.id, defenderId);
-  assert.equal(ended.gameState.players[0]!.hand.length, HAND_SIZE);
+  // 初期手札は9枚。攻撃カード1枚を使ったので1枚引いて9枚に戻る。
+  assert.equal(ended.gameState.players[0]!.hand.length, INITIAL_HAND_SIZE);
   assert.equal(ended.gameState.winner, null);
 
   // 攻撃者はもう自分の手番ではないので play_card できない。
@@ -742,7 +814,6 @@ test("finishTurn refuses to advance the turn after victory or during defense", (
     room.players.map((p) => ({ id: p.id, name: p.name })),
   );
   room.gameState = { ...created.state, winner: "p1" };
-  room.deck = created.deck;
   room.started = true;
 
   assert.equal(finishTurn(room), false);

@@ -21,7 +21,7 @@ export interface DoomsdayDevil {
   description: string;
 }
 
-/** 終末の時、手札を補充するために1枚引くたびに悪魔が現れる確率 */
+/** 終末の時、ターン終了時にカードを引くたびに悪魔が現れる確率 */
 export const DOOMSDAY_DEVIL_RATE = 0.25;
 
 export const DOOMSDAY_DEVILS: readonly DoomsdayDevil[] = [

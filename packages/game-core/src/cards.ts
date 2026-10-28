@@ -1584,12 +1584,10 @@ export function getCardsByTag(tag: string): CardDefinition[] {
   return BASE_CARDS.filter((c) => c.customTags?.includes(tag));
 }
 
-export const HAND_SIZE = 5;
 export const INITIAL_HP = 20;
 export const INITIAL_MP = 10;
 export const INITIAL_MONEY = 20;
 export const MAX_LEARNED_MIRACLES = 6;
-export const DECK_SIZE = 30;
 
 export function getCardPrice(id: string): number {
   const card = findCard(id);

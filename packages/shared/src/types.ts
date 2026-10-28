@@ -83,7 +83,6 @@ export interface BattleLogEntry {
 export interface GameState {
   roomId: RoomId;
   players: PlayerState[];
-  deckSize: number;
   turn: number;
   actionTurn: number;
   doomsdayTurn: DoomsdayTurn | null;

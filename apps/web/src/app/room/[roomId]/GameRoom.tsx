@@ -620,8 +620,6 @@ export function GameRoom({
             終末 {gameState.doomsdayActive ? "発生中" : `G.F.${gameState.doomsdayTurn}`}
           </span>
         )}
-        <span className="gf-tag">山札 {gameState.deckSize}</span>
-        {me && <span className="gf-tag">￥{me.money}</span>}
       </BottomBar>
 
       {gameState.winner && !presentation.isAnimating && (

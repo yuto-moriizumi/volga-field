@@ -39,7 +39,6 @@ function state(overrides: Partial<GameState> = {}): GameState {
   return {
     roomId: "room",
     players: [player("p1", "アリス"), player("p2", "ボブ")],
-    deckSize: 20,
     turn: 3,
     actionTurn: 3,
     doomsdayTurn: null,

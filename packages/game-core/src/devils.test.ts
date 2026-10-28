@@ -33,7 +33,6 @@ function gameState(players: PlayerState[], overrides: Partial<GameState> = {}): 
   return {
     roomId: "room",
     players,
-    deckSize: 0,
     turn: 7,
     actionTurn: 7,
     doomsdayTurn: 50,
@@ -76,15 +75,15 @@ test("a failed 25% roll produces no devil and leaves the player unchanged", () =
   const rolled = rollDoomsdayDevil(() => 0.25);
   assert.equal(rolled, null);
 
-  // 手札1枚不足、デッキ1枚。0.25 は失敗なので悪魔は現れない。
+  // 手札1枚不足。0.25 は失敗なので悪魔は現れない（0.0 はドローの抽選）。
   const result = endTurn(
     gameState([
       player({ hand: FULL_HAND.slice(0, 4).map((card) => ({ ...card })) }),
       player({ id: "other", name: "相手" }),
     ]),
     "victim",
-    [{ id: "sword" }],
-    sequenceRng([0.25]),
+    1,
+    sequenceRng([0.25, 0.0]),
   );
 
   assert.equal(result.ok, true);
@@ -187,15 +186,15 @@ test("endTurn during doomsday triggers a devil when the injected rng forces it",
     player({ id: "other", name: "相手" }),
   ]);
 
-  // 1枚目の補充: 0.1 で出現成功、0.0 でトランプ大統領（重み7の先頭）
-  const result = endTurn(state, "victim", [{ id: "sword" }], sequenceRng([0.1, 0.0]));
+  // 1枚目のドロー: 0.1 で出現成功、0.0 でトランプ大統領（重み7の先頭）、
+  // 最後の 0.0 は引くカードの抽選。
+  const result = endTurn(state, "victim", 1, sequenceRng([0.1, 0.0, 0.0]));
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   const victim = result.state.players.find((entry) => entry.id === "victim");
   assert.equal(victim?.hp, 10);
   assert.equal(victim?.hand.length, 5);
-  assert.equal(result.deck.length, 0);
 
   const devilLog = result.state.log.find((entry) => entry.message.includes("終末の時:"));
   assert.ok(devilLog);
@@ -216,8 +215,8 @@ test("doomsday devils do not appear before doomsday becomes active", () => {
       { doomsdayActive: false, doomsdayTurn: null },
     ),
     "victim",
-    [{ id: "sword" }],
-    sequenceRng([]),
+    1,
+    sequenceRng([0.0]),
   );
 
   assert.equal(result.ok, true);
