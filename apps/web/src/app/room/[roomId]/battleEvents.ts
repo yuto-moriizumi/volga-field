@@ -1,3 +1,4 @@
+import { BASE_CARDS } from "@volga/game-core";
 import type {
   BattleLogEntry,
   GameState,
@@ -61,6 +62,15 @@ export interface MoneyEvent extends LogPositioned {
   delta: number;
 }
 
+export interface PartyEvent extends LogPositioned {
+  kind: "party";
+  playerId: PlayerId;
+  cardId: string;
+  cardName: string;
+  /** Party name before a switch; `null` for a first-time join. */
+  previousPartyName: string | null;
+}
+
 export interface TurnEvent {
   kind: "turn";
   playerId: PlayerId;
@@ -82,6 +92,7 @@ export type BattleEvent =
   | HealEvent
   | MpRecoverEvent
   | MoneyEvent
+  | PartyEvent
   | TurnEvent
   | DrawEvent;
 
@@ -106,6 +117,7 @@ const EVENT_DURATION: Record<BattleEvent["kind"], number> = {
   heal: BATTLE_EVENT_DURATION,
   mpRecover: BATTLE_EVENT_DURATION,
   money: BATTLE_EVENT_DURATION,
+  party: BATTLE_EVENT_DURATION,
   turn: BATTLE_EVENT_DURATION,
   draw: BATTLE_EVENT_DURATION,
 };
@@ -126,6 +138,7 @@ export function eventAffectsPlayer(
     case "heal":
     case "mpRecover":
     case "money":
+    case "party":
     case "turn":
     case "draw":
       return event.playerId === playerId;
@@ -157,6 +170,10 @@ export function battleEventText(
       const delta = `${event.delta > 0 ? "+" : ""}${event.delta}`;
       return `${resolveName(event.playerId)}の所持金が${delta}`;
     }
+    case "party":
+      return event.previousPartyName
+        ? `${resolveName(event.playerId)}が${event.previousPartyName}から${event.cardName}へ所属を変更した`
+        : `${resolveName(event.playerId)}が${event.cardName}に入党した`;
     case "turn":
       return event.isSelf ? "あなたのターン" : `${event.playerName}のターン`;
     case "draw":
@@ -218,7 +235,8 @@ export function splitSupportEventsBeforeAttack(
     const positioned =
       event.kind === "heal" ||
       event.kind === "mpRecover" ||
-      event.kind === "money";
+      event.kind === "money" ||
+      event.kind === "party";
     if (
       positioned &&
       typeof event.logIndex === "number" &&
@@ -451,7 +469,26 @@ export function deriveBattleEvents(
     }
   });
 
-  for (const entry of newEntries) {
+  for (const [index, entry] of newEntries.entries()) {
+    if (entry.kind === "special" && /入党した|所属を変更した/.test(entry.message)) {
+      // Joining a party changes no HP/MP/money, so the log entry is the only
+      // trace of the action. It is positioned like an exchange: the join
+      // happened on this turn and must play before the opponent's attack.
+      const player = nextPlayers.get(entry.playerId);
+      const parsed = parsePartyLog(entry.message, player?.name ?? null);
+      if (parsed) {
+        supports.push({
+          kind: "party",
+          playerId: entry.playerId,
+          cardId: partyCardId(parsed.cardName, player?.party ?? null),
+          cardName: parsed.cardName,
+          previousPartyName: parsed.previousPartyName,
+          logIndex: index,
+        });
+      }
+      continue;
+    }
+
     if (entry.kind === "heal") {
       const target =
         resolveLogTarget(entry, next.players) ??
@@ -604,6 +641,39 @@ function gainedBy(
   if (!player) return 0;
   const before = previous.get(player.id);
   return before ? Math.max(0, player[stat] - before[stat]) : 0;
+}
+
+/** `◯◯が共産党に入党した` / `◯◯が自民党から共産党へ所属を変更した` */
+function parsePartyLog(
+  message: string,
+  playerName: string | null,
+): { cardName: string; previousPartyName: string | null } | null {
+  const prefix = playerName ? `${playerName}が` : null;
+  const rest =
+    prefix && message.startsWith(prefix)
+      ? message.slice(prefix.length)
+      : message;
+  const changed = /^(.+?)から(.+?)へ所属を変更した$/.exec(rest);
+  if (changed?.[1] && changed[2]) {
+    return {
+      cardName: changed[2].trim(),
+      previousPartyName: changed[1].trim(),
+    };
+  }
+  const joined = /^(.+?)に入党した$/.exec(rest);
+  if (joined?.[1]) {
+    return { cardName: joined[1].trim(), previousPartyName: null };
+  }
+  return null;
+}
+
+/** Party name → party card id, falling back to the player's current party. */
+function partyCardId(cardName: string, partyId: string | null): string {
+  const card = BASE_CARDS.find(
+    (definition) =>
+      definition.category === "party" && definition.name === cardName,
+  );
+  return card?.id ?? partyId ?? cardName;
 }
 
 function parseNumber(message: string, pattern: RegExp): number | null {

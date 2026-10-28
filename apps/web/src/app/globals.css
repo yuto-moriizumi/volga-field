@@ -2285,6 +2285,122 @@ a {
   animation-delay: 0s;
 }
 
+/* Joining (or switching) party: a card panel instead of a number, because the
+   action changes no HP/MP/money. Same 3s window as the other full-screen
+   effects, and no attack label anywhere in it. */
+.gf-party-effect {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  animation: gf-party-pop var(--gf-effect-duration) ease both;
+}
+
+.gf-party-glow {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 280px;
+  height: 280px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 236, 168, 0.55) 0%,
+    rgba(184, 180, 212, 0.26) 45%,
+    transparent 72%
+  );
+  animation: gf-party-glow var(--gf-effect-duration) ease-out both;
+}
+
+.gf-party-card {
+  position: relative;
+  z-index: 1;
+  width: clamp(112px, 13vw, 148px);
+  min-height: 152px;
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: linear-gradient(
+    180deg,
+    var(--panel-cream) 0%,
+    var(--panel-cream-soft) 100%
+  );
+  border: 3px solid var(--bar-teal-dark);
+  border-radius: 12px;
+  box-shadow:
+    0 12px 26px rgba(31, 91, 80, 0.32),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+  animation: gf-party-card-flip var(--gf-effect-duration)
+    cubic-bezier(0.2, 0.8, 0.3, 1.12) both;
+}
+
+.gf-party-card-emoji {
+  font-size: 64px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(31, 91, 80, 0.25));
+}
+
+.gf-party-card-name {
+  color: var(--bar-teal-deep);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.gf-party-badge {
+  margin-top: 2px;
+  padding: 2px 14px;
+  border-radius: 999px;
+  border: 2px solid #a17a1f;
+  background: var(--accent-gold-soft);
+  color: #6b4a13;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.gf-party-change {
+  position: relative;
+  z-index: 1;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid var(--accent-lavender-dark);
+  color: #3f3b66;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: gf-label-in var(--gf-effect-duration) ease both;
+}
+
+.gf-party-name {
+  position: relative;
+  z-index: 1;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text-dark);
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: gf-label-in var(--gf-effect-duration) ease both;
+}
+
+.gf-party-sparkles span {
+  color: var(--accent-gold-soft);
+  font-size: 18px;
+  opacity: 0.75;
+  text-shadow: 0 0 6px rgba(224, 198, 107, 0.8);
+}
+
 .gf-turn-banner {
   position: absolute;
   left: 50%;
@@ -2562,6 +2678,53 @@ a {
   100% {
     opacity: 0;
     transform: scale(0.7) rotate(60deg);
+  }
+}
+
+@keyframes gf-party-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes gf-party-glow {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+}
+
+@keyframes gf-party-card-flip {
+  0% {
+    opacity: 0;
+    transform: rotate(-16deg) scale(0.7);
+  }
+  25% {
+    opacity: 1;
+    transform: rotate(2deg) scale(1.06);
+  }
+  40% {
+    transform: rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
   }
 }
 
