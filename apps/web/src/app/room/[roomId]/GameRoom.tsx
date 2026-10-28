@@ -390,6 +390,12 @@ export function GameRoom({
     window.location.href = "/lobby";
   }
 
+  /** デバッグ用: 手札をすべて引き直す。ターンは消費しない。 */
+  function debugShuffleHand() {
+    if (!me || interactionLocked) return;
+    send({ type: "debug_shuffle_hand" });
+  }
+
   function ready() {
     send({ type: "ready" });
   }
@@ -619,6 +625,16 @@ export function GameRoom({
           <span className="gf-tag">
             終末 {gameState.doomsdayActive ? "発生中" : `G.F.${gameState.doomsdayTurn}`}
           </span>
+        )}
+        {process.env.NODE_ENV !== "production" && (
+          <button
+            type="button"
+            className="gf-tag gf-debug-button"
+            onClick={debugShuffleHand}
+            title="手札をすべて引き直す（ターンは消費しない）"
+          >
+            手札シャッフル
+          </button>
         )}
       </BottomBar>
 

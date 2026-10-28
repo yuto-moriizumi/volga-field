@@ -601,6 +601,43 @@ export function discardCards(
  * 攻撃ターンは最低1枚引く（cardsUsed が 0 でも1枚）。
  * 手札が MAX_HAND_SIZE に達している場合、あふれた分は引かない。
  */
+/**
+ * デバッグ用: 手札をすべて引き直す。枚数はそのままで、手番も消費しない。
+ */
+export function shuffleHand(
+  state: GameState,
+  playerId: PlayerId,
+  rng: Rng = Math.random,
+): { ok: true; state: GameState } | { ok: false; reason: string } {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return { ok: false, reason: "player not found" };
+  if (state.winner) return { ok: false, reason: "game already finished" };
+  const count = player.hand.length;
+  if (count === 0) return { ok: false, reason: "no cards in hand" };
+
+  const drawn = drawRandomCards(count, rng);
+  const finalPlayers = state.players.map((p) =>
+    p.id === playerId ? { ...p, hand: drawn } : p,
+  );
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players: finalPlayers,
+      log: [
+        ...state.log,
+        {
+          turn: state.turn,
+          playerId,
+          message: `${player.name}が手札${count}枚を引き直した`,
+          kind: "system",
+        },
+      ],
+    },
+  };
+}
+
 export function endTurn(
   state: GameState,
   playerId: PlayerId,

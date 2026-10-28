@@ -37,6 +37,7 @@ export {
   confirmBuy,
   sellCards,
   exchangeStats,
+  shuffleHand,
   INITIAL_HAND_SIZE,
   MAX_HAND_SIZE,
   MAX_PLAYERS,

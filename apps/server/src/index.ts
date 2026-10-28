@@ -22,6 +22,7 @@ import {
   findCard,
   playCard,
   sellCards,
+  shuffleHand,
   startBuy,
 } from "@volga/game-core";
 import {
@@ -652,6 +653,24 @@ function handleLeaveRoom(client: Client): void {
   removePlayerFromRoom(client);
 }
 
+/**
+ * デバッグ用: 手札をすべて引き直す。手番は消費しない。
+ * 本番ビルドでは受け付けない。
+ */
+function handleDebugShuffleHand(client: Client): void {
+  if (!client.roomId) return;
+  if (process.env.NODE_ENV === "production") return;
+  const room = rooms.get(client.roomId);
+  if (!room || !room.gameState) return;
+  const result = shuffleHand(room.gameState, client.id);
+  if (!result.ok) {
+    send(client.ws, { type: "error", message: result.reason });
+    return;
+  }
+  room.gameState = result.state;
+  broadcastStateToAll(room);
+}
+
 function handleListRooms(client: Client): void {
   const waitingRooms = Array.from(rooms.values()).filter((r) => !r.started);
   const playerCount = waitingRooms.reduce(
@@ -725,6 +744,9 @@ function dispatch(client: Client, msg: ClientMessage): void {
       break;
     case "end_turn":
       handleEndTurn(client);
+      break;
+    case "debug_shuffle_hand":
+      handleDebugShuffleHand(client);
       break;
     case "list_rooms":
       handleListRooms(client);
