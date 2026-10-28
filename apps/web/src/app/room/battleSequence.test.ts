@@ -6,6 +6,7 @@ import { deriveBattleEvents } from "./[roomId]/battleEvents";
 import {
   buildDuelPresentation,
   defenseCardsFromLog,
+  planDelta,
   planDuels,
   updateDuelModel,
   type DuelModel,
@@ -326,4 +327,133 @@ test("a resolved attack and the AI counterattack in one delta become two duels",
   assert.equal(second?.effect, null);
   assert.equal(second?.turn, null);
   assert.equal(second?.statsBefore.p2?.hp, 27);
+});
+
+const TRADE_LOG = {
+  turn: 3,
+  playerId: "p1",
+  message: "アリスが両替した (MP+2 / ￥+1 / HP-3)",
+  kind: "trade" as const,
+};
+
+const DRAW_LOG = {
+  turn: 3,
+  playerId: "p1",
+  message: "アリスが1枚ドロー",
+  kind: "system" as const,
+};
+
+const COUNTER_LOG = {
+  turn: 3,
+  playerId: "p2",
+  message: "ボブが反撃で攻撃",
+  kind: "attack" as const,
+};
+
+/**
+ * The exchange, the turn end and the AI's attack delivered before the client
+ * rendered once: the three server broadcasts collapse into a single delta.
+ */
+function coalescedExchangeState(): GameState {
+  return state({
+    players: [
+      player("p1", "アリス", { hp: 27, mp: 7, money: 11 }),
+      player("p2", "ボブ"),
+    ],
+    activePlayerIndex: 1,
+    actionTurn: 4,
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "p2",
+      defenderId: "p1",
+      card: { id: "attack" },
+      cardName: "反撃",
+      amount: 2,
+    },
+    log: [TRADE_LOG, DRAW_LOG, COUNTER_LOG],
+  });
+}
+
+test("exchange effects in a coalesced delta are ordered before the enemy duel", () => {
+  const previous = state();
+  const next = coalescedExchangeState();
+  const events = deriveBattleEvents(previous, next, "p1");
+
+  // The exchange happened before the attack declaration, so its effects are
+  // derived in front of the attack (instead of being appended after it).
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ["mpRecover", "money", "attack", "turn"],
+  );
+  const mp = events[0];
+  assert.equal(mp?.kind === "mpRecover" ? mp.amount : null, 2);
+  const money = events[1];
+  assert.equal(money?.kind === "money" ? money.delta : null, 1);
+
+  const plan = planDelta(previous, next, "p1", events, 1);
+  assert.deepEqual(
+    plan.leading.map((event) => event.kind),
+    ["mpRecover", "money"],
+  );
+  assert.equal(plan.duels.length, 1);
+  assert.equal(plan.duels[0]?.attackerId, "p2");
+  assert.equal(plan.duels[0]?.defenderId, "p1");
+
+  // What `consumeDelta` pushes into the queue: leading overlays first, then
+  // the duel, then whatever is left.
+  const queue = [
+    ...plan.leading.map((event) => `overlay:${event.kind}`),
+    ...plan.duels.map((duel) => `duel:${duel.attackerId}`),
+    ...plan.events.map((event) => `overlay:${event.kind}`),
+  ];
+  assert.deepEqual(queue, ["overlay:mpRecover", "overlay:money", "duel:p2"]);
+});
+
+test("support logged after the attack declaration stays behind the duel", () => {
+  const healLog = {
+    turn: 3,
+    playerId: "p2",
+    message: "ボブが3回復 (回復)",
+    kind: "heal" as const,
+  };
+  const previous = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ", { hp: 27 })],
+  });
+  const next = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ")],
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "p2",
+      defenderId: "p1",
+      card: { id: "attack" },
+      cardName: "反撃",
+      amount: 3,
+    },
+    log: [COUNTER_LOG, healLog],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  const plan = planDelta(previous, next, "p1", events, 1);
+  assert.deepEqual(plan.leading, []);
+  assert.equal(plan.duels.length, 1);
+  assert.deepEqual(
+    plan.events.map((event) => event.kind),
+    ["heal"],
+  );
+});
+
+test("a trade-only delta yields the exchange's MP and money events", () => {
+  const previous = state();
+  const next = state({
+    players: [
+      player("p1", "アリス", { hp: 27, mp: 7, money: 11 }),
+      player("p2", "ボブ"),
+    ],
+    log: [TRADE_LOG],
+  });
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ["mpRecover", "money"],
+  );
 });
