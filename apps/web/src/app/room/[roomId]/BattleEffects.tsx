@@ -95,7 +95,7 @@ function EventVisual({
         />
       );
     case "draw":
-      return <DrawVisual event={event} />;
+      return <DrawVisual event={event} resolveName={resolveName} />;
   }
 }
 
@@ -247,9 +247,7 @@ function TurnVisual({
     : playerCount > 2
       ? `${event.playerName}のターン`
       : "相手のターン";
-  const sub = event.isSelf
-    ? `${resolveName(event.playerId)}${event.continuation ? "（継続）" : ""}`
-    : event.playerName;
+  const sub = resolveName(event.playerId);
   return (
     <div className={`gf-turn-banner${event.isSelf ? " is-self" : ""}`}>
       <div className="gf-turn-banner-main">{main}</div>
@@ -258,11 +256,22 @@ function TurnVisual({
   );
 }
 
-function DrawVisual({ event }: { event: DrawEvent }) {
+function DrawVisual({
+  event,
+  resolveName,
+}: {
+  event: DrawEvent;
+  resolveName: (playerId: PlayerId) => string;
+}) {
+  // Both players draw when a turn is passed, so the visual has to name the
+  // drawer: an unattributed "1枚ドロー" twice in a row reads as one player
+  // drawing two cards.
   return (
     <div className="gf-draw-effect">
       <div className="gf-draw-card" />
-      <div className="gf-draw-label">{event.count}枚ドロー</div>
+      <div className="gf-draw-label">
+        {resolveName(event.playerId)}が{event.count}枚ドロー
+      </div>
     </div>
   );
 }
