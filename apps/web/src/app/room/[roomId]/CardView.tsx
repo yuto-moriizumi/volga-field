@@ -89,8 +89,12 @@ export function shortPower(card: NonNullable<ReturnType<typeof findCard>>): stri
   if (card.category === "miracle") return `MP${card.mpCost ?? 0}`;
   if (card.effects.some((effect) => effect.kind === "heal")) return `癒${amount ?? ""}`;
   if (card.effects.some((effect) => effect.kind === "mpRecover")) return `MP+${amount ?? ""}`;
-  if (card.effects.every((effect) => effect.kind === "attack_power")) {
+  if (
+    card.effects.length > 0 &&
+    card.effects.every((effect) => effect.kind === "attack_power")
+  ) {
     return `攻+${amount ?? ""}`;
   }
+  if (card.effects.length === 0) return card.name;
   return `攻${amount ?? ""}`;
 }
