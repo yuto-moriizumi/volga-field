@@ -1,5 +1,6 @@
 import { BASE_CARDS, findCard } from "@volga/game-core";
 import type { BattleLogEntry, GameState, PlayerId } from "@volga/shared";
+import { isAttackDeclarationLog, splitSupportEventsBeforeAttack } from "./battleEvents";
 import type {
   BattleEvent,
   DamageEvent,
@@ -262,11 +263,7 @@ export interface DuelBatch {
 }
 
 function isAttackDeclaration(entry: BattleLogEntry): boolean {
-  return (
-    entry.kind === "attack" &&
-    typeof entry.damage !== "number" &&
-    /で攻撃/.test(entry.message)
-  );
+  return isAttackDeclarationLog(entry);
 }
 
 function parseAttackName(message: string): string {
@@ -473,6 +470,55 @@ export function planDuels(
   }
 
   return { duels, consumed };
+}
+
+export interface DeltaPlan {
+  /**
+   * Support events that the log places before this delta's first attack. They
+   * happened on the previous turn and must be presented ahead of the duels.
+   */
+  leading: BattleEvent[];
+  /** Duels declared in this delta, in log order. */
+  duels: DuelModel[];
+  /** Events left once the duels took theirs, in their original order. */
+  events: BattleEvent[];
+  /** Events absorbed by the duels. */
+  consumed: BattleEvent[];
+}
+
+/**
+ * Order one delta for presentation.
+ *
+ * The server broadcasts the exchange, the turn end and the AI's attack as
+ * separate messages, but a slow client can receive them before React renders,
+ * so all three arrive as one snapshot. In that snapshot the exchange's support
+ * events sit before the attack declaration in the log, and they have to play
+ * before the duel — otherwise the exchange effect only shows up after the
+ * attack has been defended, i.e. on the wrong turn.
+ *
+ * Support events logged *after* the attack (the next turn's draw/heal/money)
+ * stay behind the duels, so the new turn is not presented early.
+ */
+export function planDelta(
+  previous: GameState,
+  next: GameState,
+  viewerId: PlayerId | null,
+  events: BattleEvent[],
+  startKey: number,
+): DeltaPlan {
+  const { before, after } = splitSupportEventsBeforeAttack(
+    previous,
+    next,
+    events,
+  );
+  const batch = planDuels(previous, next, viewerId, after, startKey);
+  const consumed = new Set(batch.consumed);
+  return {
+    leading: before,
+    duels: batch.duels,
+    events: after.filter((event) => !consumed.has(event)),
+    consumed: batch.consumed,
+  };
 }
 
 export interface DuelUpdate {

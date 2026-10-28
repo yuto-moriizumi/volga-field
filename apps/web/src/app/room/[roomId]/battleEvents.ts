@@ -28,21 +28,34 @@ export interface DamageEvent {
   cardName: string | null;
 }
 
-export interface HealEvent {
+/**
+ * Where an event sits in the delta it was derived from: the index of the log
+ * entry that describes it, counted from the first new entry.
+ *
+ * The states arrive coalesced, so this is the only ordering information left
+ * once the server messages have been merged into one snapshot. Events without
+ * a log entry (stat changes inferred from a diff) have no position and are
+ * treated as happening after the attacks of the delta.
+ */
+interface LogPositioned {
+  logIndex?: number;
+}
+
+export interface HealEvent extends LogPositioned {
   kind: "heal";
   playerId: PlayerId;
   amount: number;
   cardName: string | null;
 }
 
-export interface MpRecoverEvent {
+export interface MpRecoverEvent extends LogPositioned {
   kind: "mpRecover";
   playerId: PlayerId;
   amount: number;
   cardName: string | null;
 }
 
-export interface MoneyEvent {
+export interface MoneyEvent extends LogPositioned {
   kind: "money";
   playerId: PlayerId;
   delta: number;
@@ -149,6 +162,85 @@ export function battleEventText(
     case "draw":
       return `${resolveName(event.playerId)}が${event.count}枚ドロー`;
   }
+}
+
+/**
+ * An attack declaration in the combat log ("◯◯が△△で攻撃" before its damage
+ * entry). The same predicate is used by `planDuels` to segment a delta.
+ */
+export function isAttackDeclarationLog(entry: BattleLogEntry): boolean {
+  return (
+    entry.kind === "attack" &&
+    typeof entry.damage !== "number" &&
+    /で攻撃/.test(entry.message)
+  );
+}
+
+/** Index of the delta's first attack declaration, or the delta length. */
+export function firstAttackLogIndex(
+  previous: GameState,
+  next: GameState,
+): number {
+  if (next.log.length < previous.log.length) return 0;
+  const newEntries = next.log.slice(previous.log.length);
+  const index = newEntries.findIndex(isAttackDeclarationLog);
+  return index === -1 ? newEntries.length : index;
+}
+
+export interface SplitSupportEvents {
+  /** Support events logged before the delta's first attack. */
+  before: BattleEvent[];
+  /** Everything else, in the order it was derived. */
+  after: BattleEvent[];
+}
+
+/**
+ * Split the delta's support events around its first attack.
+ *
+ * Trading happens on the player's own turn, so its "両替した" log entry always
+ * precedes the opponent's attack declaration. Presenting the two in log order
+ * keeps the exchange effect on the turn it belongs to instead of letting it
+ * play after the opponent's duel. Support events that the log places *after*
+ * the attack (the next turn's draw, heals, money) must stay after it.
+ *
+ * Only heal / mpRecover / money carry a log position; everything else is
+ * returned in `after`.
+ */
+export function splitSupportEventsBeforeAttack(
+  previous: GameState,
+  next: GameState,
+  events: BattleEvent[],
+): SplitSupportEvents {
+  const limit = firstAttackLogIndex(previous, next);
+  const before: BattleEvent[] = [];
+  const after: BattleEvent[] = [];
+  for (const event of events) {
+    const positioned =
+      event.kind === "heal" ||
+      event.kind === "mpRecover" ||
+      event.kind === "money";
+    if (
+      positioned &&
+      typeof event.logIndex === "number" &&
+      event.logIndex < limit
+    ) {
+      before.push(event);
+    } else {
+      after.push(event);
+    }
+  }
+  return { before, after };
+}
+
+/** `◯◯が両替した (MP+2 / ￥+1 / HP-3)` → the stat changes it reports. */
+function parseTradeParts(
+  message: string,
+): { mp: number; money: number; hp: number } | null {
+  const mp = parseNumber(message, /MP([+-]\d+)/);
+  const money = parseNumber(message, /￥([+-]\d+)/);
+  const hp = parseNumber(message, /HP([+-]\d+)/);
+  if (mp === null && money === null && hp === null) return null;
+  return { mp: mp ?? 0, money: money ?? 0, hp: hp ?? 0 };
 }
 
 /**
@@ -318,6 +410,46 @@ export function deriveBattleEvents(
 
   const healedPlayers = new Set<PlayerId>();
   const recoveredPlayers = new Set<PlayerId>();
+  const tradedPlayers = new Set<PlayerId>();
+
+  newEntries.forEach((entry, index) => {
+    if (entry.kind === "trade" && /両替した/.test(entry.message)) {
+      // The exchange is a log entry of its own, so its effects belong at this
+      // position in the delta (before the opponent's attack, not after it).
+      const player = nextPlayers.get(entry.playerId);
+      const parts = parseTradeParts(entry.message);
+      if (!player || !parts) return;
+      tradedPlayers.add(player.id);
+      if (parts.mp > 0) {
+        recoveredPlayers.add(player.id);
+        supports.push({
+          kind: "mpRecover",
+          playerId: player.id,
+          amount: parts.mp,
+          cardName: null,
+          logIndex: index,
+        });
+      }
+      if (parts.money !== 0) {
+        supports.push({
+          kind: "money",
+          playerId: player.id,
+          delta: parts.money,
+          logIndex: index,
+        });
+      }
+      if (parts.hp > 0) {
+        healedPlayers.add(player.id);
+        supports.push({
+          kind: "heal",
+          playerId: player.id,
+          amount: parts.hp,
+          cardName: null,
+          logIndex: index,
+        });
+      }
+    }
+  });
 
   for (const entry of newEntries) {
     if (entry.kind === "heal") {
@@ -371,6 +503,7 @@ export function deriveBattleEvents(
   for (const player of next.players) {
     const before = previousPlayers.get(player.id);
     if (!before) continue;
+    if (tradedPlayers.has(player.id)) continue;
     if (!healedPlayers.has(player.id) && player.hp > before.hp) {
       supports.push({
         kind: "heal",
@@ -423,7 +556,15 @@ export function deriveBattleEvents(
     }
   }
 
-  return [...flights, ...supports, ...damages, ...turns];
+  const ordered = splitSupportEventsBeforeAttack(previous, next, supports);
+
+  return [
+    ...ordered.before,
+    ...flights,
+    ...ordered.after,
+    ...damages,
+    ...turns,
+  ];
 }
 
 function resolveLogTarget(

@@ -16,7 +16,7 @@ import {
   DUEL_TURN_SETTLE_MS,
   absorbDraw,
   buildDuelPresentation,
-  planDuels,
+  planDelta,
   updateDuelModel,
   type DuelCard,
   type DuelModel,
@@ -309,25 +309,29 @@ export function useBattleSequence(
       // not used (it would flash before the sequence reaches the name step).
       setDefenseFallback(false);
       const events = deriveBattleEvents(previous, next, playerIdRef.current);
-      let remaining = events;
 
-      // 1. Build every duel declared in this delta (the server can chain my
-      //    attack, its resolution and the AI's counterattack into one state).
-      const planned = planDuels(
+      // 0. Order the delta. Exchange support events logged before the attack
+      //    declaration belong to the previous turn, so they are queued before
+      //    the duels instead of waiting behind the opponent's defense.
+      const planned = planDelta(
         previous,
         next,
         playerIdRef.current,
-        remaining,
+        events,
         keyRef.current + 1,
       );
+      for (const event of planned.leading) {
+        queueRef.current.push({ kind: "overlay", event });
+      }
+      let remaining = planned.events;
+
+      // 1. Build every duel declared in this delta (the server can chain my
+      //    attack, its resolution and the AI's counterattack into one state).
       if (planned.duels.length > 0) {
         keyRef.current += planned.duels.length;
         for (const model of planned.duels) {
           queueRef.current.push({ kind: "duel", model });
         }
-        remaining = remaining.filter(
-          (event) => !planned.consumed.includes(event),
-        );
       }
 
       // 2. Fold this delta into the running duel.
