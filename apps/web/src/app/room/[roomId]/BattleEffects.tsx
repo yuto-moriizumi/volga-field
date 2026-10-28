@@ -10,6 +10,7 @@ import {
   type HealEvent,
   type MoneyEvent,
   type MpRecoverEvent,
+  type PartyEvent,
   type PresentedBattleEvent,
   type TurnEvent,
 } from "./battleEvents";
@@ -83,6 +84,8 @@ function EventVisual({
     case "mpRecover":
     case "money":
       return <SupportVisual event={event} resolveName={resolveName} />;
+    case "party":
+      return <PartyVisual event={event} resolveName={resolveName} />;
     case "turn":
       return (
         <TurnVisual
@@ -190,6 +193,38 @@ function SupportVisual({
         {icon} {resolveName(event.playerId)}
       </div>
       <div className="gf-sparkles">
+        <span>✦</span>
+        <span>✧</span>
+        <span>✦</span>
+      </div>
+    </div>
+  );
+}
+
+function PartyVisual({
+  event,
+  resolveName,
+}: {
+  event: PartyEvent;
+  resolveName: (playerId: PlayerId) => string;
+}) {
+  return (
+    <div className="gf-party-effect">
+      <div className="gf-party-glow" />
+      <div className="gf-party-card">
+        <span className="gf-party-card-emoji">
+          {cardEmoji(event.cardId, event.cardName)}
+        </span>
+        <span className="gf-party-card-name">{event.cardName}</span>
+        <span className="gf-party-badge">入党</span>
+      </div>
+      {event.previousPartyName && (
+        <div className="gf-party-change">
+          {event.previousPartyName} → {event.cardName}
+        </div>
+      )}
+      <div className="gf-party-name">{resolveName(event.playerId)}</div>
+      <div className="gf-sparkles gf-party-sparkles">
         <span>✦</span>
         <span>✧</span>
         <span>✦</span>

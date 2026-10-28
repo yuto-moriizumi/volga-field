@@ -456,3 +456,140 @@ test("a trade-only delta yields the exchange's MP and money events", () => {
     ["mpRecover", "money"],
   );
 });
+
+const PARTY_JOIN_LOG = {
+  turn: 3,
+  playerId: "p1",
+  message: "アリスが共産党に入党した",
+  kind: "special" as const,
+};
+
+const PARTY_SWITCH_LOG = {
+  turn: 3,
+  playerId: "p1",
+  message: "アリスが自民党から共産党へ所属を変更した",
+  kind: "special" as const,
+};
+
+test("a first party join becomes one party event with its card", () => {
+  const previous = state();
+  const next = state({
+    players: [
+      player("p1", "アリス", { party: "communist_party" }),
+      player("p2", "ボブ"),
+    ],
+    log: [PARTY_JOIN_LOG],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ["party"],
+  );
+  const party = events[0];
+  assert.equal(party?.kind === "party" ? party.cardName : null, "共産党");
+  assert.equal(party?.kind === "party" ? party.cardId : null, "communist_party");
+  assert.equal(
+    party?.kind === "party" ? party.previousPartyName : "unexpected",
+    null,
+  );
+  // The join is positioned in the log so it can be ordered against duels.
+  assert.equal(party?.kind === "party" ? party.logIndex : null, 0);
+});
+
+test("a party switch reports the party that was left behind", () => {
+  const previous = state({
+    players: [
+      player("p1", "アリス", { party: "ldp" }),
+      player("p2", "ボブ"),
+    ],
+  });
+  const next = state({
+    players: [
+      player("p1", "アリス", { party: "communist_party" }),
+      player("p2", "ボブ"),
+    ],
+    log: [PARTY_SWITCH_LOG],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.deepEqual(
+    events.map((event) => event.kind),
+    ["party"],
+  );
+  const party = events[0];
+  assert.equal(party?.kind === "party" ? party.cardName : null, "共産党");
+  assert.equal(
+    party?.kind === "party" ? party.previousPartyName : null,
+    "自民党",
+  );
+});
+
+/**
+ * The join, the turn-end draw and the AI's attack delivered before the client
+ * rendered once: the three server broadcasts collapse into a single delta.
+ */
+function coalescedPartyState(): GameState {
+  return state({
+    players: [
+      player("p1", "アリス", { party: "communist_party" }),
+      player("p2", "ボブ"),
+    ],
+    activePlayerIndex: 1,
+    actionTurn: 4,
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "p2",
+      defenderId: "p1",
+      card: { id: "attack" },
+      cardName: "反撃",
+      amount: 2,
+    },
+    log: [PARTY_JOIN_LOG, DRAW_LOG, COUNTER_LOG],
+  });
+}
+
+test("a coalesced party join is presented before the enemy duel", () => {
+  const previous = state();
+  const next = coalescedPartyState();
+  const events = deriveBattleEvents(previous, next, "p1");
+
+  // The join happened before the attack declaration, so it is a leading event
+  // instead of being swallowed by the duel.
+  const plan = planDelta(previous, next, "p1", events, 1);
+  assert.deepEqual(
+    plan.leading.map((event) => event.kind),
+    ["party"],
+  );
+  assert.equal(plan.duels.length, 1);
+  assert.equal(plan.duels[0]?.attackerId, "p2");
+
+  const queue = [
+    ...plan.leading.map((event) => `overlay:${event.kind}`),
+    ...plan.duels.map((duel) => `duel:${duel.attackerId}`),
+    ...plan.events.map((event) => `overlay:${event.kind}`),
+  ];
+  assert.deepEqual(queue, ["overlay:party", "duel:p2"]);
+});
+
+test("special logs that are not a join do not become party events", () => {
+  const previous = state();
+  const next = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ", { hp: 28 })],
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "共産党が動いた！ デモ: ボブに2ダメージ",
+        kind: "special" as const,
+        damage: 2,
+      },
+    ],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  assert.equal(
+    events.some((event) => event.kind === "party"),
+    false,
+  );
+});
