@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 import {
+  ATTRIBUTE_ORDER,
+  AttributeBadge,
+  attributeGroupNote,
+  attributeLabel,
+} from "../attributes";
+import {
   CATEGORIES,
   cardStatLabels,
   partyActionText,
@@ -133,6 +139,11 @@ function CardGridCatalog({
   if (!selected) return null;
 
   const stats = cardStatLabels(selected);
+  // 属性ごとにまとめて並べる。どの属性の武器・盾かひと目で分かる。
+  const groups = ATTRIBUTE_ORDER.map((attribute) => ({
+    attribute,
+    cards: cards.filter((card) => card.attribute === attribute),
+  })).filter((group) => group.cards.length > 0);
 
   return (
     <div className="gf-textbook-weapon">
@@ -143,9 +154,13 @@ function CardGridCatalog({
         <div className="gf-textbook-weapon-info">
           <div className="gf-textbook-weapon-name">{selected.name}</div>
           <div className="gf-textbook-weapon-stats">
+            <AttributeBadge attribute={selected.attribute} />
             {stats.map((stat) => (
               <span key={stat}>{stat}</span>
             ))}
+          </div>
+          <div className="gf-textbook-weapon-note">
+            {attributeGroupNote(selected.attribute)}
           </div>
           <div className="gf-textbook-weapon-note">{selected.description}</div>
         </div>
@@ -153,19 +168,41 @@ function CardGridCatalog({
           <div className="gf-textbook-weapon-price">￥{selected.price}</div>
         )}
       </div>
-      <div className="gf-textbook-weapon-grid">
-        {cards.map((card) => (
-          <button
-            key={card.id}
-            className={`gf-textbook-tile${
-              card.id === selected.id ? " is-active" : ""
-            }`}
-            onClick={() => setSelectedId(card.id)}
-            title={card.name}
-            aria-label={card.name}
+      <div className="gf-attr-groups">
+        {groups.map((group) => (
+          <section
+            key={group.attribute}
+            className="gf-attr-group"
+            aria-label={`${attributeLabel(group.attribute)}のカード`}
           >
-            <span className="gf-textbook-tile-emoji">{card.emoji}</span>
-          </button>
+            <header className="gf-attr-group-head">
+              <AttributeBadge attribute={group.attribute} />
+              <span className="gf-attr-group-count">
+                {group.cards.length}枚
+              </span>
+              <span className="gf-attr-group-behavior">
+                {attributeGroupNote(group.attribute)}
+              </span>
+            </header>
+            <div
+              className="gf-textbook-weapon-grid gf-attr-group-grid"
+              data-attribute={group.attribute}
+            >
+              {group.cards.map((card) => (
+                <button
+                  key={card.id}
+                  className={`gf-textbook-tile${
+                    card.id === selected.id ? " is-active" : ""
+                  }`}
+                  onClick={() => setSelectedId(card.id)}
+                  title={`${card.name}（${attributeLabel(card.attribute)}）`}
+                  aria-label={`${card.name}（${attributeLabel(card.attribute)}）`}
+                >
+                  <span className="gf-textbook-tile-emoji">{card.emoji}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
       {note && (
@@ -202,6 +239,9 @@ function CardListCatalog({
               <div className="gf-textbook-calamity-body">
                 <div className="gf-textbook-item-name">
                   <span>{card.name}</span>
+                  {card.attribute !== "none" && (
+                    <AttributeBadge attribute={card.attribute} />
+                  )}
                   {card.price !== undefined && (
                     <span className="gf-textbook-item-price">
                       ￥{card.price}

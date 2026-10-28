@@ -14,14 +14,17 @@ import {
   DUEL_STEP_MS,
   DUEL_TURN_HOLD_MS,
   DUEL_TURN_SETTLE_MS,
+  PARTY_ACTION_MS,
   absorbDraw,
   buildDuelPresentation,
+  buildPartyPresentation,
   planDelta,
   updateDuelModel,
   type DuelCard,
   type DuelModel,
   type DuelPresentation,
   type DuelStage,
+  type PartyPresentation,
 } from "./battleSequence";
 
 interface DuelRun extends DuelModel {
@@ -36,10 +39,13 @@ interface DuelRun extends DuelModel {
 
 type QueueItem =
   | { kind: "duel"; model: DuelModel }
+  | { kind: "party"; event: BattleEvent }
   | { kind: "overlay"; event: BattleEvent };
 
 export interface BattleSequence {
   duel: DuelPresentation | null;
+  /** Party actions get their own field presentation (left card / right target). */
+  party: PartyPresentation | null;
   /** Non-duel events still use the full-screen overlay. */
   overlay: PresentedBattleEvent | null;
   isAnimating: boolean;
@@ -68,14 +74,18 @@ export function useBattleSequence(
   playerId: PlayerId | null,
 ): BattleSequence {
   const [duel, setDuel] = useState<DuelPresentation | null>(null);
+  const [party, setParty] = useState<PartyPresentation | null>(null);
   const [overlay, setOverlay] = useState<PresentedBattleEvent | null>(null);
   const [defenseFallback, setDefenseFallback] = useState(false);
 
   const runRef = useRef<DuelRun | null>(null);
+  const partyRef = useRef<PartyPresentation | null>(null);
   const queueRef = useRef<QueueItem[]>([]);
   const overlayRef = useRef<PresentedBattleEvent | null>(null);
   const previousStateRef = useRef<GameState | null>(null);
   const processedStateRef = useRef<GameState | null>(null);
+  /** Latest state, for resolving player names when a queued item starts. */
+  const stateRef = useRef<GameState | null>(null);
   const timerRef = useRef<number | null>(null);
   const keyRef = useRef(0);
   const epochRef = useRef(0);
@@ -86,6 +96,7 @@ export function useBattleSequence(
   // Declared up front because the timer chain and the queue reference each
   // other; every entry point is only ever called after render.
   const startDuelRef = useRef<(model: DuelModel) => void>(() => {});
+  const pumpRef = useRef<() => void>(() => {});
   const advanceToTurnRef = useRef<(run: DuelRun, epoch: number) => void>(
     () => {},
   );
@@ -124,9 +135,35 @@ export function useBattleSequence(
   );
 
   const pump = useCallback(() => {
-    if (runRef.current || overlayRef.current) return;
+    if (runRef.current || overlayRef.current || partyRef.current) return;
     const next = queueRef.current.shift();
     if (!next) return;
+    if (next.kind === "party") {
+      if (next.event.kind !== "partyAction") {
+        keyRef.current += 1;
+        const presented = { event: next.event, key: keyRef.current };
+        overlayRef.current = presented;
+        setOverlay(presented);
+        return;
+      }
+      keyRef.current += 1;
+      const presented = buildPartyPresentation(
+        next.event,
+        stateRef.current?.players ?? [],
+        playerIdRef.current,
+        keyRef.current,
+      );
+      partyRef.current = presented;
+      setParty(presented);
+      // Party actions are pure flavour: a fixed 1.2s beat, skippable, and no
+      // input is expected.
+      after(PARTY_ACTION_MS, epochRef.current, () => {
+        partyRef.current = null;
+        setParty(null);
+        pumpRef.current();
+      });
+      return;
+    }
     if (next.kind === "overlay") {
       keyRef.current += 1;
       const presented = { event: next.event, key: keyRef.current };
@@ -135,7 +172,10 @@ export function useBattleSequence(
       return;
     }
     startDuelRef.current(next.model);
-  }, []);
+  }, [after]);
+  useEffect(() => {
+    pumpRef.current = pump;
+  }, [pump]);
 
   const finishDuel = useCallback(
     (run: DuelRun) => {
@@ -279,9 +319,11 @@ export function useBattleSequence(
     epochRef.current += 1;
     clearTimer();
     runRef.current = null;
+    partyRef.current = null;
     queueRef.current = [];
     overlayRef.current = null;
     setDuel(null);
+    setParty(null);
     setOverlay(null);
   }, [clearTimer]);
 
@@ -293,12 +335,19 @@ export function useBattleSequence(
       finishDuel(run);
       return;
     }
+    if (partyRef.current) {
+      clearTimer();
+      partyRef.current = null;
+      setParty(null);
+      pump();
+      return;
+    }
     if (overlayRef.current) {
       overlayRef.current = null;
       setOverlay(null);
       pump();
     }
-  }, [finishDuel, pump]);
+  }, [clearTimer, finishDuel, pump]);
 
   // The delta is folded in a microtask so React never sees a synchronous
   // setState from an effect body; it still runs before the next paint, so the
@@ -320,8 +369,15 @@ export function useBattleSequence(
         events,
         keyRef.current + 1,
       );
+      const enqueue = (event: BattleEvent) => {
+        queueRef.current.push(
+          event.kind === "partyAction"
+            ? { kind: "party", event }
+            : { kind: "overlay", event },
+        );
+      };
       for (const event of planned.leading) {
-        queueRef.current.push({ kind: "overlay", event });
+        enqueue(event);
       }
       let remaining = planned.events;
 
@@ -396,7 +452,7 @@ export function useBattleSequence(
 
       // 4. Everything left is a non-duel event and keeps the overlay.
       for (const event of remaining) {
-        queueRef.current.push({ kind: "overlay", event });
+        enqueue(event);
       }
 
       pump();
@@ -405,6 +461,7 @@ export function useBattleSequence(
   );
 
   useEffect(() => {
+    stateRef.current = gameState;
     if (!gameState) {
       previousStateRef.current = null;
       processedStateRef.current = null;
@@ -449,7 +506,7 @@ export function useBattleSequence(
   }, [overlay, pump]);
 
   useEffect(() => {
-    if (!overlay) return;
+    if (!overlay && !party) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
       if (event.key !== " " && event.key !== "Enter") return;
@@ -468,7 +525,7 @@ export function useBattleSequence(
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [overlay, skip]);
+  }, [overlay, party, skip]);
 
   useEffect(
     () => () => {
@@ -478,12 +535,15 @@ export function useBattleSequence(
     [],
   );
 
-  const isAnimating = duel !== null || overlay !== null;
+  const isAnimating = duel !== null || party !== null || overlay !== null;
   const interactionLocked =
-    overlay !== null || (duel !== null && !duel.awaitingDefense);
+    overlay !== null ||
+    party !== null ||
+    (duel !== null && !duel.awaitingDefense);
 
   return {
     duel,
+    party,
     overlay,
     isAnimating,
     canDefend: duel?.awaitingDefense ?? false,

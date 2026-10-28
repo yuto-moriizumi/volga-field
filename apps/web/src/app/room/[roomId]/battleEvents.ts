@@ -1,4 +1,5 @@
 import { BASE_CARDS } from "@volga/game-core";
+import type { PartyActionKind } from "@volga/game-core";
 import type {
   BattleLogEntry,
   GameState,
@@ -71,6 +72,28 @@ export interface PartyEvent extends LogPositioned {
   previousPartyName: string | null;
 }
 
+/**
+ * A party acting on its own at the end of a turn (25% roll per party member).
+ *
+ * The server only writes a `special` log line for these, so the whole event is
+ * reconstructed from text: `共産党が動いた！ 労働者の反撃: ボブに3ダメージ`.
+ */
+export interface PartyActionEvent extends LogPositioned {
+  kind: "partyAction";
+  /** The party owner, i.e. the player whose party acted. */
+  playerId: PlayerId;
+  /** Party card id (`communist_party` …), used for the card face emoji. */
+  cardId: string | null;
+  partyName: string;
+  actionName: string;
+  /** Who the action landed on. `playerId` for self-targeted effects. */
+  targetId: PlayerId | null;
+  effect: {
+    kind: PartyActionKind;
+    amount: number;
+  };
+}
+
 export interface TurnEvent {
   kind: "turn";
   playerId: PlayerId;
@@ -91,6 +114,7 @@ export type BattleEvent =
   | MpRecoverEvent
   | MoneyEvent
   | PartyEvent
+  | PartyActionEvent
   | TurnEvent
   | DrawEvent;
 
@@ -116,6 +140,7 @@ const EVENT_DURATION: Record<BattleEvent["kind"], number> = {
   mpRecover: BATTLE_EVENT_DURATION,
   money: BATTLE_EVENT_DURATION,
   party: BATTLE_EVENT_DURATION,
+  partyAction: BATTLE_EVENT_DURATION,
   turn: BATTLE_EVENT_DURATION,
   draw: BATTLE_EVENT_DURATION,
 };
@@ -140,6 +165,8 @@ export function eventAffectsPlayer(
     case "turn":
     case "draw":
       return event.playerId === playerId;
+    case "partyAction":
+      return event.playerId === playerId || event.targetId === playerId;
   }
 }
 
@@ -172,6 +199,22 @@ export function battleEventText(
       return event.previousPartyName
         ? `${resolveName(event.playerId)}が${event.previousPartyName}から${event.cardName}へ所属を変更した`
         : `${resolveName(event.playerId)}が${event.cardName}に入党した`;
+    case "partyAction": {
+      const target = event.targetId ? resolveName(event.targetId) : "?";
+      const amount = event.effect.amount;
+      switch (event.effect.kind) {
+        case "damage":
+          return `${event.partyName}が動いた！${event.actionName}：${target}に${amount}ダメージ`;
+        case "heal":
+          return `${event.partyName}が動いた！${event.actionName}：${target}のHPが${amount}回復`;
+        case "mp":
+          return `${event.partyName}が動いた！${event.actionName}：${target}のMPが${amount}回復`;
+        case "money":
+          return `${event.partyName}が動いた！${event.actionName}：${target}が${amount}円を得た`;
+        case "steal":
+          return `${event.partyName}が動いた！${event.actionName}：${target}から${amount}円を奪った`;
+      }
+    }
     case "turn":
       return event.isSelf ? "あなたのターン" : `${event.playerName}のターン`;
     case "draw":
@@ -234,7 +277,8 @@ export function splitSupportEventsBeforeAttack(
       event.kind === "heal" ||
       event.kind === "mpRecover" ||
       event.kind === "money" ||
-      event.kind === "party";
+      event.kind === "party" ||
+      event.kind === "partyAction";
     if (
       positioned &&
       typeof event.logIndex === "number" &&
@@ -343,12 +387,13 @@ export function deriveBattleEvents(
       }))
       .find(({ entry, target }) => target && target.id !== entry.playerId);
     if (attack?.target) {
+      const cardName = parseDamageCardName(attack.entry.message) ?? "攻撃";
       flights.push({
         kind: "attack",
         attackerId: attack.entry.playerId,
         defenderId: attack.target.id,
-        cardId: null,
-        cardName: parseDamageCardName(attack.entry.message) ?? "攻撃",
+        cardId: cardIdFromLogName(cardName),
+        cardName,
         amount: null,
       });
     } else {
@@ -360,12 +405,13 @@ export function deriveBattleEvents(
       );
       const defenseEntry = defenseEntries[0];
       if (attackEntry && defenseEntry) {
+        const cardName = parseAttackCardName(attackEntry.message) ?? "攻撃";
         flights.push({
           kind: "attack",
           attackerId: attackEntry.playerId,
           defenderId: defenseEntry.playerId,
-          cardId: null,
-          cardName: parseAttackCardName(attackEntry.message) ?? "攻撃",
+          cardId: cardIdFromLogName(cardName),
+          cardName,
           amount: null,
         });
       }
@@ -485,6 +531,25 @@ export function deriveBattleEvents(
         });
       }
       continue;
+    }
+
+    if (entry.kind === "special") {
+      const action = parsePartyActionLog(entry.message, next.players);
+      if (action) {
+        // Party actions fire at the end of a turn, so the log position keeps
+        // them after the attack they follow.
+        supports.push({
+          kind: "partyAction",
+          playerId: entry.playerId,
+          cardId: partyCardIdOrNull(action.partyName),
+          partyName: action.partyName,
+          actionName: action.actionName,
+          targetId: action.targetId,
+          effect: action.effect,
+          logIndex: index,
+        });
+        continue;
+      }
     }
 
     if (entry.kind === "heal") {
@@ -670,6 +735,88 @@ function partyCardId(cardName: string, partyId: string | null): string {
   return card?.id ?? partyId ?? cardName;
 }
 
+/** Party name → party card id, or `null` for an unknown label. */
+function partyCardIdOrNull(cardName: string): string | null {
+  return (
+    BASE_CARDS.find(
+      (definition) =>
+        definition.category === "party" && definition.name === cardName,
+    )?.id ?? null
+  );
+}
+
+/**
+ * `共産党が動いた！ 労働者の反撃: ボブに3ダメージ` and its four siblings.
+ *
+ * The five server shapes are damage / heal / mp / money / steal. Party actions
+ * have no state of their own beyond the log line, so the whole event is parsed
+ * from text.
+ */
+export function parsePartyActionLog(
+  message: string,
+  players: readonly { id: PlayerId; name: string }[],
+): {
+  partyName: string;
+  actionName: string;
+  targetId: PlayerId | null;
+  effect: { kind: PartyActionKind; amount: number };
+} | null {
+  const head = /^(.+?)が動いた！ (.+?): (.+)$/.exec(message);
+  if (!head?.[1] || !head[2] || !head[3]) return null;
+  const partyName = head[1].trim();
+  const actionName = head[2].trim();
+  const body = head[3].trim();
+  const idOf = (name: string): PlayerId | null =>
+    players.find((player) => player.name === name)?.id ?? null;
+
+  const damage = /^(.+?)に(\d+)ダメージ$/.exec(body);
+  if (damage?.[1] && damage[2]) {
+    return {
+      partyName,
+      actionName,
+      targetId: idOf(damage[1].trim()),
+      effect: { kind: "damage", amount: Number(damage[2]) },
+    };
+  }
+  const heal = /^(.+?)のHPが(\d+)回復$/.exec(body);
+  if (heal?.[1] && heal[2]) {
+    return {
+      partyName,
+      actionName,
+      targetId: idOf(heal[1].trim()),
+      effect: { kind: "heal", amount: Number(heal[2]) },
+    };
+  }
+  const mp = /^(.+?)のMPが(\d+)回復$/.exec(body);
+  if (mp?.[1] && mp[2]) {
+    return {
+      partyName,
+      actionName,
+      targetId: idOf(mp[1].trim()),
+      effect: { kind: "mp", amount: Number(mp[2]) },
+    };
+  }
+  const money = /^(.+?)が(\d+)円を得た$/.exec(body);
+  if (money?.[1] && money[2]) {
+    return {
+      partyName,
+      actionName,
+      targetId: idOf(money[1].trim()),
+      effect: { kind: "money", amount: Number(money[2]) },
+    };
+  }
+  const steal = /^(.+?)から(\d+)円を奪った$/.exec(body);
+  if (steal?.[1] && steal[2]) {
+    return {
+      partyName,
+      actionName,
+      targetId: idOf(steal[1].trim()),
+      effect: { kind: "steal", amount: Number(steal[2]) },
+    };
+  }
+  return null;
+}
+
 function parseNumber(message: string, pattern: RegExp): number | null {
   const match = pattern.exec(message);
   const value = match?.[1];
@@ -690,4 +837,17 @@ function parseAttackCardName(message: string): string | null {
   const match = /が(.+?)で攻撃/.exec(message);
   const value = match?.[1]?.trim();
   return value ? value : null;
+}
+
+/**
+ * Resolve a card id from the card name in the combat log.
+ *
+ * Duplicated from `cardIdFromLogName` in battleSequence: battleSequence already
+ * imports from this module, so importing back would create a cycle. Combined
+ * attacks are logged as `A+B`; the primary card is the first name.
+ */
+function cardIdFromLogName(name: string | null): string | null {
+  const primary = name?.split("+")[0]?.trim();
+  if (!primary) return null;
+  return BASE_CARDS.find((card) => card.name === primary)?.id ?? null;
 }

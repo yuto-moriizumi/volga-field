@@ -18,7 +18,12 @@ import type {
   DoomsdayDevil,
   PartyAction,
 } from "@volga/game-core";
-import type { CardCategory, PartyId } from "@volga/shared";
+import type { CardCategory, CardAttribute, PartyId } from "@volga/shared";
+import {
+  ATTRIBUTE_ORDER,
+  attributeLabel,
+  attackDefenseRule,
+} from "../attributes";
 
 /**
  * 教典のカード情報は packages/game-core の実装データから生成する。
@@ -32,6 +37,8 @@ export interface CatalogCard {
   emoji: string;
   category: CardCategory;
   description: string;
+  /** バトル属性（防御の可否を決める）。game-core の定義をそのまま写す。 */
+  attribute: CardAttribute;
   /** 相手に与えるダメージ */
   damage: number;
   /** 攻撃力上昇 */
@@ -67,6 +74,7 @@ export function toCatalogCard(card: CardDefinition): CatalogCard {
     emoji: card.emoji,
     category: card.category,
     description: card.description,
+    attribute: card.attribute,
     damage,
     attackPower,
     attack: damage + attackPower,
@@ -199,6 +207,16 @@ export interface RuleSection {
   lines: string[];
 }
 
+/** 属性と防御の関係は game-core の判定から文にする。 */
+export const ATTRIBUTE_RULE_LINES: string[] = [
+  "武器・盾・雑貨などのカードには属性がある。攻撃の属性は、その行動で使ったカードの属性をまとめて決まる。",
+  "盾にも属性があり、攻撃の属性に合う盾でしか防げない。",
+  ...ATTRIBUTE_ORDER.map(
+    (attribute) =>
+      `${attributeLabel(attribute)}の攻撃: ${attackDefenseRule(attribute)}。`,
+  ),
+];
+
 export const RULES: RuleSection[] = [
   {
     title: "基本",
@@ -220,6 +238,10 @@ export const RULES: RuleSection[] = [
       "防御のときは防御カードを複数枚同時に使える。",
       "HPが0になったプレイヤーは敗北し、最後まで生存した1人が勝利する。",
     ],
+  },
+  {
+    title: "属性と防御",
+    lines: ATTRIBUTE_RULE_LINES,
   },
   {
     title: "終末の時",
@@ -295,14 +317,14 @@ export const CATEGORIES: TextbookCategory[] = [
     title: "武器",
     variant: "card-grid",
     cards: cardsByCategory("weapon"),
-    note: CARD_DRAW_NOTE,
+    note: `武器は属性ごとに並んでいます。攻撃の属性は、同じ行動で使ったカードの属性をまとめて決まります。${CARD_DRAW_NOTE}`,
   },
   {
     id: "bugu",
     title: "防具",
     variant: "card-grid",
     cards: cardsByCategory("shield"),
-    note: CARD_DRAW_NOTE,
+    note: `盾にも属性があります。攻撃の属性ごとに防げる盾の属性が決まっていて、たとえば社会主義の攻撃は資本主義の盾でしか防げません。${CARD_DRAW_NOTE}`,
   },
   {
     id: "zakka",

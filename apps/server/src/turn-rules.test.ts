@@ -3,7 +3,7 @@ import test from "node:test";
 import { WebSocket } from "ws";
 import { INITIAL_HAND_SIZE, createGame, findCard } from "@volga/game-core";
 import type { GameState, PlayerState, ServerMessage } from "@volga/shared";
-import { finishTurn, startServer } from "./index.js";
+import { finishTurn, pickAiDefenseCards, startServer } from "./index.js";
 import { createRoom, type Room } from "./room.js";
 
 const MESSAGE_TIMEOUT_MS = 4000;
@@ -361,6 +361,138 @@ test("non-attack cards also end the turn", async (t) => {
     INITIAL_HAND_SIZE,
     "one card was used, so one card is drawn",
   );
+});
+
+test("a used miracle stays in hand and the turn still draws one card", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  // ヒールはダメージなしなので防御待ちにならず、奇跡の使用だけを検証できる。
+  const room = await createTrainingRoom(client, (human) =>
+    human.hand.some((cardRef) => cardRef.id === "heal") && human.mp >= 7
+      ? "heal"
+      : null,
+  );
+  const initialActionTurn = room.state.actionTurn;
+  const mpBefore = room.state.players[room.humanIndex]!.mp;
+
+  client.send({ type: "play_card", cardRef: { id: room.cardId } });
+
+  const effect = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn &&
+      msg.gameState.pendingAttack === null &&
+      msg.gameState.players[room.humanIndex]!.mp === mpBefore - 7,
+  );
+  assert.equal(effect.type, "game_state");
+  if (effect.type !== "game_state") return;
+
+  const human = effect.gameState.players[room.humanIndex]!;
+  // 奇跡は手札から消えない。
+  assert.equal(human.hand.length, INITIAL_HAND_SIZE);
+  assert.ok(human.hand.some((cardRef) => cardRef.id === "heal"));
+  // 習得済みには追加されない（演出で二重に出さない）。
+  assert.deepEqual(human.learnedMiracles, []);
+  assert.equal(
+    effect.gameState.log.some((entry) => entry.message.includes("習得")),
+    false,
+  );
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  // 使用した1枚ぶんは引かれる（手札に残った奇跡の上に1枚増える）。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE + 1,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("1枚ドロー")),
+  );
+  assert.equal(ended.gameState.winner, null);
+});
+
+test("a combined attack counts every played card for the draw", async (t) => {
+  const server = await startServer({ port: 0 });
+  const client = await TestClient.connect(server.port);
+  t.after(async () => {
+    client.close();
+    await server.close();
+  });
+
+  const isAttackWeapon = (id: string) => {
+    const card = findCard(id);
+    return (
+      card?.category === "weapon" &&
+      card.effects.some(
+        (effect) => effect.kind === "damage" && effect.target === "opponent",
+      )
+    );
+  };
+  const isSupportWeapon = (id: string) => {
+    const card = findCard(id);
+    return (
+      card?.category === "weapon" &&
+      card.effects.some((effect) => effect.kind === "attack_power")
+    );
+  };
+
+  const room = await findTrainingRoom(client, (human) => {
+    const ids = human.hand.map((cardRef) => cardRef.id);
+    return ids.some(isAttackWeapon) && ids.some(isSupportWeapon);
+  });
+  const hand = room.state.players[room.humanIndex]!.hand;
+  const attackId = hand.find((cardRef) => isAttackWeapon(cardRef.id))!.id;
+  const supportId = hand.find((cardRef) => isSupportWeapon(cardRef.id))!.id;
+  const initialActionTurn = room.state.actionTurn;
+
+  client.send({
+    type: "play_card",
+    cardRefs: [{ id: attackId }, { id: supportId }],
+    targetPlayerId: room.aiId,
+  });
+
+  const pending = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.pendingAttack !== null &&
+      msg.gameState.pendingAttack.attackerId === room.humanId,
+  );
+  assert.equal(pending.type, "game_state");
+  if (pending.type !== "game_state") return;
+  assert.deepEqual(
+    pending.gameState.pendingAttack?.cards,
+    [{ id: attackId }, { id: supportId }],
+    "the pending attack carries every card in play order",
+  );
+
+  const ended = await client.next(
+    (msg) =>
+      msg.type === "game_state" &&
+      msg.gameState.actionTurn === initialActionTurn + 1 &&
+      msg.gameState.activePlayerIndex === room.aiIndex,
+  );
+  assert.equal(ended.type, "game_state");
+  if (ended.type !== "game_state") return;
+  // 2枚プレイしたので2枚引く（9 - 2 + 2 = 9）。
+  assert.equal(
+    ended.gameState.players[room.humanIndex]!.hand.length,
+    INITIAL_HAND_SIZE,
+  );
+  assert.ok(
+    ended.gameState.log.some((entry) => entry.message.includes("2枚ドロー")),
+  );
+  assert.equal(ended.gameState.winner, null);
 });
 
 test("join-party cards end the turn", async (t) => {
@@ -830,9 +962,52 @@ test("finishTurn refuses to advance the turn after victory or during defense", (
       card: { id: "fire" },
       cardName: "ファイア",
       amount: 4,
+      attribute: "none",
     },
   };
   assert.equal(finishTurn(room), false);
   assert.equal(room.gameState.activePlayerIndex, 0);
   assert.equal(room.gameState.actionTurn, 1);
 });
+
+test("AI defense picks an attribute-compatible shield and passes against environmentalism", () => {
+  const room: Room = createRoom("ai-defense-room", {
+    id: "human",
+    ws: null,
+    name: "Human",
+    ready: true,
+  });
+  room.players.push({ id: "ai", ws: null, name: "AI", ready: true, ai: true });
+  const created = createGame(
+    room.id,
+    room.players.map((p) => ({ id: p.id, name: p.name })),
+  );
+  room.gameState = {
+    ...created.state,
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "human",
+      defenderId: "ai",
+      card: { id: "socialist_strike_3" },
+      cardName: "国有化攻勢",
+      amount: 3,
+      attribute: "socialism",
+    },
+    players: created.state.players.map((player) =>
+      player.id === "ai"
+        ? {
+            ...player,
+            hand: [{ id: "leaf_shield" }, { id: "shield" }],
+          }
+        : player,
+    ),
+  };
+  room.started = true;
+
+  // leaf_shield は資本主義属性（社会主義属性の攻撃を防げる）、shield は無属性（防げない）。
+  assert.deepEqual(pickAiDefenseCards(room, "ai"), [{ id: "leaf_shield" }]);
+
+  room.gameState.pendingAttack!.attribute = "environmentalism";
+  assert.deepEqual(pickAiDefenseCards(room, "ai"), []);
+});
+

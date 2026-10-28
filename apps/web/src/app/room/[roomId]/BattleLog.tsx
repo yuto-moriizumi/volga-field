@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { BattleLogEntry } from "@volga/shared";
 
 const KIND_ICON: Record<BattleLogEntry["kind"], string> = {
@@ -13,56 +14,47 @@ const KIND_ICON: Record<BattleLogEntry["kind"], string> = {
   mpRecover: "✧",
 };
 
+/** Distance from the bottom (px) that still counts as "following the log". */
+const STICK_THRESHOLD = 24;
+
 export function BattleLog({ entries }: { entries: BattleLogEntry[] }) {
   const last = entries.slice(-30);
+  const listRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+
+  // The log keeps a fixed height, so new entries scroll inside it instead of
+  // moving the hand. Follow the newest entry unless the player scrolled up.
+  useEffect(() => {
+    const list = listRef.current;
+    if (list && stickToBottom.current) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }, [entries.length]);
+
   return (
     <div className="gf-card gf-info-log">
-      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+      <div className="gf-info-log-inner">
         <div className="gf-section-title">戦記</div>
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            maxHeight: 180,
-            overflowY: "auto",
+          className="gf-info-log-list"
+          ref={listRef}
+          onScroll={() => {
+            const list = listRef.current;
+            if (!list) return;
+            stickToBottom.current =
+              list.scrollHeight - list.scrollTop - list.clientHeight < STICK_THRESHOLD;
           }}
         >
           {last.length === 0 && (
-            <div style={{ fontSize: 12, color: "var(--text-dark-soft)" }}>
-              まだ何も起きていない…
-            </div>
+            <div className="gf-info-log-empty">まだ何も起きていない…</div>
           )}
           {last.map((e, i) => (
-            <div
-              key={i}
-              style={{
-                fontSize: 12,
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                padding: "4px 8px",
-                background: i % 2 ? "rgba(255,255,255,0.4)" : "transparent",
-                borderRadius: 6,
-              }}
-            >
-              <span style={{ opacity: 0.6, fontWeight: 900 }}>T{e.turn}</span>
-              <span style={{ width: 16, textAlign: "center" }}>
-                {KIND_ICON[e.kind]}
-              </span>
-              <span style={{ flex: 1 }}>{e.message}</span>
+            <div key={i} className="gf-info-log-entry">
+              <span className="gf-info-log-turn">T{e.turn}</span>
+              <span className="gf-info-log-icon">{KIND_ICON[e.kind]}</span>
+              <span className="gf-info-log-message">{e.message}</span>
               {e.damage !== undefined && (
-                <span
-                  style={{
-                    color: "#b03030",
-                    fontWeight: 900,
-                    background: "#ffe2d6",
-                    padding: "1px 8px",
-                    borderRadius: 999,
-                  }}
-                >
-                  -{e.damage}
-                </span>
+                <span className="gf-info-log-damage">-{e.damage}</span>
               )}
             </div>
           ))}

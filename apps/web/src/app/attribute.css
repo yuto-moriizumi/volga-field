@@ -1,0 +1,220 @@
+/*
+ * 属性（社会主義・資本主義…）の表示だけをまとめた追加スタイル。
+ * globals.css の後に読み込み、カードの寸法は変えない。
+ */
+
+.gf-attr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #5f6d69;
+  background: #e8efec;
+  border-color: #a9b8b3;
+}
+
+.gf-attr-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.gf-attr-badge[data-attribute="none"] {
+  color: #5f6d69;
+  background: #e8efec;
+  border-color: #a9b8b3;
+}
+
+.gf-attr-badge[data-attribute="socialism"] {
+  color: #9d352a;
+  background: #fbe5df;
+  border-color: #d99a8f;
+}
+
+.gf-attr-badge[data-attribute="capitalism"] {
+  color: #82600f;
+  background: #faf0cd;
+  border-color: #d3b25c;
+}
+
+.gf-attr-badge[data-attribute="republicanism"] {
+  color: #2a6486;
+  background: #dcebf4;
+  border-color: #8db7ce;
+}
+
+.gf-attr-badge[data-attribute="feudalism"] {
+  color: #5c4382;
+  background: #ece4f5;
+  border-color: #ab96c9;
+}
+
+.gf-attr-badge[data-attribute="environmentalism"] {
+  color: #33703b;
+  background: #dceddb;
+  border-color: #8bbd90;
+}
+
+.gf-attr-badge[data-attribute="anarchism"] {
+  color: #3f3a3a;
+  background: #e6e2de;
+  border-color: #a8a09a;
+}
+
+/* 名前の行にバッジを並べる。名前は省略記号で縮み、カードの高さは変えない。 */
+.gf-large-card-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gf-large-card-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gf-large-card-name .gf-attr-badge {
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+/* 使用先（防御）の名前の下に出す、攻撃属性と防御できる盾の案内。 */
+.gf-target-attr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px 9px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid var(--line-teal);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #2f6b63;
+}
+
+.gf-target-attr.is-blocked {
+  background: #fdeceb;
+  border-color: #d99a8f;
+  color: #9d352a;
+}
+
+.gf-target-attr-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #5a6b68;
+}
+
+/* 教典: 属性ごとにまとめたカード一覧。 */
+.gf-attr-groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 2px solid var(--line-teal);
+  border-radius: 10px;
+}
+
+.gf-attr-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gf-attr-group-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.gf-attr-group-behavior {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #46564f;
+}
+
+.gf-attr-group-count {
+  font-size: 11px;
+  font-weight: 900;
+  color: #5a6b68;
+}
+
+/* 既存のタイルグリッドを、グループ内では枠なしの並びとして使う。 */
+.gf-attr-group-grid {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+}
+
+.gf-attr-group-grid[data-attribute="none"] .gf-textbook-tile {
+  border-color: #a9b8b3;
+}
+
+.gf-attr-group-grid[data-attribute="socialism"] .gf-textbook-tile {
+  border-color: #d99a8f;
+}
+
+.gf-attr-group-grid[data-attribute="capitalism"] .gf-textbook-tile {
+  border-color: #d3b25c;
+}
+
+.gf-attr-group-grid[data-attribute="republicanism"] .gf-textbook-tile {
+  border-color: #8db7ce;
+}
+
+.gf-attr-group-grid[data-attribute="feudalism"] .gf-textbook-tile {
+  border-color: #ab96c9;
+}
+
+.gf-attr-group-grid[data-attribute="environmentalism"] .gf-textbook-tile {
+  border-color: #8bbd90;
+}
+
+.gf-attr-group-grid[data-attribute="anarchism"] .gf-textbook-tile {
+  border-color: #a8a09a;
+}
+
+/* 属性を説明するルール節の用語リスト。 */
+.gf-attr-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+}
+
+.gf-attr-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.gf-attr-legend-note {
+  font-size: 11px;
+  color: #5a6b68;
+}

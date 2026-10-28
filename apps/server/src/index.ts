@@ -13,6 +13,7 @@ import {
   type GameState,
 } from "@volga/shared";
 import {
+  canDefendAttribute,
   confirmBuy,
   createGame,
   defendAttack,
@@ -20,6 +21,7 @@ import {
   endTurn,
   exchangeStats,
   findCard,
+  getCardAttribute,
   playCard,
   sellCards,
   shuffleHand,
@@ -122,12 +124,17 @@ function defensePower(cardRef: CardRef): number {
   );
 }
 
-function pickAiDefenseCards(room: Room, aiId: PlayerId): CardRef[] {
+export function pickAiDefenseCards(room: Room, aiId: PlayerId): CardRef[] {
   const aiState = room.gameState?.players.find((p) => p.id === aiId);
-  const pendingAmount = room.gameState?.pendingAttack?.amount ?? 0;
+  const pending = room.gameState?.pendingAttack;
+  const pendingAmount = pending?.amount ?? 0;
+  const attackAttribute = pending?.attribute ?? "none";
   const cards =
     aiState?.hand
       .filter((cardRef) => defensePower(cardRef) > 0)
+      .filter((cardRef) =>
+        canDefendAttribute(getCardAttribute(cardRef.id), attackAttribute),
+      )
       .sort((a, b) => defensePower(b) - defensePower(a)) ?? [];
   const selected: CardRef[] = [];
   let total = 0;
@@ -198,15 +205,17 @@ function runAiTurn(room: Room): void {
     const aiState = room.gameState.players.find((p) => p.id === ai.id);
     const target = room.gameState.players.find((p) => p.id !== ai.id && p.hp > 0);
     const card = aiState?.hand.find((c) => findCard(c.id)?.category !== "trade");
-    const handBefore = aiState?.hand.length ?? 0;
+    // AI は1行動につき1枚だけプレイする。奇跡カードは手札に残るため、
+    // 手札の増減ではなくプレイの成否で使用枚数を数える。
+    let cardsUsed = 0;
     if (card) {
       const played = playCard(room.gameState, ai.id, { id: card.id }, target?.id);
       if (played.ok) {
         room.gameState = played.state;
         broadcastStateToAll(room);
+        cardsUsed = 1;
       }
     }
-    const cardsUsed = handDelta(room.gameState, ai.id, handBefore);
     room.pendingCardsUsed = cardsUsed;
 
     resolveAiDefense(room);
@@ -470,8 +479,6 @@ function handlePlayCard(
     send(client.ws, { type: "error", message: "no card to play" });
     return;
   }
-  const handBefore =
-    room.gameState.players.find((p) => p.id === client.id)?.hand.length ?? 0;
   const result = playCard(
     room.gameState,
     client.id,
@@ -483,7 +490,9 @@ function handlePlayCard(
     return;
   }
   room.gameState = result.state;
-  const cardsUsed = handDelta(room.gameState, client.id, handBefore);
+  // 奇跡カードは使用後も手札に残るので、手札の増減ではなく実際にプレイした
+  // 枚数（武器＋攻撃力カードの合成を含む）で数える。
+  const cardsUsed = cardIds.length;
   broadcastStateToAll(room);
   broadcastRoom(room, {
     type: "card_played",

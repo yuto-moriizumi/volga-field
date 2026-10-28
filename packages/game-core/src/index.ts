@@ -26,6 +26,8 @@ export type {
   Rng,
 } from "./parties.js";
 export {
+  aggregateAttackAttributes,
+  canDefendAttribute,
   createGame,
   defendAttack,
   discardCards,

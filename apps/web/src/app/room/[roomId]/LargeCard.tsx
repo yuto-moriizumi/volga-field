@@ -3,10 +3,17 @@
 import { findCard } from "@volga/game-core";
 import type { CardDefinition } from "@volga/game-core";
 import type { CardRef } from "@volga/shared";
+import { AttributeBadge } from "../../attributes";
 
 export function LargeCard({ cardRef }: { cardRef: CardRef }) {
   const card = findCard(cardRef.id);
   if (!card) return null;
+  // 武器と盾は無属性でもバッジを出す（防御の判断に属性が要るため）。
+  // それ以外のカードは属性を持つときだけ出す。
+  const showAttribute =
+    card.category === "weapon" ||
+    card.category === "shield" ||
+    card.attribute !== "none";
   if (card.category === "trade") {
     return (
       <div className="gf-large-card">
@@ -26,7 +33,10 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
         {card.emoji}
       </div>
       <div className="gf-large-card-body">
-        <div className="gf-large-card-name">{card.name}</div>
+        <div className="gf-large-card-name">
+          <span className="gf-large-card-name-text">{card.name}</span>
+          {showAttribute && <AttributeBadge attribute={card.attribute} />}
+        </div>
         <div className="gf-large-card-power">
           {largeCardPower(card)}
           {typeof card.price === "number" && card.price > 0 && (

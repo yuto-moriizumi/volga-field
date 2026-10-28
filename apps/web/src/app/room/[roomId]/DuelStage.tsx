@@ -5,10 +5,13 @@ import { LargeCard } from "./LargeCard";
 import {
   duelStageAnnouncement,
   duelTurnText,
+  partyActionAnnouncement,
+  partyEffectLabel,
   type DuelCard,
   type DuelEffect,
   type DuelPresentation,
   type DuelTurn,
+  type PartyPresentation,
 } from "./battleSequence";
 
 /**
@@ -126,8 +129,60 @@ export function DuelTurnView({ turn }: { turn: DuelTurn }) {
   );
 }
 
-export function DuelDrawChip({ count }: { count: number }) {
-  if (count <= 0) return null;
+/**
+ * The party action as a card in the left field: party emoji, party name, the
+ * effect amount and the action name in the description slot. Deliberately the
+ * same anatomy as `LargeCard`, in the party (amber) tone instead of attack red.
+ */
+export function PartyActionCard({ party }: { party: PartyPresentation }) {
+  const definition = party.cardId ? findCard(party.cardId) : null;
+  const emoji = definition?.emoji ?? "🚩";
+  return (
+    <div className="gf-party-action-card" data-step="party-card">
+      <div className="gf-party-action-art" aria-hidden="true">
+        {emoji}
+      </div>
+      <div className="gf-party-action-body">
+        <div className="gf-party-action-name">{party.partyName}</div>
+        <div className="gf-party-action-power">
+          {partyEffectLabel(party.effect)}
+        </div>
+        <div className="gf-party-action-desc">{party.actionName}</div>
+      </div>
+    </div>
+  );
+}
+
+/** What the party action did to the target, shown on the right side. */
+export function PartyImpactView({ party }: { party: PartyPresentation }) {
+  const { kind, amount } = party.effect;
+  const lost = kind === "damage" || kind === "steal";
+  const unit = kind === "heal" ? "HP" : kind === "mp" ? "MP" : kind === "money" || kind === "steal" ? "￥" : "";
+  return (
+    <div
+      className="gf-party-impact"
+      data-kind={kind}
+      data-step="party-effect"
+      aria-hidden="true"
+    >
+      <div className="gf-party-impact-value">
+        {lost ? `-${amount}` : `+${amount}`}
+        {unit && <small>{unit}</small>}
+      </div>
+      <div className="gf-party-impact-label">{party.actionName}</div>
+    </div>
+  );
+}
+
+export function PartyAnnouncer({ party }: { party: PartyPresentation }) {
+  return (
+    <p className="gf-duel-live" role="status" aria-live="polite">
+      {partyActionAnnouncement(party)}
+    </p>
+  );
+}
+
+export function DuelDrawChip({ count }: { count: number }) {  if (count <= 0) return null;
   return (
     <div className="gf-duel-draw" data-step="draw">
       <span aria-hidden="true">🃏</span> {count}枚ドロー

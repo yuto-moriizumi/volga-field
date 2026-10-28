@@ -1154,6 +1154,13 @@ a {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* 場に置いたカードは上ぞろえ。空状態の「ターン終了」などは従来どおり下に置く。 */
+.gf-confirm-zone:has(.gf-confirm-card-stack) {
+  align-items: flex-start;
+  padding-top: 22px;
+  padding-bottom: 0;
+}
+
 .gf-confirm-card-stack {
   width: 100%;
   display: flex;
@@ -1783,6 +1790,54 @@ a {
   outline: 4px solid #ffdf4f;
 }
 
+/*
+ * Cards that cannot be used in the current step (attack turn, defense step,
+ * discard/sell mode, opponent's turn). They stay identifiable but read as
+ * clearly dormant: flat cream-grey body, dashed outline (shape cue, not just
+ * colour), washed art and caption. Playable cards keep their vivid category
+ * colours untouched.
+ */
+.gf-hand-card[data-playable="false"] {
+  background: #e9e7db;
+  border-style: dashed;
+  border-color: #b3b0a0;
+  color: #5c5f56;
+  cursor: default;
+  box-shadow: none;
+  opacity: 0.66;
+}
+
+/* Desaturate the art + caption only, so a yellow selection ring stays yellow. */
+.gf-hand-card[data-playable="false"] .gf-hand-card-art,
+.gf-hand-card[data-playable="false"] .gf-hand-card-caption {
+  filter: grayscale(1);
+}
+
+.gf-hand-card[data-playable="false"] .gf-hand-card-art {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.gf-hand-card[data-playable="false"] .gf-hand-card-caption {
+  background: #dcdacd;
+  color: #4a4d45;
+}
+
+.gf-hand-card[data-playable="false"] .gf-hand-card-caption small {
+  color: #8b8d83;
+}
+
+.gf-hand-card[data-playable="false"] .gf-hand-card-price {
+  color: #8b8d83;
+  border-color: #b9b6a6;
+}
+
+/* Keep a selected card obvious even if the state became unavailable. */
+.gf-hand-card[data-playable="false"][data-selected="true"] {
+  opacity: 0.82;
+  transform: translateY(-12px);
+  outline: 4px solid #ffdf4f;
+}
+
 .gf-hand-card-hidden {
   background: repeating-linear-gradient(45deg, #58bd9b 0 8px, #3a9b82 8px 16px);
   color: #fff;
@@ -1826,6 +1881,8 @@ a {
 
 .gf-info-card {
   width: 100%;
+  /* Pinned so hovering a card (empty -> LargeCard) cannot nudge the hand. */
+  height: 96px;
   min-height: 96px;
   background: #d9ffd0;
   border: 4px solid #58bd9b;
@@ -1838,7 +1895,7 @@ a {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 96px;
+  height: 100%;
   background: rgba(255, 255, 255, 0.4);
   color: #4a6b62;
   font-size: 16px;
@@ -1847,10 +1904,75 @@ a {
 }
 
 .gf-info-log {
-  flex: 1;
+  /* A fixed height keeps the battle log from resizing the row below the field.
+     Every entry past this height scrolls inside the log instead of moving the
+     hand up. */
+  flex: 0 0 auto;
+  height: clamp(170px, 23vh, 230px);
   min-height: 0;
   border-radius: 8px;
   border-width: 2px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gf-info-log-inner {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gf-info-log-list {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gf-info-log-entry {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.gf-info-log-entry:nth-child(even) {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.gf-info-log-turn {
+  opacity: 0.6;
+  font-weight: 900;
+}
+
+.gf-info-log-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.gf-info-log-message {
+  flex: 1;
+}
+
+.gf-info-log-damage {
+  color: #b03030;
+  font-weight: 900;
+  background: #ffe2d6;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.gf-info-log-empty {
+  font-size: 12px;
+  color: var(--text-dark-soft);
 }
 
 .gf-empty-hand {
@@ -2906,6 +3028,81 @@ a {
   border-color: #4b8bd8;
 }
 
+/*
+ * Several cards played at once (weapon + power-ups) stack vertically in play
+ * order, like the confirm preview. A single card keeps the roomy 90px card;
+ * two or more shrink step by step so the stack always fits the left field.
+ */
+.gf-duel-attack-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.gf-duel-attack-stack .gf-duel-card {
+  flex: 0 0 auto;
+}
+
+.gf-duel-attack-stack[data-count="2"] .gf-duel-card .gf-large-card {
+  height: 68px;
+}
+
+.gf-duel-attack-stack[data-count="3"] .gf-duel-card .gf-large-card {
+  height: 58px;
+}
+
+.gf-duel-attack-stack[data-count="4"] .gf-duel-card .gf-large-card {
+  height: 52px;
+}
+
+/* Compact card typography once the stack holds more than one card: name and
+   power stay readable, the description (unreadable at this size) steps aside. */
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card {
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card-body {
+  padding: 2px 5px;
+  min-width: 0;
+}
+
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card-name {
+  height: 26px;
+  font-size: 17px;
+  line-height: 22px;
+  padding: 0 4px;
+}
+
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card-power {
+  font-size: 17px;
+  line-height: 1.05;
+  padding-left: 19px;
+}
+
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card-art {
+  font-size: 32px;
+}
+
+.gf-duel-attack-stack:not([data-count="1"]) .gf-large-card-desc {
+  display: none;
+}
+
+.gf-duel-attack-stack[data-count="4"] .gf-large-card-name {
+  height: 22px;
+  font-size: 15px;
+  line-height: 18px;
+}
+
+.gf-duel-attack-stack[data-count="4"] .gf-large-card-power {
+  font-size: 15px;
+}
+
+.gf-duel-attack-stack[data-count="4"] .gf-large-card-art {
+  font-size: 26px;
+}
+
 .gf-duel-card-plain {
   display: flex;
   align-items: center;
@@ -2961,6 +3158,101 @@ a {
   align-items: center;
   justify-content: center;
   gap: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Party actions: the same stage as a duel, in the amber party tone    */
+/* ------------------------------------------------------------------ */
+
+.gf-party-action-card {
+  width: 100%;
+  height: 90px;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  background: #fff7e2;
+  border: 4px solid #d8a64a;
+  border-radius: 4px;
+  overflow: hidden;
+  animation: gf-duel-in 0.3s ease both;
+}
+
+.gf-party-action-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.55);
+  border-right: 4px solid #d8a64a;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.gf-party-action-body {
+  min-width: 0;
+  padding: 3px 6px;
+  text-align: left;
+}
+
+.gf-party-action-name {
+  height: 31px;
+  padding: 0 5px;
+  border: 2px solid #e2bb6c;
+  background: rgba(255, 255, 255, 0.45);
+  color: #5c3f12;
+  font-size: 20px;
+  line-height: 27px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.gf-party-action-power {
+  padding-left: 28px;
+  color: #7a4c0e;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.gf-party-action-desc {
+  padding-left: 28px;
+  color: #6b4a13;
+  font-size: 14px;
+  line-height: 1.1;
+  overflow: hidden;
+}
+
+.gf-party-impact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 26px;
+  border: 4px solid #d8a64a;
+  border-radius: 12px;
+  background: #fff7e2;
+  box-shadow: 0 6px 0 rgba(120, 92, 30, 0.14);
+  animation: gf-duel-in 0.3s ease both;
+}
+
+.gf-party-impact-value {
+  color: #7a4c0e;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.gf-party-impact-value small {
+  margin-left: 3px;
+  font-size: 18px;
+}
+
+.gf-party-impact[data-kind="damage"] .gf-party-impact-value,
+.gf-party-impact[data-kind="steal"] .gf-party-impact-value {
+  color: #b03030;
+}
+
+.gf-party-impact-label {
+  color: #6b4a13;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .gf-duel-defense {

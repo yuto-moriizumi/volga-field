@@ -1,4 +1,4 @@
-import type { CardCategory, PartyId } from "@volga/shared";
+import type { CardAttribute, CardCategory, PartyId } from "@volga/shared";
 import { POLITICAL_ARMORS } from "./armors.js";
 
 export type Target = "self" | "opponent" | "either";
@@ -17,12 +17,45 @@ export interface CardDefinition {
   emoji: string;
   description: string;
   effects: CardEffect[];
+  /** Battle attribute used by attack aggregation and defense compatibility. */
+  attribute: CardAttribute;
   mpCost?: number;
   price?: number;
   customTags?: string[];
 }
 
-export const BASE_CARDS: CardDefinition[] = [
+/** タグから決まる武器の属性。タグを持たないカードは無属性。 */
+const TAG_ATTRIBUTES: Record<string, CardAttribute> = {
+  socialism: "socialism",
+  capitalism: "capitalism",
+  republicanism: "republicanism",
+  feudalism: "feudalism",
+  environmentalism: "environmentalism",
+  anarchism: "anarchism",
+};
+
+export function attributeFromTags(tags: string[] | undefined): CardAttribute {
+  for (const tag of tags ?? []) {
+    const attribute = TAG_ATTRIBUTES[tag];
+    if (attribute) return attribute;
+  }
+  return "none";
+}
+
+/** 防御カードに無属性・社会主義・資本主義・共和主義・封建主義を順番に割り当てるための循環。 */
+const SHIELD_ATTRIBUTES: CardAttribute[] = [
+  "none",
+  "socialism",
+  "capitalism",
+  "republicanism",
+  "feudalism",
+];
+
+type CardDefinitionInput = Omit<CardDefinition, "attribute"> & {
+  attribute?: CardAttribute;
+};
+
+const CARD_DEFINITIONS: CardDefinitionInput[] = [
   {
     id: "sword",
     name: "剣",
@@ -1563,6 +1596,28 @@ export const BASE_CARDS: CardDefinition[] = [
     effects: [],
   },
 ];
+
+/**
+ * 武器の属性は customTags から、防御カードの属性は無属性・社会主義・資本主義・共和主義・封建主義の循環から決める。
+ * これによりカード定義を手で編集せずに全カードへ属性を付与できる。
+ */
+export const BASE_CARDS: CardDefinition[] = (() => {
+  let shieldIndex = 0;
+  return CARD_DEFINITIONS.map((card) => {
+    if (card.attribute) return { ...card, attribute: card.attribute };
+    if (card.category === "shield") {
+      const attribute =
+        SHIELD_ATTRIBUTES[shieldIndex % SHIELD_ATTRIBUTES.length]!;
+      shieldIndex += 1;
+      return { ...card, attribute };
+    }
+    return { ...card, attribute: attributeFromTags(card.customTags) };
+  });
+})();
+
+export function getCardAttribute(id: string): CardAttribute {
+  return findCard(id)?.attribute ?? "none";
+}
 
 export function findCard(id: string): CardDefinition | undefined {
   return BASE_CARDS.find((c) => c.id === id);

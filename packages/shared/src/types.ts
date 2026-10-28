@@ -10,6 +10,15 @@ export type CardCategory =
   | "misc"
   | "party";
 
+export type CardAttribute =
+  | "none"
+  | "socialism"
+  | "capitalism"
+  | "republicanism"
+  | "feudalism"
+  | "environmentalism"
+  | "anarchism";
+
 export type PartyId =
   | "communist_party"
   | "ldp"
@@ -46,8 +55,12 @@ export interface PendingAttack {
   attackerId: PlayerId;
   defenderId: PlayerId;
   card: CardRef;
+  /** Every card played in the action, in play order (support cards included). */
+  cards?: CardRef[];
   cardName: string;
   amount: number;
+  /** Aggregated attribute of every card in the action. Undefined means "none". */
+  attribute?: CardAttribute;
 }
 
 export interface PendingBuy {

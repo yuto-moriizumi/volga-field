@@ -1,12 +1,12 @@
 import type { CardDefinition } from "./cards.js";
 
-/** 政治的防御カード（防具）を共通フォーマットで生成する。 */
+/** 政治的防御カード（防具）を共通フォーマットで生成する。属性は cards.ts で付与する。 */
 export function politicalArmor(
   id: string,
   name: string,
   emoji: string,
   defense: number,
-): CardDefinition {
+): Omit<CardDefinition, "attribute"> {
   return {
     id,
     name,
@@ -27,7 +27,7 @@ export function politicalArmor(
 }
 
 /** 防具カテゴリの政治的カード。既存の3枚と合わせて50枚になる。 */
-export const POLITICAL_ARMORS: CardDefinition[] = [
+export const POLITICAL_ARMORS: Omit<CardDefinition, "attribute">[] = [
   // 防御力1
   politicalArmor("namecard", "名刺", "💳", 1),
   politicalArmor("party_flyer", "政党ビラ", "📄", 1),

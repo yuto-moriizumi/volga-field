@@ -1,13 +1,15 @@
 "use client";
 
-import { findCard } from "@volga/game-core";
-import type { CardRef, PlayerState } from "@volga/shared";
+import { canDefendAttribute, findCard, getCardAttribute } from "@volga/game-core";
+import type { CardAttribute, CardRef, PlayerState } from "@volga/shared";
 import { CardView } from "./CardView";
 
 interface HandAreaProps {
   me: PlayerState | null;
   canAct: boolean;
   isDefending: boolean;
+  /** 防御する攻撃の属性。undefined は無属性。 */
+  attackAttribute?: CardAttribute;
   selectedCardIdxes: number[];
   selectedDefenseIdxes: number[];
   discardMode: boolean;
@@ -27,6 +29,7 @@ export function HandArea({
   me,
   canAct,
   isDefending,
+  attackAttribute,
   selectedCardIdxes,
   selectedDefenseIdxes,
   discardMode,
@@ -55,6 +58,12 @@ export function HandArea({
           const canDiscardCard = discardMode && !isLearned;
           const canSellCard =
             sellMode && !isLearned && !isSellCardItself(card.id) && !isBuyCardItself(card.id);
+          // 防御では、攻撃属性を防げる盾だけを選べる。
+          const canDefendCard =
+            isDefending &&
+            !isLearned &&
+            isDefenseCard(card.id) &&
+            canDefendAttribute(getCardAttribute(card.id), attackAttribute ?? "none");
           return (
             <CardView
               key={`${card.id}-${idx}`}
@@ -71,7 +80,7 @@ export function HandArea({
                   : sellMode
                     ? canSellCard
                     : isDefending
-                      ? !isLearned && isDefenseCard(card.id)
+                      ? canDefendCard
                       : canPlayCard
               }
               learned={isLearned}
@@ -82,7 +91,7 @@ export function HandArea({
                 } else if (sellMode) {
                   if (canSellCard) onSelectSell(idx);
                 } else if (isDefending) {
-                  if (!isLearned) onSelectDefense(idx);
+                  if (canDefendCard) onSelectDefense(idx);
                 } else if (canPlayCard) {
                   onPlayCard(idx);
                 }

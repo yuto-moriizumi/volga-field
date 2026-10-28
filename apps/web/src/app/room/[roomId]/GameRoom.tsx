@@ -3,7 +3,13 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
 import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
-import { findCard, getCardPrice, isDirectAttackCard } from "@volga/game-core";
+import {
+  canDefendAttribute,
+  findCard,
+  getCardAttribute,
+  getCardPrice,
+  isDirectAttackCard,
+} from "@volga/game-core";
 import type { CardRef, GameState, PlayerState, ServerMessage } from "@volga/shared";
 import { BottomBar } from "../../_components/BottomBar";
 import { TopBar } from "../../_components/TopBar";
@@ -15,7 +21,7 @@ import { NameList } from "./NameList";
 import { SourceArea, type ExchangeDraft } from "./SourceArea";
 import { TargetArea } from "./TargetArea";
 import { eventAffectsPlayer, type PresentedBattleEvent } from "./battleEvents";
-import type { DuelPresentation } from "./battleSequence";
+import type { DuelPresentation, PartyPresentation } from "./battleSequence";
 import { defaultTargetId, isAttackCard } from "./cardSelection";
 import { useBattleSequence } from "./useBattleSequence";
 
@@ -120,6 +126,7 @@ export function GameRoom({
   }
   const presentation = useBattleSequence(gameState, playerId);
   const duel = presentation.duel;
+  const party = presentation.party;
   const interactionLocked = presentation.interactionLocked;
   // The defense UI only appears once the sequence has shown the target name;
   // while the attack card is still entering, the player cannot react.
@@ -299,7 +306,14 @@ export function GameRoom({
     if (!allowAction()) return;
     const cards = cardIdxes
       .map((idx) => me.hand[idx])
-      .filter((card): card is { id: string } => Boolean(card));
+      .filter((card): card is { id: string } => Boolean(card))
+      // 攻撃属性を防げない盾は選択できない（手札の見た目と揃える）。
+      .filter((card) =>
+        canDefendAttribute(
+          getCardAttribute(card.id),
+          gameState?.pendingAttack?.attribute ?? "none",
+        ),
+      );
     const cardRefs = cards.map((card) => ({ id: card.id }));
     // Start the local "clear → 100ms → card" steps immediately; the damage
     // itself waits for the resolution state.
@@ -552,6 +566,7 @@ export function GameRoom({
                 interactionLocked={presentation.interactionLocked}
                 battleEvent={presentation.overlay}
                 duel={duel}
+                party={party}
                 onSelectTarget={setSelectedTargetId}
                 onExecute={executeSelectedCard}
                 onAcceptBuy={acceptBuy}
@@ -568,6 +583,7 @@ export function GameRoom({
                 me={me}
                 canAct={canAct && !interactionLocked}
                 isDefending={defenseStepOpen}
+                attackAttribute={gameState.pendingAttack?.attribute ?? "none"}
                 selectedCardIdxes={selectedCardIdxes}
                 selectedDefenseIdxes={selectedDefenseIdxes}
                 discardMode={discardMode}
@@ -726,6 +742,7 @@ function BattleField({
   interactionLocked,
   battleEvent,
   duel,
+  party,
   onSelectTarget,
   onExecute,
   onAcceptBuy,
@@ -758,6 +775,7 @@ function BattleField({
   interactionLocked: boolean;
   battleEvent: PresentedBattleEvent | null;
   duel: DuelPresentation | null;
+  party: PartyPresentation | null;
   onSelectTarget: (playerId: string) => void;
   onExecute: () => void;
   onAcceptBuy: () => void;
@@ -870,6 +888,7 @@ function BattleField({
     <>
       <SourceArea
         duel={duel}
+        party={party}
         activePlayer={activePlayer}
         selectedCards={selectedCards}
         isDefending={isDefending}
@@ -890,6 +909,7 @@ function BattleField({
       />
       <TargetArea
         duel={duel}
+        party={party}
         pending={pending}
         pendingBuy={pendingBuy}
         pendingSell={pendingSell}

@@ -1,5 +1,6 @@
 import type {
   BattleLogEntry,
+  CardAttribute,
   CardRef,
   DoomsdayTurn,
   GameState,
@@ -9,7 +10,6 @@ import type {
 import { findCard } from "./cards.js";
 import type { CardDefinition, CardEffect } from "./cards.js";
 import {
-  MAX_LEARNED_MIRACLES,
   INITIAL_MONEY,
   INITIAL_MP,
   getCardPrice,
@@ -35,6 +35,41 @@ export const INITIAL_HAND_SIZE = 9;
 export const MAX_HAND_SIZE = 18;
 export const INITIAL_HP = 20;
 export const MAX_PLAYERS = 9;
+
+/** 社会主義・資本主義・共和主義・封建主義の攻撃を防げる防御属性。 */
+const DEFENDED_BY: Partial<Record<CardAttribute, CardAttribute>> = {
+  socialism: "capitalism",
+  capitalism: "socialism",
+  republicanism: "feudalism",
+  feudalism: "republicanism",
+};
+
+/**
+ * 攻撃属性ごとに、複数カードの属性を1つにまとめる。
+ * 無属性は寄与しない。環境主義は社会主義・資本主義・共和主義・封建主義の代わりになれる。
+ */
+export function aggregateAttackAttributes(
+  attributes: CardAttribute[],
+): CardAttribute {
+  const distinct = [...new Set(attributes.filter((a) => a !== "none"))];
+  if (distinct.length === 0) return "none";
+  if (distinct.length === 1) return distinct[0]!;
+  if (distinct.length === 2 && distinct.includes("environmentalism")) {
+    const other = distinct.find((a) => a !== "environmentalism");
+    if (other && other !== "anarchism") return other;
+  }
+  return "none";
+}
+
+/** 防御属性が攻撃属性を防げるか。環境主義の攻撃は防げず、無政府主義はどの属性でも防げる。 */
+export function canDefendAttribute(
+  defense: CardAttribute,
+  attack: CardAttribute,
+): boolean {
+  if (attack === "environmentalism") return false;
+  if (attack === "none" || attack === "anarchism") return true;
+  return defense === DEFENDED_BY[attack];
+}
 
 export function createGame(
   roomId: string,
@@ -281,7 +316,8 @@ export function playCard(
     if (idx === -1 && !(isMiracle && learnedMiracle)) {
       return { ok: false, reason: "card not in hand" };
     }
-    if (idx !== -1) {
+    // 奇跡カードは使用しても手札に残る（MPだけ消費する）。
+    if (idx !== -1 && !isMiracle) {
       newHand.splice(idx, 1);
     }
     if (isMiracle) {
@@ -295,33 +331,12 @@ export function playCard(
     return { ok: false, reason: "only one attack card can be used per turn" };
   }
 
-  let nextLearnedMiracles = active.learnedMiracles;
-  for (const card of cards) {
-    if (card.category === "miracle") {
-      const learned = nextLearnedMiracles.some((c) => c.id === card.id);
-      if (!learned) {
-        nextLearnedMiracles = [...nextLearnedMiracles, { id: card.id }].slice(
-          -MAX_LEARNED_MIRACLES,
-        );
-      }
-    }
-  }
-  let self: PlayerState = spendMp(
-    { ...active, hand: newHand, learnedMiracles: nextLearnedMiracles },
-    totalMpCost,
-  );
+  // 手札の奇跡カードは使用後も手札に残るため、習得済みリストには追加しない。
+  // 習得済みの奇跡カード（手札に無いもの）は従来どおりそのまま使える。
+  let self: PlayerState = spendMp({ ...active, hand: newHand }, totalMpCost);
   const miracleLogs: BattleLogEntry[] = [];
   for (const card of cards) {
-    const learned = active.learnedMiracles.some((c) => c.id === card.id);
     if (card.category === "miracle") {
-      if (!learned) {
-        miracleLogs.push({
-          turn: state.turn,
-          playerId,
-          message: `${active.name}が${card.name}を習得`,
-          kind: "miracle",
-        });
-      }
       if ((card.mpCost ?? 0) > 0) {
         miracleLogs.push({
           turn: state.turn,
@@ -389,8 +404,12 @@ export function playCard(
           attackerId: playerId,
           defenderId: opponent.id,
           card: { id: primaryCard.id },
+          cards: cards.map((card) => ({ id: card.id })),
           cardName: combinedName,
           amount: pendingDamage,
+          attribute: aggregateAttackAttributes(
+            cards.map((card) => card.attribute),
+          ),
         },
         log: [
           ...state.log,
@@ -475,6 +494,11 @@ export function defendAttack(
   let defensePower = 0;
   let nextHand = defender.hand;
   const selectedCardRefs = Array.isArray(cardRefs) ? cardRefs : [cardRefs];
+  const attackAttribute = pending.attribute ?? "none";
+
+  if (attackAttribute === "environmentalism" && selectedCardRefs.length > 0) {
+    return { ok: false, reason: "environmentalism attack cannot be defended" };
+  }
 
   if (selectedCardRefs.length > 0) {
     nextHand = [...defender.hand];
@@ -486,6 +510,9 @@ export function defendAttack(
     const card = findCard(cardRef.id);
     const defenseEffect = card?.effects.find((effect) => effect.kind === "defense");
     if (!card || !defenseEffect) return { ok: false, reason: "not a defense card" };
+    if (!canDefendAttribute(card.attribute, attackAttribute)) {
+      return { ok: false, reason: "attribute mismatch" };
+    }
     defensePower += defenseEffect.amount ?? 0;
     nextHand.splice(idx, 1);
     logs.push({
@@ -497,9 +524,10 @@ export function defendAttack(
   }
   defender = { ...defender, hand: nextHand };
 
+  const damage = Math.max(0, pending.amount - defensePower);
   const { target: damaged, log } = resolveDamage(
     defender,
-    Math.max(0, pending.amount - defensePower),
+    damage,
     pending.card.id,
     pending.cardName,
     pending.attackerId,
@@ -507,6 +535,10 @@ export function defendAttack(
   );
   defender = damaged;
   logs.push(...log);
+  // 無政府主義の攻撃でダメージを受けた防御者は HP0 になる。完全防御なら変化なし。
+  if (attackAttribute === "anarchism" && damage > 0) {
+    defender = { ...defender, hp: 0 };
+  }
 
   // 防衛で使った枚数ぶん引き直す（0枚なら何もしない）。
   const defenseDraw = Math.min(

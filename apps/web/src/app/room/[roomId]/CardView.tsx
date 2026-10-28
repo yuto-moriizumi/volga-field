@@ -62,10 +62,11 @@ export function CardView({
       onPointerEnter={onHover}
       aria-disabled={!playable}
       data-selected={selected}
+      data-playable={playable ? "true" : "false"}
       style={{
-        background: playable ? tone.bg : "#d6d6c8",
+        background: playable ? tone.bg : undefined,
         borderColor: selected ? tone.chip : undefined,
-        color: tone.ink,
+        color: playable ? tone.ink : undefined,
         cursor: playable ? "pointer" : "default",
       }}
     >

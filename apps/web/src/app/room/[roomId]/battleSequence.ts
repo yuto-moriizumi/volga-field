@@ -1,10 +1,12 @@
 import { BASE_CARDS, findCard } from "@volga/game-core";
+import type { PartyActionKind } from "@volga/game-core";
 import type { BattleLogEntry, GameState, PlayerId } from "@volga/shared";
 import { isAttackDeclarationLog, splitSupportEventsBeforeAttack } from "./battleEvents";
 import type {
   BattleEvent,
   DamageEvent,
   DrawEvent,
+  PartyActionEvent,
   TurnEvent,
 } from "./battleEvents";
 
@@ -92,6 +94,8 @@ export interface DuelModel {
   attackerName: string;
   defenderName: string;
   attackCard: DuelCard;
+  /** Every card of the attack action, in play order. */
+  attackCards: DuelCard[];
   /** Attack power while it was still pending. `null` when it was never observed. */
   attackAmount: number | null;
   /** `null` until the defense is known; `[]` means "defended without cards". */
@@ -113,6 +117,7 @@ export interface DuelPresentation {
   defenderId: PlayerId;
   defenderName: string;
   attackCard: DuelCard;
+  attackCards: DuelCard[];
   attackAmount: number | null;
   defenseCards: DuelCard[] | null;
   effect: DuelEffect | null;
@@ -147,6 +152,7 @@ export function buildDuelPresentation(
     defenderId: model.defenderId,
     defenderName: model.defenderName,
     attackCard: model.attackCard,
+    attackCards: model.attackCards,
     attackAmount: model.attackAmount,
     defenseCards: model.defenseCards,
     effect: model.effect,
@@ -167,6 +173,88 @@ export function buildDuelPresentation(
   };
 }
 
+/** How long a party action stays on the field before the next queued step. */
+export const PARTY_ACTION_MS = 1_200;
+
+/**
+ * A party acting on its own turn: the owner's name on the left plate, the
+ * party action as a card in the left field, and the target with its effect on
+ * the right. Nothing here is selectable.
+ */
+export interface PartyPresentation {
+  key: number;
+  actorId: PlayerId;
+  actorName: string;
+  /** Party card id, used for the card face emoji. */
+  cardId: string | null;
+  partyName: string;
+  actionName: string;
+  targetId: PlayerId | null;
+  targetName: string;
+  effect: {
+    kind: PartyActionKind;
+    amount: number;
+  };
+  isSelfActor: boolean;
+}
+
+export function buildPartyPresentation(
+  event: PartyActionEvent,
+  players: readonly { id: PlayerId; name: string }[],
+  viewerId: PlayerId | null,
+  key: number,
+): PartyPresentation {
+  const nameOf = (id: PlayerId | null) =>
+    id ? (players.find((player) => player.id === id)?.name ?? "?") : null;
+  return {
+    key,
+    actorId: event.playerId,
+    actorName: nameOf(event.playerId) ?? "?",
+    cardId: event.cardId,
+    partyName: event.partyName,
+    actionName: event.actionName,
+    targetId: event.targetId,
+    targetName: nameOf(event.targetId) ?? nameOf(event.playerId) ?? "?",
+    effect: event.effect,
+    isSelfActor: viewerId !== null && event.playerId === viewerId,
+  };
+}
+
+/** The amount chip on the party card: `攻3`, `HP+2`, `MP+2`, `￥+3`, `奪￥2`. */
+export function partyEffectLabel(effect: {
+  kind: PartyActionKind;
+  amount: number;
+}): string {
+  switch (effect.kind) {
+    case "damage":
+      return `攻${effect.amount}`;
+    case "heal":
+      return `HP+${effect.amount}`;
+    case "mp":
+      return `MP+${effect.amount}`;
+    case "money":
+      return `￥+${effect.amount}`;
+    case "steal":
+      return `奪￥${effect.amount}`;
+  }
+}
+
+export function partyActionAnnouncement(party: PartyPresentation): string {
+  const amount = party.effect.amount;
+  switch (party.effect.kind) {
+    case "damage":
+      return `${party.partyName}が動いた！${party.actionName}：${party.targetName}に${amount}ダメージ`;
+    case "heal":
+      return `${party.partyName}が動いた！${party.actionName}：${party.targetName}のHPが${amount}回復`;
+    case "mp":
+      return `${party.partyName}が動いた！${party.actionName}：${party.targetName}のMPが${amount}回復`;
+    case "money":
+      return `${party.partyName}が動いた！${party.actionName}：${party.targetName}が${amount}円を得た`;
+    case "steal":
+      return `${party.partyName}が動いた！${party.actionName}：${party.targetName}から${amount}円を奪った`;
+  }
+}
+
 export function duelCardsFromRefs(
   cardRefs: readonly { id: string }[],
 ): DuelCard[] {
@@ -174,6 +262,53 @@ export function duelCardsFromRefs(
     id: cardRef.id,
     name: findCard(cardRef.id)?.name ?? cardRef.id,
   }));
+}
+
+/**
+ * Resolve a card id from the display name in the combat log.
+ *
+ * When the attack and its resolution arrive in one state, the pending attack is
+ * never observed, so the card id has to come from the log. Combined attacks are
+ * logged as `A+B`; the primary card is the first name, and the full name stays
+ * on the card as a label.
+ */
+export function cardIdFromLogName(name: string): string | null {
+  const primary = name.split("+")[0]?.trim();
+  if (!primary) return null;
+  return BASE_CARDS.find((card) => card.name === primary)?.id ?? null;
+}
+
+/**
+ * Split a combined attack name (`A+B`) into one card per played card.
+ *
+ * The server logs every card of an attack action joined with `+`; card names
+ * themselves never contain `+`. Unknown names keep their label with a `null` id.
+ */
+export function attackCardsFromLogName(name: string): DuelCard[] {
+  return name
+    .split("+")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => ({ id: cardIdFromLogName(part), name: part }));
+}
+
+type PendingAttackState = NonNullable<GameState["pendingAttack"]>;
+
+/**
+ * The cards of an attack action: the pending snapshot is authoritative, then
+ * the legacy single `card`, then the combined log name (when the whole exchange
+ * arrived in one state and neither pending snapshot was observable).
+ */
+function attackCardsFor(
+  pending: PendingAttackState | null,
+  previous: PendingAttackState | null,
+  cardName: string,
+): DuelCard[] {
+  const refs = pending?.cards ?? previous?.cards;
+  if (refs && refs.length > 0) return duelCardsFromRefs(refs);
+  const legacy = pending ?? previous;
+  if (legacy) return duelCardsFromRefs([legacy.card]);
+  return attackCardsFromLogName(cardName);
 }
 
 /** `${name}が${cardName}で防御` log entries → card references. */
@@ -401,9 +536,16 @@ export function planDuels(
       attackerName: playerName(attackerId, next, previous),
       defenderName: playerName(defenderId, next, previous),
       attackCard: {
-        id: pendingMatch?.card.id ?? previousMatch?.card.id ?? null,
+        // The pending card always wins. When the whole exchange arrived in one
+        // state, neither pending snapshot was observable, so the log name is the
+        // only remaining source for the id.
+        id:
+          pendingMatch?.card.id ??
+          previousMatch?.card.id ??
+          cardIdFromLogName(cardName),
         name: pendingMatch?.cardName ?? cardName,
       },
+      attackCards: attackCardsFor(pendingMatch, previousMatch, cardName),
       attackAmount,
       defenseCards,
       effect: resolved

@@ -1,6 +1,7 @@
 "use client";
 
-import type { CardRef, GameState, PlayerState } from "@volga/shared";
+import type { CardAttribute, CardRef, GameState, PlayerState } from "@volga/shared";
+import { AttributeBadge, attributeLabel, attackDefenseRule } from "../../attributes";
 import type { BattleEvent } from "./battleEvents";
 import type { DuelPresentation } from "./battleSequence";
 import { NamePlate } from "./NamePlate";
@@ -11,7 +12,10 @@ import {
   DuelDrawChip,
   DuelEffectView,
   DuelTurnView,
+  PartyAnnouncer,
+  PartyImpactView,
 } from "./DuelStage";
+import type { PartyPresentation } from "./battleSequence";
 
 export interface TargetBattleEffect {
   event: BattleEvent;
@@ -29,6 +33,7 @@ export function TargetArea({
   defensePower,
   defenseDisabled,
   duel,
+  party,
   onConfirmDefense,
 }: {
   pending: GameState["pendingAttack"];
@@ -41,8 +46,32 @@ export function TargetArea({
   defensePower: number;
   defenseDisabled: boolean;
   duel: DuelPresentation | null;
+  party: PartyPresentation | null;
   onConfirmDefense: () => void;
 }) {
+  // Party actions target someone too: the name plate and the effect sit on the
+  // right while the action card is on the left.
+  if (party) {
+    const hit = party.effect.kind === "damage" || party.effect.kind === "steal";
+    return (
+      <div className="gf-target-area" aria-label="政党行動の対象" data-party-stage="target">
+        <NamePlate
+          label="対象"
+          name={party.targetName}
+          tone="blue"
+          playerId={party.targetId ?? undefined}
+          flash={hit}
+          dataStep="party-target"
+        />
+        <div className="gf-stage-wrap" data-hit={hit ? "true" : undefined}>
+          <div className="gf-action-stage gf-duel-stage">
+            <PartyImpactView party={party} />
+          </div>
+        </div>
+        <PartyAnnouncer party={party} />
+      </div>
+    );
+  }
   // The centre field carries the target name, the defense card and the effect
   // while a duel plays out. The name plate and the step content appear on their
   // own timer, so the field is empty until the name step.
@@ -63,6 +92,9 @@ export function TargetArea({
           flash={Boolean(duel.showEffect && duel.effect)}
           dataStep={duel.showTargetName ? "target-name" : undefined}
         />
+        {duel.awaitingDefense && (
+          <IncomingAttributeNote attribute={pending?.attribute} />
+        )}
         <div className="gf-stage-wrap" data-hit={hit ? "true" : undefined}>
           <div className="gf-action-stage gf-duel-stage">
             {duel.awaitingDefense && (
@@ -119,6 +151,7 @@ export function TargetArea({
         playerId={targetPlayer?.id}
         flash={Boolean(damageEffect)}
       />
+      {isDefending && <IncomingAttributeNote attribute={pending?.attribute} />}
       <div
         key={effect && damageEffect ? effect.key : "target-stage"}
         className="gf-stage-wrap"
@@ -152,6 +185,25 @@ export function TargetArea({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function IncomingAttributeNote({
+  attribute,
+}: {
+  attribute: CardAttribute | undefined;
+}) {
+  const blocked = (attribute ?? "none") === "environmentalism";
+  return (
+    <div
+      className={`gf-target-attr${blocked ? " is-blocked" : ""}`}
+      role="note"
+      aria-label={`攻撃属性 ${attributeLabel(attribute)} ${attackDefenseRule(attribute)}`}
+    >
+      <span className="gf-target-attr-label">攻撃</span>
+      <AttributeBadge attribute={attribute} />
+      <span>{attackDefenseRule(attribute)}</span>
     </div>
   );
 }

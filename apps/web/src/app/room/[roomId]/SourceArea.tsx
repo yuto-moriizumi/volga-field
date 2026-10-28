@@ -4,8 +4,8 @@ import type { CardRef, GameState, PlayerState } from "@volga/shared";
 import { findCard } from "@volga/game-core";
 import { NamePlate } from "./NamePlate";
 import { LargeCard } from "./LargeCard";
-import { DuelCardView } from "./DuelStage";
-import type { DuelPresentation } from "./battleSequence";
+import { DuelCardView, PartyActionCard, PartyAnnouncer } from "./DuelStage";
+import type { DuelPresentation, PartyPresentation } from "./battleSequence";
 
 export function SourceArea({
   activePlayer,
@@ -22,6 +22,7 @@ export function SourceArea({
   pendingBuy,
   canAffordPendingBuy,
   duel,
+  party,
   onConfirm,
   onAcceptBuy,
   onDeclineBuy,
@@ -41,14 +42,40 @@ export function SourceArea({
   pendingBuy: GameState["pendingBuy"];
   canAffordPendingBuy: boolean;
   duel: DuelPresentation | null;
+  party: PartyPresentation | null;
   onConfirm: () => void;
   onAcceptBuy: () => void;
   onDeclineBuy: () => void;
   onAdjustExchange: (stat: "mp" | "money", delta: number) => void;
 }) {
+  // A party acting on its own borrows the left field for a beat: the owner's
+  // name on the plate and the action shown as a card. Nothing is selectable.
+  if (party) {
+    return (
+      <div className="gf-source-area" aria-label="政党の場" data-party-stage="card">
+        <div className="gf-status-stack">
+          <NamePlate
+            label="政党"
+            name={party.actorName}
+            tone="teal"
+            playerId={party.actorId}
+            dataStep="party-owner"
+          />
+        </div>
+        <div className="gf-duel-slot is-filled" data-step="party-card">
+          <PartyActionCard party={party} />
+        </div>
+        <PartyAnnouncer party={party} />
+      </div>
+    );
+  }
   // During a duel the left field belongs to the attacker: empty at first, then
   // the card that was played. No controls live here until the sequence ends.
   if (duel) {
+    // `attackCards` carries every card played at once (weapon + power-ups) in
+    // play order; fall back to the single card for older presentations.
+    const attackCards =
+      duel.attackCards.length > 0 ? duel.attackCards : [duel.attackCard];
     return (
       <div
         className="gf-source-area"
@@ -69,7 +96,24 @@ export function SourceArea({
         </div>
         {duel.showAttackCard ? (
           <div className="gf-duel-slot is-filled" data-step="attack-card">
-            <DuelCardView card={duel.attackCard} tone="attack" />
+            <div
+              className="gf-duel-attack-stack"
+              data-count={Math.min(attackCards.length, 4)}
+              role="group"
+              aria-label={
+                attackCards.length > 1
+                  ? `攻撃カード${attackCards.length}枚`
+                  : "攻撃カード"
+              }
+            >
+              {attackCards.map((card, index) => (
+                <DuelCardView
+                  key={`${card.id ?? card.name}-${index}`}
+                  card={card}
+                  tone="attack"
+                />
+              ))}
+            </div>
             {duel.attackAmount !== null && duel.attackAmount > 0 && (
               <div className="gf-duel-power">攻{duel.attackAmount}</div>
             )}

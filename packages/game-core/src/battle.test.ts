@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameState } from "@volga/shared";
 import {
+  aggregateAttackAttributes,
+  canDefendAttribute,
   confirmBuy,
   createGame,
   defendAttack,
@@ -16,7 +18,12 @@ import {
   shuffleHand,
   startBuy,
 } from "./battle.js";
-import { BASE_CARDS, findCard } from "./cards.js";
+import {
+  BASE_CARDS,
+  attributeFromTags,
+  findCard,
+  getCardAttribute,
+} from "./cards.js";
 import { drawRandomCards } from "./draw.js";
 
 function defenseState(): GameState {
@@ -143,6 +150,101 @@ test("playCard healing is not capped by maxHp", () => {
   const attacker = result.state.players.find((p) => p.id === "attacker");
   assert.equal(attacker?.hp, 28);
   assert.equal(attacker?.maxHp, 20);
+});
+
+test("playCard keeps the heal miracle in hand, spends MP and does not learn it", () => {
+  const before = playState();
+  const result = playCard(before, "attacker", { id: "heal" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  // 使用しても同じ位置に残る（手札から消えない）。
+  assert.deepEqual(attacker?.hand, [{ id: "heal" }]);
+  assert.equal(attacker?.mp, 3, "MP7 is spent");
+  assert.deepEqual(attacker?.learnedMiracles, []);
+  assert.equal(
+    result.state.log.some((entry) => entry.message.includes("習得")),
+    false,
+    "a hand-held miracle is not learned",
+  );
+});
+
+test("a learned miracle can still be cast without being in hand", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [],
+    learnedMiracles: [{ id: "heal" }],
+  };
+
+  const result = playCard(state, "attacker", { id: "heal" }, "defender");
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  const attacker = result.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.hp, 20);
+  assert.equal(attacker?.mp, 3);
+  assert.deepEqual(attacker?.hand, []);
+  assert.deepEqual(attacker?.learnedMiracles, [{ id: "heal" }]);
+});
+
+test("ending the turn after a miracle still draws the used card", () => {
+  const played = playCard(playState(), "attacker", { id: "heal" }, "defender");
+  assert.equal(played.ok, true);
+  if (!played.ok) return;
+
+  const ended = endTurn(played.state, "attacker", 1, () => 0);
+  assert.equal(ended.ok, true);
+  if (!ended.ok) return;
+
+  const attacker = ended.state.players.find((p) => p.id === "attacker");
+  // 奇跡1枚は手札に残り、使用1枚ぶんの1枚が引かれる。
+  assert.equal(attacker?.hand.length, 2);
+  assert.ok(
+    ended.state.log.some((entry) => entry.message.includes("1枚ドロー")),
+  );
+});
+
+test("a miracle combined with an attack keeps both cards and draws two", () => {
+  const state = playState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "heal" }, { id: "capitalist_strike_3" }],
+  };
+
+  const played = playCard(
+    state,
+    "attacker",
+    [{ id: "heal" }, { id: "capitalist_strike_3" }],
+    "defender",
+  );
+  assert.equal(played.ok, true);
+  if (!played.ok) return;
+  assert.equal(played.state.phase, "defense");
+  // 奇跡＋攻撃の順序を保ったまま、演出用に全カードを持つ。
+  assert.deepEqual(played.state.pendingAttack?.cards, [
+    { id: "heal" },
+    { id: "capitalist_strike_3" },
+  ]);
+  const afterPlay = played.state.players.find((p) => p.id === "attacker");
+  assert.deepEqual(afterPlay?.hand, [{ id: "heal" }], "only the attack card is consumed");
+  assert.equal(afterPlay?.mp, 3);
+
+  const defended = defendAttack(played.state, "defender");
+  assert.equal(defended.ok, true);
+  if (!defended.ok) return;
+
+  const ended = endTurn(defended.state, "attacker", 2, () => 0);
+  assert.equal(ended.ok, true);
+  if (!ended.ok) return;
+  const attacker = ended.state.players.find((p) => p.id === "attacker");
+  assert.equal(attacker?.hand.length, 3, "the retained miracle plus two drawn cards");
+  assert.ok(
+    ended.state.log.some((entry) => entry.message.includes("2枚ドロー")),
+  );
 });
 
 test("drawRandomCards draws the requested number of cards from BASE_CARDS", () => {
@@ -901,7 +1003,7 @@ test("defendAttack reduces damage from combined multi-card attack", () => {
   const state = attributeWeaponState();
   state.players[1] = {
     ...state.players[1]!,
-    hand: [{ id: "shield" }],
+    hand: [{ id: "campaign_hq" }],
   };
   const play = playCard(
     state,
@@ -914,7 +1016,7 @@ test("defendAttack reduces damage from combined multi-card attack", () => {
   );
   assert.equal(play.ok, true);
   if (!play.ok) return;
-  const defended = defendAttack(play.state, "defender", [{ id: "shield" }]);
+  const defended = defendAttack(play.state, "defender", [{ id: "campaign_hq" }]);
   assert.equal(defended.ok, true);
   if (!defended.ok) return;
   const defender = defended.state.players.find((p) => p.id === "defender");
@@ -990,3 +1092,223 @@ test("shuffleHand refuses an empty hand", () => {
 
   assert.equal(result.ok, false);
 });
+
+test("weapon attributes come from party ideology tags", () => {
+  assert.equal(attributeFromTags(["socialism"]), "socialism");
+  assert.equal(attributeFromTags(["capitalism"]), "capitalism");
+  assert.equal(attributeFromTags(["republicanism"]), "republicanism");
+  assert.equal(attributeFromTags(["feudalism"]), "feudalism");
+  assert.equal(attributeFromTags(["environmentalism"]), "environmentalism");
+  assert.equal(attributeFromTags(["anarchism"]), "anarchism");
+  assert.equal(attributeFromTags(undefined), "none");
+
+  assert.equal(getCardAttribute("socialist_strike_3"), "socialism");
+  assert.equal(getCardAttribute("capitalist_power_2"), "capitalism");
+  assert.equal(getCardAttribute("republican_strike_1"), "republicanism");
+  assert.equal(getCardAttribute("feudal_strike_5"), "feudalism");
+  assert.equal(getCardAttribute("environmentalist_power_1"), "environmentalism");
+  assert.equal(getCardAttribute("anarchist_strike_1"), "anarchism");
+  // タグを持たない外交カード・汎用武器は無属性。
+  assert.equal(getCardAttribute("sword"), "none");
+  assert.equal(getCardAttribute("concern_expressed"), "none");
+  assert.ok(
+    BASE_CARDS.some(
+      (card) => card.category === "weapon" && card.attribute === "none",
+    ),
+    "a none weapon exists",
+  );
+});
+
+test("every shield has an elemental or none defense attribute", () => {
+  const shields = BASE_CARDS.filter((card) => card.category === "shield");
+  assert.equal(shields.length, 50);
+  const counts: Record<string, number> = {
+    none: 0,
+    socialism: 0,
+    capitalism: 0,
+    republicanism: 0,
+    feudalism: 0,
+  };
+  for (const shield of shields) {
+    assert.ok(
+      shield.attribute === "none" ||
+        shield.attribute === "socialism" ||
+        shield.attribute === "capitalism" ||
+        shield.attribute === "republicanism" ||
+        shield.attribute === "feudalism",
+      `${shield.id} has ideological or none attribute`,
+    );
+    counts[shield.attribute] = (counts[shield.attribute] ?? 0) + 1;
+  }
+  assert.ok(shields.some((shield) => shield.attribute === "none"), "a none shield exists");
+  for (const count of Object.values(counts)) {
+    assert.ok(count >= 9 && count <= 11, `balanced shield count: ${count}`);
+  }
+});
+
+test("attack attributes aggregate across every card in the action", () => {
+  assert.equal(aggregateAttackAttributes(["socialism"]), "socialism");
+  assert.equal(aggregateAttackAttributes(["socialism", "socialism"]), "socialism");
+  assert.equal(aggregateAttackAttributes(["socialism", "capitalism"]), "none");
+  assert.equal(aggregateAttackAttributes(["none", "socialism"]), "socialism");
+  assert.equal(aggregateAttackAttributes(["environmentalism", "socialism"]), "socialism");
+  assert.equal(aggregateAttackAttributes(["environmentalism", "environmentalism"]), "environmentalism");
+  assert.equal(aggregateAttackAttributes(["environmentalism", "anarchism"]), "none");
+  assert.equal(aggregateAttackAttributes(["environmentalism", "anarchism", "socialism"]), "none");
+  assert.equal(aggregateAttackAttributes(["none", "none"]), "none");
+});
+
+test("defense compatibility follows the ideological cycle", () => {
+  assert.equal(canDefendAttribute("capitalism", "socialism"), true);
+  assert.equal(canDefendAttribute("socialism", "socialism"), false);
+  assert.equal(canDefendAttribute("socialism", "capitalism"), true);
+  assert.equal(canDefendAttribute("feudalism", "republicanism"), true);
+  assert.equal(canDefendAttribute("republicanism", "feudalism"), true);
+  assert.equal(canDefendAttribute("none", "none"), true);
+  assert.equal(canDefendAttribute("capitalism", "none"), true);
+  assert.equal(canDefendAttribute("socialism", "anarchism"), true);
+  assert.equal(canDefendAttribute("none", "anarchism"), true);
+  assert.equal(canDefendAttribute("capitalism", "environmentalism"), false);
+  assert.equal(canDefendAttribute("none", "environmentalism"), false);
+});
+
+test("a none shield defends a none attack", () => {
+  const state = defenseState();
+  state.pendingAttack = { ...state.pendingAttack!, amount: 3 };
+  assert.equal(getCardAttribute("shield"), "none");
+
+  const result = defendAttack(state, "defender", [{ id: "shield" }]);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 20);
+});
+
+test("defendAttack rejects a mismatched shield without consuming cards", () => {
+  const state = defenseState();
+  state.pendingAttack = { ...state.pendingAttack!, attribute: "socialism" };
+  // shield（選挙事務所）は無属性なので、社会主義属性の攻撃は防げない。
+  assert.equal(getCardAttribute("shield"), "none");
+  const before = handOf(state, "defender");
+
+  const result = defendAttack(state, "defender", [{ id: "shield" }]);
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "attribute mismatch");
+  assert.equal(handOf(state, "defender"), before);
+});
+
+test("defendAttack accepts a capitalism shield against a socialism attack", () => {
+  const state = defenseState();
+  state.pendingAttack = {
+    ...state.pendingAttack!,
+    amount: 1,
+    attribute: "socialism",
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "leaf_shield" }],
+  };
+  assert.equal(getCardAttribute("leaf_shield"), "capitalism");
+
+  const result = defendAttack(state, "defender", [{ id: "leaf_shield" }]);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 20);
+});
+
+test("environmentalism attacks cannot be defended but the defender can still pass", () => {
+  const state = defenseState();
+  state.pendingAttack = { ...state.pendingAttack!, attribute: "environmentalism" };
+
+  const rejected = defendAttack(state, "defender", [{ id: "shield" }]);
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) {
+    assert.equal(rejected.reason, "environmentalism attack cannot be defended");
+  }
+
+  const passed = defendAttack(state, "defender", []);
+  assert.equal(passed.ok, true);
+  if (!passed.ok) return;
+  const defender = passed.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 16);
+});
+
+test("an anarchism attack that deals damage drops the defender to HP 0", () => {
+  const state = defenseState();
+  state.pendingAttack = { ...state.pendingAttack!, attribute: "anarchism" };
+
+  const result = defendAttack(state, "defender", []);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 0);
+  assert.equal(result.state.winner, "attacker");
+  const damageLog = result.state.log.find((entry) => entry.damage === 4);
+  assert.ok(damageLog, "damage amount is still logged");
+});
+
+test("a fully blocked anarchism attack leaves the defender's HP unchanged", () => {
+  const state = defenseState();
+  state.pendingAttack = {
+    ...state.pendingAttack!,
+    amount: 3,
+    attribute: "anarchism",
+  };
+  state.players[1] = {
+    ...state.players[1]!,
+    hand: [{ id: "great_shield" }],
+  };
+
+  const result = defendAttack(state, "defender", [{ id: "great_shield" }]);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.hp, 20);
+  assert.equal(result.state.winner, null);
+});
+
+test("playCard sets the aggregated attribute on the pending attack", () => {
+  const state = attributeWeaponState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "socialist_strike_3" }, { id: "socialist_power_2" }],
+  };
+
+  const result = playCard(
+    state,
+    "attacker",
+    [{ id: "socialist_strike_3" }, { id: "socialist_power_2" }],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.attribute, "socialism");
+});
+
+test("playCard makes an environmentalism weapon act as the ideological weapon it supports", () => {
+  const state = attributeWeaponState();
+  state.players[0] = {
+    ...state.players[0]!,
+    hand: [{ id: "environmentalist_power_2" }, { id: "socialist_strike_3" }],
+  };
+
+  const result = playCard(
+    state,
+    "attacker",
+    [{ id: "environmentalist_power_2" }, { id: "socialist_strike_3" }],
+    "defender",
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.state.pendingAttack?.attribute, "socialism");
+});
+

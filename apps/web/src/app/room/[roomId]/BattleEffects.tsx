@@ -86,6 +86,21 @@ function EventVisual({
       return <SupportVisual event={event} resolveName={resolveName} />;
     case "party":
       return <PartyVisual event={event} resolveName={resolveName} />;
+    case "partyAction":
+      // Party actions normally play in the field (left card / right target);
+      // this is only a fallback if one ever reaches the overlay queue.
+      return (
+        <div className="gf-party-effect">
+          <div className="gf-party-card">
+            <span className="gf-party-card-emoji">
+              {cardEmoji(event.cardId, event.partyName)}
+            </span>
+            <span className="gf-party-card-name">{event.partyName}</span>
+            <span className="gf-party-badge">{event.actionName}</span>
+          </div>
+          <div className="gf-party-name">{resolveName(event.playerId)}</div>
+        </div>
+      );
     case "turn":
       return (
         <TurnVisual

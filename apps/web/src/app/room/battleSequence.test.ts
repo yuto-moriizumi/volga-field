@@ -663,3 +663,175 @@ test("a round that comes back to the viewer is a fresh turn, not a continuation"
     "あなたのターン",
   );
 });
+
+test("a coalesced attack resolves the attack card id from the log name", () => {
+  // The server delivered the pending attack and its resolution in one state, so
+  // neither snapshot has `pendingAttack`. The duel must still show the real
+  // card instead of the plain placeholder.
+  const previous = state();
+  const next = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ", { hp: 27 })],
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "アリスが企業買収で攻撃",
+        kind: "attack",
+      },
+      DEFENSE_LOG,
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "ボブが3ダメージを受けた (企業買収)",
+        kind: "attack",
+        damage: 3,
+      },
+    ],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  const flight = events.find((event) => event.kind === "attack");
+  assert.equal(flight?.cardId, "capitalist_strike_3");
+  const batch = planDuels(previous, next, "p1", events, 20);
+  assert.equal(batch.duels.length, 1);
+  const model = batch.duels[0]!;
+  assert.equal(model.attackCard.name, "企業買収");
+  assert.equal(model.attackCard.id, "capitalist_strike_3");
+  assert.equal(model.effect?.amount, 3);
+});
+
+test("a combined attack name resolves the primary card id", () => {
+  const previous = state();
+  const next = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ", { hp: 27 })],
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "アリスが企業買収+計画経済で攻撃",
+        kind: "attack",
+      },
+      DEFENSE_LOG,
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "ボブが3ダメージを受けた (企業買収+計画経済)",
+        kind: "attack",
+        damage: 3,
+      },
+    ],
+  });
+
+  const events = deriveBattleEvents(previous, next, "p1");
+  const batch = planDuels(previous, next, "p1", events, 30);
+  assert.equal(batch.duels.length, 1);
+  const model = batch.duels[0]!;
+  assert.equal(model.attackCard.name, "企業買収+計画経済");
+  assert.equal(model.attackCard.id, "capitalist_strike_3");
+});
+
+test("pending attack with multiple cards exposes every attack card in play order", () => {
+  const previous = state();
+  const next = state({
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "p1",
+      defenderId: "p2",
+      card: { id: "capitalist_strike_3" },
+      cards: [{ id: "capitalist_strike_3" }, { id: "socialist_power_2" }],
+      cardName: "企業買収+計画経済",
+      amount: 5,
+    },
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "アリスが企業買収+計画経済で攻撃",
+        kind: "attack",
+      },
+    ],
+  });
+
+  const batch = planDuels(previous, next, "p1", [], 50);
+  assert.equal(batch.duels.length, 1);
+  const model = batch.duels[0]!;
+  assert.deepEqual(model.attackCards, [
+    { id: "capitalist_strike_3", name: "企業買収" },
+    { id: "socialist_power_2", name: "計画経済" },
+  ]);
+  // The primary card stays available for the current rendering.
+  assert.equal(model.attackCard.id, "capitalist_strike_3");
+
+  const presentation = buildDuelPresentation(model, "attack", false, "p1");
+  assert.deepEqual(presentation.attackCards, model.attackCards);
+});
+
+test("a batched combined attack resolves one entry per log name", () => {
+  // The attack and its resolution arrive in one state, so no pending snapshot
+  // is observable. The combined name still has to produce both cards.
+  const previous = state();
+  const next = state({
+    players: [player("p1", "アリス"), player("p2", "ボブ", { hp: 27 })],
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "アリスが企業買収+計画経済+謎の札で攻撃",
+        kind: "attack",
+      },
+      DEFENSE_LOG,
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "ボブが3ダメージを受けた (企業買収+計画経済+謎の札)",
+        kind: "attack",
+        damage: 3,
+      },
+    ],
+  });
+
+  const batch = planDuels(previous, next, "p1", [], 60);
+  assert.equal(batch.duels.length, 1);
+  const model = batch.duels[0]!;
+  assert.deepEqual(model.attackCards, [
+    { id: "capitalist_strike_3", name: "企業買収" },
+    { id: "socialist_power_2", name: "計画経済" },
+    // Unknown names keep their label without an id.
+    { id: null, name: "謎の札" },
+  ]);
+  assert.equal(model.attackCard.name, "企業買収+計画経済+謎の札");
+  assert.equal(model.attackCard.id, "capitalist_strike_3");
+});
+
+test("a legacy single-card pending attack still yields one attack card", () => {
+  const { model } = startDuel();
+  assert.equal(model.attackCards.length, 1);
+  assert.equal(model.attackCards[0]?.id, model.attackCard.id);
+});
+
+test("the pending attack card still wins over the log name", () => {
+  // `pending.card.id` is authoritative: the log name is only a fallback.
+  const previous = state();
+  const next = state({
+    phase: "defense",
+    pendingAttack: {
+      attackerId: "p1",
+      defenderId: "p2",
+      card: { id: "capitalist_strike_3" },
+      cardName: "企業買収",
+      amount: 3,
+    },
+    log: [
+      {
+        turn: 3,
+        playerId: "p1",
+        message: "アリスが攻撃で攻撃",
+        kind: "attack",
+      },
+    ],
+  });
+
+  const batch = planDuels(previous, next, "p1", [], 40);
+  const model = batch.duels[0]!;
+  assert.equal(model.attackCard.id, "capitalist_strike_3");
+});
