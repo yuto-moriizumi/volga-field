@@ -1,6 +1,7 @@
 "use client";
 
 import { findCard } from "@volga/game-core";
+import type { CardDefinition } from "@volga/game-core";
 import type { CardRef } from "@volga/shared";
 
 export function LargeCard({ cardRef }: { cardRef: CardRef }) {
@@ -19,15 +20,6 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
       </div>
     );
   }
-  const power =
-    card.category === "miracle"
-      ? card.mpCost
-      : card.effects.find((effect) => typeof effect.amount === "number")?.amount;
-  const isMpRecover = card.effects.some((effect) => effect.kind === "mpRecover");
-  const isHeal = card.effects.some((effect) => effect.kind === "heal");
-  const isAttackPower = card.effects.every(
-    (effect) => effect.kind === "attack_power",
-  );
   return (
     <div className="gf-large-card">
       <div className="gf-large-card-art">
@@ -36,18 +28,7 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
       <div className="gf-large-card-body">
         <div className="gf-large-card-name">{card.name}</div>
         <div className="gf-large-card-power">
-          {card.category === "miracle"
-            ? "MP"
-            : card.category === "shield"
-              ? "守"
-              : isMpRecover
-                ? "MP+"
-                : isHeal
-                  ? "HP+"
-                  : isAttackPower
-                    ? "攻+"
-                    : "攻"}
-          {power ?? ""}
+          {largeCardPower(card)}
           {typeof card.price === "number" && card.price > 0 && (
             <span className="gf-large-card-price"> ￥{card.price}</span>
           )}
@@ -56,4 +37,33 @@ export function LargeCard({ cardRef }: { cardRef: CardRef }) {
       </div>
     </div>
   );
+}
+
+/**
+ * 場に置かれたカード（LargeCard）のパワー表記。
+ * 手札の `shortPower` と整合させる。
+ */
+export function largeCardPower(card: CardDefinition): string {
+  if (card.category === "trade") return card.name;
+  if (card.category === "party") return "入党";
+  if (card.category === "miracle") return `MP${card.mpCost ?? 0}`;
+  const amount = card.effects.find(
+    (effect) => typeof effect.amount === "number",
+  )?.amount;
+  if (card.category === "shield") return `守${amount ?? ""}`;
+  if (card.effects.some((effect) => effect.kind === "mpRecover")) {
+    return `MP+${amount ?? ""}`;
+  }
+  if (card.effects.some((effect) => effect.kind === "heal")) {
+    return `HP+${amount ?? ""}`;
+  }
+  // `[].every(...)` は true になるため、空 effects を攻撃扱いしない。
+  if (
+    card.effects.length > 0 &&
+    card.effects.every((effect) => effect.kind === "attack_power")
+  ) {
+    return `攻+${amount ?? ""}`;
+  }
+  if (card.effects.length === 0) return card.name;
+  return `攻${amount ?? ""}`;
 }
