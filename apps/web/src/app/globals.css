@@ -3212,11 +3212,16 @@ a {
 }
 
 .gf-party-action-desc {
+  /* 行動名はカードの主役なので、属性カードの説明より一段大きく・太く。 */
   padding-left: 28px;
-  color: #6b4a13;
-  font-size: 14px;
-  line-height: 1.1;
+  color: #5c3f12;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gf-party-impact {

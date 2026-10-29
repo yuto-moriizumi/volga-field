@@ -2,6 +2,7 @@
 
 import { findCard } from "@volga/game-core";
 import type { CardRef } from "@volga/shared";
+import { AttributeBadge } from "../../attributes";
 
 interface CardViewProps {
   cardRef: CardRef;
@@ -9,6 +10,8 @@ interface CardViewProps {
   playable?: boolean;
   hidden?: boolean;
   learned?: boolean;
+  /** 防御ステップで選べない理由（属性不一致・防御不可）。指定時は打消し表示を出す。 */
+  blockedLabel?: string;
   onClick?: () => void;
   onHover?: () => void;
 }
@@ -28,6 +31,7 @@ export function CardView({
   playable,
   hidden,
   learned,
+  blockedLabel,
   onClick,
   onHover,
 }: CardViewProps) {
@@ -52,6 +56,12 @@ export function CardView({
 
   const tone = CATEGORY_COLORS[card.category] ?? CATEGORY_COLORS.misc!;
   void tone.chip;
+  const blocked = Boolean(blockedLabel);
+  // 場の LargeCard と同じ基準: 武器と盾は無属性でも出す。
+  const showAttribute =
+    card.category === "weapon" ||
+    card.category === "shield" ||
+    card.attribute !== "none";
 
   return (
     <button
@@ -63,6 +73,8 @@ export function CardView({
       aria-disabled={!playable}
       data-selected={selected}
       data-playable={playable ? "true" : "false"}
+      data-blocked={blocked ? "true" : undefined}
+      title={blocked ? blockedLabel : undefined}
       style={{
         background: playable ? tone.bg : undefined,
         borderColor: selected ? tone.chip : undefined,
@@ -70,6 +82,9 @@ export function CardView({
         cursor: playable ? "pointer" : "default",
       }}
     >
+      <span className="gf-hand-attr">
+        {showAttribute && <AttributeBadge attribute={card.attribute} short />}
+      </span>
       <div className="gf-hand-card-art">{card.emoji}</div>
       <div className="gf-hand-card-caption">
         <span>{shortPower(card)}</span>
@@ -77,6 +92,14 @@ export function CardView({
       </div>
       {typeof card.price === "number" && card.price > 0 && (
         <div className="gf-hand-card-price">￥{card.price}</div>
+      )}
+      {blocked && (
+        <span className="gf-hand-card-blocked">
+          <span className="gf-hand-card-blocked-mark" aria-hidden="true">
+            ×
+          </span>
+          <span className="gf-hand-card-blocked-label">{blockedLabel}</span>
+        </span>
       )}
     </button>
   );

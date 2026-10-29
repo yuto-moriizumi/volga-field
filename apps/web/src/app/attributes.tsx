@@ -10,16 +10,18 @@ import type { CardAttribute } from "@volga/shared";
 export interface AttributeTone {
   /** 画面に出す日本語ラベル */
   label: string;
+  /** 手札など狭い場所で使う短いラベル（読み上げは label を使う） */
+  short: string;
 }
 
 export const ATTRIBUTE_TONES: Record<CardAttribute, AttributeTone> = {
-  none: { label: "無属性" },
-  socialism: { label: "社会主義" },
-  capitalism: { label: "資本主義" },
-  republicanism: { label: "共和主義" },
-  feudalism: { label: "封建主義" },
-  environmentalism: { label: "環境主義" },
-  anarchism: { label: "無政府主義" },
+  none: { label: "無属性", short: "無" },
+  socialism: { label: "社会主義", short: "社会" },
+  capitalism: { label: "資本主義", short: "資本" },
+  republicanism: { label: "共和主義", short: "共和" },
+  feudalism: { label: "封建主義", short: "封建" },
+  environmentalism: { label: "環境主義", short: "環境" },
+  anarchism: { label: "無政府主義", short: "無政府" },
 };
 
 /** 教典や一覧で並べる順番。 */
@@ -85,11 +87,14 @@ export function attributeGroupNote(attribute: CardAttribute): string {
 
 /**
  * 属性バッジ。色だけでなく必ず日本語ラベルを表示する。
+ * `short` は手札のような狭い場所向けで、読み上げ・ツールチップは常に正式名。
  */
 export function AttributeBadge({
   attribute,
+  short = false,
 }: {
   attribute: CardAttribute | undefined | null;
+  short?: boolean;
 }) {
   const key = attribute ?? "none";
   const tone = ATTRIBUTE_TONES[key];
@@ -97,10 +102,12 @@ export function AttributeBadge({
     <span
       className="gf-attr-badge"
       data-attribute={key}
+      data-short={short ? "true" : undefined}
       title={`属性: ${tone.label}`}
+      aria-label={`属性: ${tone.label}`}
     >
       <span className="gf-attr-badge-dot" aria-hidden="true" />
-      {tone.label}
+      {short ? tone.short : tone.label}
     </span>
   );
 }

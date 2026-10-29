@@ -64,6 +64,12 @@ export function HandArea({
             !isLearned &&
             isDefenseCard(card.id) &&
             canDefendAttribute(getCardAttribute(card.id), attackAttribute ?? "none");
+          // 防御中に選べない理由をカード自体に出す（色だけに頼らない）。
+          const blockedLabel = !isDefending || canDefendCard
+            ? undefined
+            : isDefenseCard(card.id)
+              ? "属性不一致"
+              : "防御不可";
           return (
             <CardView
               key={`${card.id}-${idx}`}
@@ -84,6 +90,7 @@ export function HandArea({
                       : canPlayCard
               }
               learned={isLearned}
+              blockedLabel={blockedLabel}
               onHover={() => onHoverCard(card)}
               onClick={() => {
                 if (discardMode) {

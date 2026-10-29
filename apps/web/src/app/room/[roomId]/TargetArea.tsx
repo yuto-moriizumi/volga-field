@@ -12,7 +12,6 @@ import {
   DuelDrawChip,
   DuelEffectView,
   DuelTurnView,
-  PartyAnnouncer,
   PartyImpactView,
 } from "./DuelStage";
 import type { PartyPresentation } from "./battleSequence";
@@ -68,7 +67,6 @@ export function TargetArea({
             <PartyImpactView party={party} />
           </div>
         </div>
-        <PartyAnnouncer party={party} />
       </div>
     );
   }
@@ -99,6 +97,7 @@ export function TargetArea({
           <div className="gf-action-stage gf-duel-stage">
             {duel.awaitingDefense && (
               <DefenseZone
+                attackAttribute={pending?.attribute}
                 defenseCards={defenseCards}
                 defensePower={defensePower}
                 disabled={defenseDisabled}
@@ -160,6 +159,7 @@ export function TargetArea({
         <div className="gf-action-stage">
           {isDefending ? (
             <DefenseZone
+              attackAttribute={pending?.attribute}
               defenseCards={defenseCards}
               defensePower={defensePower}
               disabled={defenseDisabled}
@@ -209,16 +209,19 @@ function IncomingAttributeNote({
 }
 
 function DefenseZone({
+  attackAttribute,
   defenseCards,
   defensePower,
   disabled,
   onConfirm,
 }: {
+  attackAttribute: CardAttribute | undefined;
   defenseCards: CardRef[];
   defensePower: number;
   disabled: boolean;
   onConfirm: () => void;
 }) {
+  const blockable = (attackAttribute ?? "none") !== "environmentalism";
   const label =
     defenseCards.length > 0
       ? `防御を確定（${defenseCards.length}枚 防${defensePower}）`
@@ -249,8 +252,10 @@ function DefenseZone({
       ) : (
         <>
           <span className="gf-confirm-empty-action is-danger">許す</span>
-          <span className="gf-defense-hint">
-            防御カードを選ぶか、ここを押して攻撃を通す
+          <span className={`gf-defense-hint${blockable ? "" : " is-blocked"}`}>
+            {blockable
+              ? "防御カードを選ぶか、ここを押して攻撃を通す"
+              : "属性により防御できません。ここを押して攻撃を通す"}
           </span>
         </>
       )}
