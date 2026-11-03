@@ -1047,6 +1047,22 @@ a {
   font-weight: 700;
 }
 
+/* 政党行動のアイコン。カード一覧の小さな角アイコンに合わせた寸法。 */
+.gf-textbook-party-action-icon {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(108, 174, 138, 0.8);
+  background: linear-gradient(180deg, #fff, #e8efe6);
+  font-size: 14px;
+  line-height: 1;
+}
+
 .gf-textbook-party-action-name {
   font-weight: 900;
   color: var(--bar-teal-dark);

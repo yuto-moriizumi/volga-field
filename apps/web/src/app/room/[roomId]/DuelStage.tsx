@@ -130,13 +130,13 @@ export function DuelTurnView({ turn }: { turn: DuelTurn }) {
 }
 
 /**
- * The party action as a card in the left field: party emoji, party name, the
+ * The party action as a card in the left field: the action icon, party name, the
  * effect amount and the action name in the description slot. Deliberately the
  * same anatomy as `LargeCard`, in the party (amber) tone instead of attack red.
  */
 export function PartyActionCard({ party }: { party: PartyPresentation }) {
   const definition = party.cardId ? findCard(party.cardId) : null;
-  const emoji = definition?.emoji ?? "🚩";
+  const emoji = party.actionEmoji ?? definition?.emoji ?? "🚩";
   return (
     <div className="gf-party-action-card" data-step="party-card">
       <div className="gf-party-action-art" aria-hidden="true">

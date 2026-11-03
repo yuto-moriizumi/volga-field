@@ -1,4 +1,9 @@
-import { BASE_CARDS, findCard } from "@volga/game-core";
+import {
+  BASE_CARDS,
+  PARTY_ACTIONS,
+  findCard,
+  getPartyId,
+} from "@volga/game-core";
 import type { PartyActionKind } from "@volga/game-core";
 import type { BattleLogEntry, GameState, PlayerId } from "@volga/shared";
 import { isAttackDeclarationLog, splitSupportEventsBeforeAttack } from "./battleEvents";
@@ -193,6 +198,8 @@ export interface PartyPresentation {
   cardId: string | null;
   partyName: string;
   actionName: string;
+  /** Icon of the concrete action (`PARTY_ACTIONS`), shown on the card art. */
+  actionEmoji: string | null;
   targetId: PlayerId | null;
   targetName: string;
   effect: {
@@ -200,6 +207,22 @@ export interface PartyPresentation {
     amount: number;
   };
   isSelfActor: boolean;
+}
+
+/**
+ * The action icon for the card art. The log line only carries names, so the
+ * party card id selects the action list and the action name picks the entry.
+ */
+export function partyActionEmoji(
+  cardId: string | null,
+  actionName: string,
+): string | null {
+  const partyId = cardId ? getPartyId(cardId) : null;
+  if (!partyId) return null;
+  return (
+    PARTY_ACTIONS[partyId].find((action) => action.name === actionName)?.emoji ??
+    null
+  );
 }
 
 export function buildPartyPresentation(
@@ -217,6 +240,7 @@ export function buildPartyPresentation(
     cardId: event.cardId,
     partyName: event.partyName,
     actionName: event.actionName,
+    actionEmoji: partyActionEmoji(event.cardId, event.actionName),
     targetId: event.targetId,
     targetName: nameOf(event.targetId) ?? nameOf(event.playerId) ?? "?",
     effect: event.effect,

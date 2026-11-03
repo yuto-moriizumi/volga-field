@@ -12,6 +12,8 @@ export type PartyActionKind = "damage" | "heal" | "mp" | "money" | "steal";
 
 export interface PartyAction {
   name: string;
+  /** 教典とバトル画面で使う小さなアイコン。政党カードの絵文字とは別のものにする。 */
+  emoji: string;
   kind: PartyActionKind;
   amount: number;
   /** 同じ政党のアクション内での相対的な選択重み */
@@ -54,28 +56,28 @@ export function leavePartyOnDamage(
 
 export const PARTY_ACTIONS: Record<PartyId, readonly PartyAction[]> = {
   communist_party: [
-    { name: "労働者の反撃", kind: "damage", amount: 3, weight: 60 },
-    { name: "団結", kind: "mp", amount: 2, weight: 40 },
+    { name: "労働者の反撃", emoji: "✊", kind: "damage", amount: 3, weight: 60 },
+    { name: "団結", emoji: "🤝", kind: "mp", amount: 2, weight: 40 },
   ],
   ldp: [
-    { name: "経済成長", kind: "money", amount: 3, weight: 60 },
-    { name: "市場の一撃", kind: "damage", amount: 2, weight: 40 },
+    { name: "経済成長", emoji: "📈", kind: "money", amount: 3, weight: 60 },
+    { name: "市場の一撃", emoji: "💥", kind: "damage", amount: 2, weight: 40 },
   ],
   democratic_party: [
-    { name: "世論の追い風", kind: "mp", amount: 2, weight: 50 },
-    { name: "政策協力", kind: "heal", amount: 2, weight: 50 },
+    { name: "世論の追い風", emoji: "🗣️", kind: "mp", amount: 2, weight: 50 },
+    { name: "政策協力", emoji: "🫱", kind: "heal", amount: 2, weight: 50 },
   ],
   constitutional_imperial_party: [
-    { name: "王権の威光", kind: "damage", amount: 3, weight: 50 },
-    { name: "城塞の守り", kind: "heal", amount: 3, weight: 50 },
+    { name: "王権の威光", emoji: "👑", kind: "damage", amount: 3, weight: 50 },
+    { name: "城塞の守り", emoji: "🏰", kind: "heal", amount: 3, weight: 50 },
   ],
   green_party: [
-    { name: "自然の恵み", kind: "heal", amount: 3, weight: 60 },
-    { name: "再生エネルギー", kind: "mp", amount: 2, weight: 40 },
+    { name: "自然の恵み", emoji: "🍎", kind: "heal", amount: 3, weight: 60 },
+    { name: "再生エネルギー", emoji: "🔋", kind: "mp", amount: 2, weight: 40 },
   ],
   anarchist_party: [
-    { name: "直接行動", kind: "damage", amount: 2, weight: 55 },
-    { name: "略奪", kind: "steal", amount: 2, weight: 45 },
+    { name: "直接行動", emoji: "📢", kind: "damage", amount: 2, weight: 55 },
+    { name: "略奪", emoji: "💰", kind: "steal", amount: 2, weight: 45 },
   ],
 };
 

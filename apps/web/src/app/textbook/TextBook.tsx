@@ -309,6 +309,12 @@ function PartyListView({
               <div className="gf-textbook-party-actions">
                 {party.actions.map((action) => (
                   <div key={action.name} className="gf-textbook-party-action">
+                    <span
+                      className="gf-textbook-party-action-icon"
+                      aria-hidden="true"
+                    >
+                      {action.emoji}
+                    </span>
                     <span className="gf-textbook-party-action-name">
                       {action.name}
                     </span>
