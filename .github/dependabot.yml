@@ -4,6 +4,10 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    ignore:
+      # typescript-eslint (eslint-config-next) は TS 7 に未対応。対応まで 6.x に留める。
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   # アクションのバージョンが古くならないように、ワークフローも自動更新する
   - package-ecosystem: "github-actions"
     directory: "/"

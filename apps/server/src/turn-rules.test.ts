@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { WebSocket } from "ws";
-import { INITIAL_HAND_SIZE, createGame, findCard } from "@volga/game-core";
+import { INITIAL_HAND_SIZE, createGame, findCard, getCardAttribute } from "@volga/game-core";
 import type { GameState, PlayerState, ServerMessage } from "@volga/shared";
 import { finishTurn, pickAiDefenseCards, startServer } from "./index.js";
 import { createRoom, type Room } from "./room.js";
@@ -121,11 +121,25 @@ function isPlayable(cardId: string, mp: number): boolean {
   return true;
 }
 
-/** 最も弱い攻撃カードを選ぶ（勝敗が意図せず決まらないようにする）。 */
+/**
+ * 最も弱い攻撃カードを選ぶ（勝敗が意図せず決まらないようにする）。
+ * 無政府主義の攻撃はダメージが通れば相手を HP0 にするため、このテストでは避ける。
+ * 奇跡カードは使用後も手札に残るため、手札枚数の検証には使わない。
+ * MP が足りないカードも選ばない（サーバ側で not enough MP になり得る）。
+ */
 function pickAttackCard(player: PlayerState): string | null {
   return (
     [...player.hand]
-      .filter((cardRef) => attackPower(cardRef.id) > 0)
+      .filter((cardRef) => {
+        const card = findCard(cardRef.id);
+        return (
+          card !== undefined &&
+          card.category !== "miracle" &&
+          attackPower(cardRef.id) > 0 &&
+          isPlayable(cardRef.id, player.mp) &&
+          getCardAttribute(cardRef.id) !== "anarchism"
+        );
+      })
       .sort(
         (a, b) =>
           attackPower(a.id) + selfDamage(a.id) - (attackPower(b.id) + selfDamage(b.id)),
@@ -148,6 +162,8 @@ function pickNonAttackCard(player: PlayerState): string | null {
       const card = findCard(cardRef.id);
       if (!card) return false;
       if (card.category === "party") return false;
+      // 奇跡カードは使用後も手札に残るため、消費枚数の検証には使えない。
+      if (card.category === "miracle") return false;
       if (attackPower(cardRef.id) > 0) return false;
       // 自傷で決着してしまうカードは避ける（ターン終了の検証にならない）。
       if (selfDamage(cardRef.id) > 0) return false;
