@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カードアイコン スタイル試作 — 階級闘争</title>
+<style>
+  :root{
+    --bar-teal:#4ca89b; --bar-teal-dark:#2f7568; --bar-teal-deep:#1f5b50;
+    --panel-cream:#f3f6d4; --panel-cream-soft:#eef4cc; --panel-cream-line:#d6e0a6;
+    --text-dark:#1f3a35; --text-dark-soft:#4a6b62; --danger:#e0533b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",Meiryo,system-ui,sans-serif;
+    font-weight:700;color:var(--text-dark);
+    background:
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,.28), transparent 45%),
+      radial-gradient(circle at 80% 70%, rgba(255,255,255,.18), transparent 50%),
+      linear-gradient(160deg,var(--bar-teal) 0%,var(--bar-teal-dark) 60%,var(--bar-teal-deep) 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+  header.hero{
+    background:var(--panel-cream);border:3px solid var(--bar-teal-deep);border-radius:18px;
+    padding:20px 24px;box-shadow:0 6px 0 rgba(31,91,80,.35);margin-bottom:22px;
+  }
+  header.hero h1{margin:0 0 6px;font-size:22px;letter-spacing:.02em}
+  header.hero p{margin:4px 0;font-size:13px;line-height:1.7;color:var(--text-dark-soft);font-weight:700}
+  .meta{font-size:12px;color:#6b8479}
+  section{
+    background:var(--panel-cream);border:3px solid var(--bar-teal-deep);border-radius:18px;
+    padding:18px 22px 22px;margin-bottom:22px;box-shadow:0 6px 0 rgba(31,91,80,.35);
+  }
+  section > h2{
+    margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:10px;
+  }
+  section > h2 .num{
+    background:var(--bar-teal-dark);color:var(--panel-cream);border-radius:999px;
+    width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:14px;flex:0 0 auto;
+  }
+  .hint{font-size:12px;color:var(--text-dark-soft);margin:0 0 16px;line-height:1.7}
+  .row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .tag{
+    font-size:12px;background:var(--panel-cream-soft);border:2px solid var(--panel-cream-line);
+    border-radius:999px;padding:2px 10px;white-space:nowrap;
+  }
+  .icon48{
+    width:48px;height:48px;display:flex;align-items:center;justify-content:center;
+    background:#ffffff;border:1px solid #cfe0d6;border-radius:6px;
+  }
+  .icon48 .ic{width:48px;height:48px;display:block}
+  .ic{display:block}
+  /* 実カード（apps/web/src/app/globals.css の .gf-hand-card を再現） */
+  .card{
+    position:relative;width:82px;height:100px;flex:none;
+    border:2px solid #d8ffc9;border-radius:8px;overflow:hidden;
+    display:grid;grid-template-rows:72px 26px;background:#fde2d4;
+    text-align:center;
+  }
+  .card .art{
+    display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.45);
+  }
+  .card .art .ic{width:48px;height:48px;display:block}
+  .card .cap{
+    display:flex;align-items:center;justify-content:flex-start;gap:4px;
+    padding-left:7px;
+    background:#d9ffd0;color:#3f4a47;font-size:17px;font-weight:900;line-height:1;
+  }
+  .card .price{
+    position:absolute;bottom:4px;right:4px;font-size:11px;font-weight:900;line-height:1;
+    color:#c66b8a;background:#fff;border:1.5px solid #c66b8a;border-radius:999px;padding:1px 6px;
+  }
+  .cardLabel{font-size:12px;color:var(--text-dark-soft)}
+  .cardName{font-size:13px}
+  .hand{
+    display:inline-flex;
+    background:linear-gradient(180deg,#57bda2,#3a9b82);
+    border:3px solid var(--bar-teal-deep);border-radius:14px;padding:14px 16px 10px;
+    display:flex;gap:4px;align-items:flex-end;box-shadow:inset 0 3px 0 rgba(255,255,255,.25);
+  }
+  .bigIcon{width:256px;height:256px;display:block;border-radius:10px;overflow:hidden}
+  .bigIcon .ic{width:256px;height:256px;display:block}
+  .zoomGrid{display:flex;gap:26px;flex-wrap:wrap}
+  .zoomCell{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .zoomCell canvas{
+    display:block;border-radius:8px;border:1px solid #cfe0d6;background:#fff;
+    image-rendering:pixelated;
+  }
+  .zoomCell .cap{font-size:11px;color:var(--text-dark-soft)}
+  .swatches{display:flex;gap:6px;align-items:center;margin-top:2px}
+  .sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.25)}
+  table.notes{border-collapse:collapse;width:100%;font-size:12.5px;line-height:1.6}
+  table.notes th,table.notes td{border-bottom:1px solid var(--panel-cream-line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.notes th{background:var(--panel-cream-soft);white-space:nowrap}
+  code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#e6efd8;padding:1px 5px;border-radius:4px}
+  .ok{color:#2f7568}.warn{color:#b0602a}
+  .foot{font-size:11px;color:#d9efe6;text-align:center;margin-top:18px;line-height:1.9}
+  .foot code{background:rgba(0,0,0,.18);color:#e9f6ee}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<symbol id="icon-a" viewBox="0 0 64 64">
+<!-- A: 赤地 + 黒の拳シルエット + 生成りの縁 / 3 colors: #c22a21 #191310 #f4ecd6 -->
+  <rect width="64" height="64" fill="#c22a21"/>
+  <g fill="#191310">
+    <!-- 握り拳（手首まで） -->
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <!-- 前に回り込む親指 -->
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#f4ecd6" stroke-width="2.0" stroke-linecap="round">
+    <!-- 親指の合わせ目 -->
+    <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+    <!-- まくり上げた袖口 -->
+    <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+  </g>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#f4ecd6" stroke-width="2.6"/>
+</symbol>
+<symbol id="icon-b" viewBox="0 0 64 64">
+<!-- B: 黒地 + 赤い円 + 生成りの拳（ロトチェンコ風の反転） / 3 colors: #c22a21 #191310 #f4ecd6 -->
+  <rect width="64" height="64" fill="#191310"/>
+  <polygon points="0,0 16,0 0,16" fill="#f4ecd6"/>
+  <circle cx="31" cy="29" r="25.5" fill="#c22a21"/>
+  <g fill="#f4ecd6">
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#191310" stroke-width="2.4" stroke-linecap="round">
+    <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+    <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+  </g>
+</symbol>
+<symbol id="icon-c" viewBox="0 0 64 64">
+<!-- C: 生成り地 + 黒単色の拳 + 赤い円 / 3 colors: #efe6cd #1b1613 #cf3b2c -->
+  <defs>
+    <filter id="ink-c" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="1" seed="9" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.65" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <rect width="64" height="64" fill="#efe6cd"/>
+  <g filter="url(#ink)">
+    <circle cx="32" cy="29.5" r="25" fill="#cf3b2c"/>
+    <g fill="#1b1613">
+      <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+               C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+               C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+               C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+               C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+               L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+               L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+      <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+               C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+               C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+    </g>
+    <g fill="none" stroke="#efe6cd" stroke-width="2.4" stroke-linecap="round">
+      <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+      <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+    </g>
+  </g>
+  <!-- インクの抜け（軽いムラ） -->
+  <g fill="#efe6cd">
+    <circle cx="21.4" cy="22.2" r="0.5"/>
+    <circle cx="36.4" cy="35.8" r="0.45"/>
+    <circle cx="31.2" cy="48.2" r="0.4"/>
+  </g>
+</symbol>
+<symbol id="icon-d" viewBox="0 0 64 64">
+<!-- D: 生成り地 + 黒ベタ＋太い抜き線 + 赤のアクセント1点 / 3 colors: #f7f2e3 #1b1613 #d0452f -->
+  <rect width="64" height="64" fill="#f7f2e3"/>
+  <!-- 赤のアクセント（まくり上げた袖）-->
+  <rect x="20.6" y="43.2" width="25.4" height="6" rx="3" fill="#d0452f"/>
+  <g fill="#1b1613">
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#f7f2e3" stroke-width="2.2" stroke-linecap="round">
+    <path d="M13.4 34.4 C17.1 32.4 27 29.5 31.9 29.1"/>
+    <path d="M26.6 50.9 Q32.2 48.9 38.6 50.9"/>
+  </g>
+</symbol>
+<symbol id="icon-v1" viewBox="0 0 64 64">
+<!-- A-1 社会主義: 赤地 + 黒拳 + 生成りの縁 / 3 colors: #c22a21 #191310 #f4ecd6 -->
+  <rect width="64" height="64" fill="#c22a21"/>
+  <g fill="#191310">
+    <!-- 握り拳（手首まで） -->
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <!-- 前に回り込む親指 -->
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#f4ecd6" stroke-width="2.0" stroke-linecap="round">
+    <!-- 親指の合わせ目 -->
+    <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+    <!-- まくり上げた袖口 -->
+    <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+  </g>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#f4ecd6" stroke-width="2.6"/>
+</symbol>
+<symbol id="icon-v2" viewBox="0 0 64 64">
+<!-- A-2 資本主義: 紺地 + 金の拳 + 生成りの縁（拳が明るいので抜き線は地色） / 3 colors: #22406e #d9a94a #f4ecd6 -->
+  <rect width="64" height="64" fill="#22406e"/>
+  <g fill="#d9a94a">
+    <!-- 握り拳（手首まで） -->
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <!-- 前に回り込む親指 -->
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#22406e" stroke-width="2.0" stroke-linecap="round">
+    <!-- 親指の合わせ目 -->
+    <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+    <!-- まくり上げた袖口 -->
+    <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+  </g>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#22406e" stroke-width="2.6"/>
+</symbol>
+<symbol id="icon-v3" viewBox="0 0 64 64">
+<!-- A-3 無政府主義: 黒地 + 生成りの拳 + 赤い縁 / 3 colors: #16110f #f4ecd6 #c9352a -->
+  <rect width="64" height="64" fill="#16110f"/>
+  <g fill="#f4ecd6">
+    <!-- 握り拳（手首まで） -->
+    <path d="M17 31.6 L17 20.6 C17 17.6 18 16.2 20.4 16.0
+             C20.9 12.5 24.7 12.3 25.5 15.8 L26.7 15.8
+             C27.2 12.5 31.3 12.5 32.1 15.6 L33.3 15.6
+             C33.8 12.7 37.7 12.7 38.5 15.8 L39.7 15.8
+             C40.2 13.8 43.9 14.0 44.7 17.4 C45.0 18.2 45.0 19.2 45.0 20.2
+             L45.0 37.6 C45.0 40.8 42.2 42.4 38.4 42.6 L39.2 60 L24.8 60
+             L25.6 42.8 C21.2 41.8 17.8 38.2 17 31.6 Z"/>
+    <!-- 前に回り込む親指 -->
+    <path d="M10.4 33.0 C14.2 31.4 26.0 28.2 31.2 27.7 C35.2 27.4 38.2 29.2 38.2 32.6
+             C38.2 36.2 35.2 39.4 31.0 40.4 C25.2 41.8 16.8 41.4 13.6 39.2
+             C10.8 37.3 10.2 35.2 10.4 33.0 Z"/>
+  </g>
+  <g fill="none" stroke="#16110f" stroke-width="2.0" stroke-linecap="round">
+    <!-- 親指の合わせ目 -->
+    <path d="M13.2 34.4 C17 32.4 27 29.5 31.9 29.1"/>
+    <!-- まくり上げた袖口 -->
+    <path d="M26.6 50.8 Q32.2 48.8 38.6 50.8"/>
+  </g>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#c9352a" stroke-width="2.6"/>
+</symbol>
+</svg>
+
+<div class="wrap">
+  <header class="hero">
+    <h1>カードアイコン スタイル試作 —「階級闘争」</h1>
+    <p>現在は絵文字 <code>✊</code> 1 文字。ここでは同じモチーフ（突き上げる拳）を 4 つのグラフィック表現で描き、<strong>実寸 48px で読めるか</strong>を比べる試作です。アプリへの組み込みはまだ行っていません。</p>
+    <p class="meta">手札カードは実装と同じ 82×100px / アイコン領域 高さ 72px・アイコン実寸 48px。SVG はすべて手書き・3 色まで。</p>
+  </header>
+
+  <section>
+    <h2><span class="num">1</span>実寸 48px（白地）</h2>
+    <p class="hint">カード内のアイコン領域と同じ 48×48px。ここで潰れる案は本番でも潰れます。</p>
+    <div class="row">
+      <div class="col"><span class="tag">A アジプロ・ポスター</span><div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-a"/></svg></div></div>
+      <div class="col"><span class="tag">B 構成主義</span><div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-b"/></svg></div></div>
+      <div class="col"><span class="tag">C ステンシル</span><div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-c"/></svg></div></div>
+      <div class="col"><span class="tag">D 洗練ピクトグラム</span><div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-d"/></svg></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>手札カード実寸 82×100px</h2>
+    <p class="hint">実装の <code>.gf-hand-card</code> と同じ寸法・配色（属性 weapon の配色）。カード名は実カードには入らないので外に添えています。</p>
+    <div class="hand">
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-a"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="cardName">階級闘争</span><span class="cardLabel">A</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-b"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="cardName">階級闘争</span><span class="cardLabel">B</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-c"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="cardName">階級闘争</span><span class="cardLabel">C</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-d"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="cardName">階級闘争</span><span class="cardLabel">D</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><span style="font-size:48px;line-height:1">✊</span></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="cardName">階級闘争</span><span class="cardLabel">現行（絵文字）</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>48px を 5 倍に拡大（実際の 48px ラスタを最近傍で拡大）</h2>
+    <p class="hint">ブラウザが 48px で描いた画素をそのまま 5 倍にしています。線の切れ・潰れ・にじみはここで分かります。</p>
+    <div class="zoomGrid" id="zoomRow" data-ready="0"></div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>256px（モチーフの造形チェック）</h2>
+    <p class="hint">握り拳として正しく読めるか（ボクシンググローブ／手を振る人に見えないか）を大きいサイズで確認。</p>
+    <div class="row">
+      <div class="col"><div class="bigIcon"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-a"/></svg></div><span class="tag">A アジプロ・ポスター</span></div>
+      <div class="col"><div class="bigIcon"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-b"/></svg></div><span class="tag">B 構成主義</span></div>
+      <div class="col"><div class="bigIcon"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-c"/></svg></div><span class="tag">C ステンシル</span></div>
+      <div class="col"><div class="bigIcon"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-d"/></svg></div><span class="tag">D 洗練ピクトグラム</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>属性色バリエーション（スタイル A）</h2>
+    <p class="hint">背景色だけを属性ごとに差し替えた場合の見え方。拳が明るい色になる資本主義・無政府主義では、抜き線と縁の色も合わせて調整しています。</p>
+    <div class="row">
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v1"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="tag">社会主義 / 赤 #c22a21</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v2"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="tag">資本主義 / 紺 #22406e + 金 #d9a94a</span>
+      </div>
+      <div class="col">
+        <div class="card"><div class="art"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v3"/></svg></div><div class="cap">攻2</div><span class="price">￥2</span></div>
+        <span class="tag">無政府主義 / 黒 #16110f</span>
+      </div>
+      <div class="col" style="align-self:stretch;justify-content:center;gap:6px">
+        <div style="display:flex;gap:8px">
+          <div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v1"/></svg></div>
+          <div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v2"/></svg></div>
+          <div class="icon48"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true"><use href="#icon-v3"/></svg></div>
+        </div>
+        <span class="cardLabel">↑ 48px で並べた場合</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>比較メモ</h2>
+    <table class="notes">
+      <tr><th>案</th><th>狙い</th><th>色</th><th>48px の自己評価</th></tr>
+      <tr>
+        <td><strong>A</strong> アジプロ・ポスター</td>
+        <td>赤地に黒ベタの拳＋生成りの枠。印刷物のベタ塗りで、遠目にも形が残る一番素直な政治ポスター。</td>
+        <td><span class="swatches"><span class="sw" style="background:#c22a21"></span><span class="sw" style="background:#191310"></span><span class="sw" style="background:#f4ecd6"></span></span></td>
+        <td class="ok">◎ シルエットが最も強く、48px でも拳と分かる。指の刻みは消えるが問題ない。</td>
+      </tr>
+      <tr>
+        <td><strong>B</strong> 構成主義</td>
+        <td>黒地・赤い円・生成りの拳という反転構成。ロトチェンコ風の面の分割で、色数は同じでも印象が最も変わる。</td>
+        <td><span class="swatches"><span class="sw" style="background:#c22a21"></span><span class="sw" style="background:#191310"></span><span class="sw" style="background:#f4ecd6"></span></span></td>
+        <td class="ok">○ 拳は読める。赤い円が大きいので 48px では「赤い玉の上の拳」に見え、やや情報量が多い。</td>
+      </tr>
+      <tr>
+        <td><strong>C</strong> ステンシル</td>
+        <td>生成り地に黒 1 色＋赤い円。版ズレ・インクのムラを軽く入れて、印刷物の質感を出す。</td>
+        <td><span class="swatches"><span class="sw" style="background:#efe6cd"></span><span class="sw" style="background:#1b1613"></span><span class="sw" style="background:#cf3b2c"></span></span></td>
+        <td class="ok">○ 輪郭のかすれが効いて良いが、48px では腕の下側が少し溶ける。フィルタは更に弱めてもよい。</td>
+      </tr>
+      <tr>
+        <td><strong>D</strong> 洗練ピクトグラム</td>
+        <td>枠なし・生成り地に黒ベタ＋細い抜き線、赤は袖口の 1 点だけ。現行路線の延長で、他案との比較基準。</td>
+        <td><span class="swatches"><span class="sw" style="background:#f7f2e3"></span><span class="sw" style="background:#1b1613"></span><span class="sw" style="background:#d0452f"></span></span></td>
+        <td class="ok">○ 読めるが、A と並べると差が色数だけになりやすい。線画版は 48px で潰れたためベタ＋抜き線に変更した。</td>
+      </tr>
+    </table>
+  </section>
+
+  <p class="foot">Volga Field — design prototype / ブランチ <code>design/card-icon-prototype</code></p>
+</div>
+
+<script>
+(function(){
+  var items = [["a","A アジプロ"],["b","B 構成主義"],["c","C ステンシル"],["d","D ピクトグラム"]];
+  var host = document.getElementById("zoomRow");
+  var SIZE = 48, ZOOM = 5;
+  var pending = items.length;
+  items.forEach(function(it){
+    var sym = document.getElementById("icon-" + it[0]);
+    if(!sym) return;
+    var markup = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="48" height="48">' + sym.innerHTML + '</svg>';
+    var img = new Image();
+    img.onload = function(){
+      var small = document.createElement("canvas");
+      small.width = SIZE; small.height = SIZE;
+      var sctx = small.getContext("2d");
+      sctx.drawImage(img, 0, 0, SIZE, SIZE);
+
+      var cell = document.createElement("div");
+      cell.className = "zoomCell";
+      var big = document.createElement("canvas");
+      big.width = SIZE * ZOOM; big.height = SIZE * ZOOM;
+      var bctx = big.getContext("2d");
+      bctx.imageSmoothingEnabled = false;
+      bctx.drawImage(small, 0, 0, SIZE * ZOOM, SIZE * ZOOM);
+      var cap = document.createElement("span");
+      cap.className = "cap";
+      cap.textContent = it[1] + " — 48px ×" + ZOOM;
+      cell.appendChild(big); cell.appendChild(cap);
+      host.appendChild(cell);
+      if(--pending === 0){ host.setAttribute("data-ready","1"); document.body.setAttribute("data-zoom-ready","1"); }
+    };
+    img.onerror = function(){
+      if(--pending === 0){ host.setAttribute("data-ready","1"); document.body.setAttribute("data-zoom-ready","1"); }
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+  });
+})();
+</script>
+</body>
+</html>
