@@ -27,19 +27,18 @@ import type {
  */
 export const DUEL_STEP_MS = 700;
 /**
- * The field is cleared first so the played card arrives on an empty stage. That
- * empty beat is deliberately shorter than a normal step: it carries no
- * information, and a full second of blank field feels like a stall.
+ * The field is cleared first so the played card arrives on an empty stage.
+ * Same 700ms beat as every other step, so the rhythm stays even.
  */
-export const DUEL_CLEAR_MS = 500;
+export const DUEL_CLEAR_MS = 700;
 /**
  * Own defense confirmation: clear the centre field, then reveal the card. Kept
  * at 100ms because the player already committed by pressing the button, and
  * waiting half a second there makes the confirmation feel unresponsive.
  */
 export const DUEL_DEFENSE_STEP_MS = 100;
-/** How long the turn banner stays up before the normal UI comes back. */
-export const DUEL_TURN_HOLD_MS = 500;
+/** How long the turn banner stays up before the normal UI comes back (same 700ms beat). */
+export const DUEL_TURN_HOLD_MS = 700;
 /**
  * When the resolution arrived very recently, wait a little for a follow-up
  * state before deciding that the turn did not change. The server may broadcast
