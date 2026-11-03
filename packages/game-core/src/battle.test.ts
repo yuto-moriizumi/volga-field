@@ -120,6 +120,69 @@ test("defendAttack can use multiple defense cards at once", () => {
   assert.equal(result.state.log.filter((entry) => entry.kind === "defense").length, 2);
 });
 
+test("a party member leaves their party when damage triggers the 10% roll", () => {
+  const state = defenseState();
+  state.players[1] = { ...state.players[1]!, party: "green_party" };
+
+  // 0 < 0.1 なので離党する。
+  const result = defendAttack(state, "defender", [], () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.party, null);
+  assert.equal(defender?.hp, 16);
+  assert.ok(
+    result.state.log.some((entry) => entry.message.includes("緑の党を離党した")),
+  );
+});
+
+test("a party member keeps their party when the 10% roll misses", () => {
+  const state = defenseState();
+  state.players[1] = { ...state.players[1]!, party: "green_party" };
+
+  // 0.5 >= 0.1 なので離党しない。
+  const result = defendAttack(state, "defender", [], () => 0.5);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.party, "green_party");
+  assert.equal(defender?.hp, 16);
+  assert.ok(
+    !result.state.log.some((entry) => entry.message.includes("離党")),
+  );
+});
+
+test("a fully blocked attack does not roll for leaving the party", () => {
+  const state = defenseState();
+  state.pendingAttack = { ...state.pendingAttack!, amount: 0 };
+  state.players[1] = { ...state.players[1]!, party: "green_party" };
+
+  // rng が 0 でも、ダメージ0なら離党判定をしない。
+  const result = defendAttack(state, "defender", [], () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.party, "green_party");
+  assert.ok(
+    !result.state.log.some((entry) => entry.message.includes("離党")),
+  );
+});
+
+test("a player without a party is unaffected by the leave roll", () => {
+  const result = defendAttack(defenseState(), "defender", [], () => 0);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const defender = result.state.players.find((p) => p.id === "defender");
+  assert.equal(defender?.party, null);
+  assert.ok(
+    !result.state.log.some((entry) => entry.message.includes("離党")),
+  );
+});
+
 test("playCard heals the player who uses the ヒール miracle", () => {
   const result = playCard(playState(), "attacker", { id: "heal" }, "defender");
 

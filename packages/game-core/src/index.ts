@@ -4,6 +4,8 @@ export * from "./player.js";
 export {
   PARTY_ACTION_CHANCE,
   PARTY_ACTIONS,
+  PARTY_LEAVE_CHANCE,
+  leavePartyOnDamage,
   resolvePartyActions,
 } from "./parties.js";
 export {

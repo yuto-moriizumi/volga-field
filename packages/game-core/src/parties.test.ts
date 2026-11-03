@@ -90,6 +90,26 @@ test("communist party deals damage to a random living opponent", () => {
   assert.deepEqual(result.state.log, result.logs);
 });
 
+test("a party member damaged by a party action can leave their party", () => {
+  const state = gameState([
+    withParty("other", "green_party"),
+    withParty("voter", "communist_party"),
+  ]);
+
+  // chance 0.1 -> 成功, action 0.1 -> 労働者の反撃, target 0.0 -> other, leave 0.0 -> 離党
+  const result = resolvePartyActions(
+    state,
+    "other",
+    sequenceRng([0.1, 0.1, 0.0, 0.0]),
+  );
+
+  const other = result.state.players.find((p) => p.id === "other");
+  assert.equal(other?.hp, 17);
+  assert.equal(other?.party, null);
+  assert.equal(result.logs.length, 2);
+  assert.ok(result.logs[1]!.message.includes("緑の党を離党した"));
+});
+
 test("democratic party heals itself beyond the base HP", () => {
   const state = gameState([
     withParty("voter", "democratic_party", { hp: 20, maxHp: 20 }),

@@ -21,6 +21,7 @@ import {
 import { drawRandomCards } from "./draw.js";
 import { applyDoomsdayDevil, rollDoomsdayDevil } from "./devils.js";
 import { resolvePartyActions } from "./parties.js";
+import { leavePartyOnDamage } from "./parties.js";
 import type { Rng } from "./parties.js";
 import {
   chargePlayer,
@@ -181,6 +182,7 @@ function resolveDamage(
   fromCardName: string,
   playerId: PlayerId,
   turn: number,
+  rng: Rng,
 ): { target: PlayerState; log: BattleLogEntry[] } {
   const logs: BattleLogEntry[] = [];
   const damaged = damagePlayer(target, amount);
@@ -193,7 +195,10 @@ function resolveDamage(
       damage: amount,
     });
   }
-  return { target: damaged, log: logs };
+  // 政党所属者はダメージを受けると10%で離党する。
+  const left = leavePartyOnDamage(damaged, amount, turn, rng);
+  if (left.log) logs.push(left.log);
+  return { target: left.player, log: logs };
   void fromCardId;
 }
 
@@ -205,6 +210,7 @@ function applyEffect(
   cardName: string,
   turn: number,
   actorId: PlayerId,
+  rng: Rng,
 ): PairResult {
   const logs: BattleLogEntry[] = [];
   const actorName =
@@ -220,6 +226,7 @@ function applyEffect(
         cardName,
         actorId,
         turn,
+        rng,
       );
       logs.push(
         ...log.map((l) => ({
@@ -274,6 +281,7 @@ export function playCard(
   playerId: PlayerId,
   cardRef: CardRef | CardRef[],
   targetPlayerId?: PlayerId,
+  rng: Rng = Math.random,
 ): { ok: true; state: GameState } | { ok: false; reason: string } {
   const active = state.players[state.activePlayerIndex];
   if (!active || active.id !== playerId) return { ok: false, reason: "not your turn" };
@@ -377,6 +385,7 @@ export function playCard(
           card.name,
           state.turn,
           playerId,
+          rng,
         );
         self = result.self;
         opponent = result.opponent;
@@ -439,6 +448,7 @@ export function playCard(
         card.name,
         state.turn,
         playerId,
+        rng,
       );
       self = result.self;
       opponent = result.opponent;
@@ -532,6 +542,7 @@ export function defendAttack(
     pending.cardName,
     pending.attackerId,
     state.turn,
+    rng,
   );
   defender = damaged;
   logs.push(...log);
@@ -697,6 +708,11 @@ export function endTurn(
         const result = applyDoomsdayDevil(devil, self, state.turn);
         self = result.player;
         logs.push(result.log);
+        if (devil.effect.kind === "damage") {
+          const left = leavePartyOnDamage(self, devil.effect.amount, state.turn, rng);
+          self = left.player;
+          if (left.log) logs.push(left.log);
+        }
       }
     }
     const drawn = drawRandomCards(toDraw, rng);

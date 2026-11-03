@@ -23,6 +23,35 @@ export type Rng = () => number;
 /** ターン終了時、所属政党を持つプレイヤーが行動する確率 */
 export const PARTY_ACTION_CHANCE = 0.25;
 
+/** 政党所属者が1以上のダメージを受けたとき、この確率で離党する */
+export const PARTY_LEAVE_CHANCE = 0.1;
+
+/**
+ * ダメージを受けたプレイヤーが政党に所属していれば、10%で離党させる。
+ * ダメージが0（防御で無効化）や、すでに倒れている場合は判定しない。
+ */
+export function leavePartyOnDamage(
+  player: PlayerState,
+  amount: number,
+  turn: number,
+  rng: Rng,
+): { player: PlayerState; log: BattleLogEntry | null } {
+  if (amount <= 0 || player.party === null || player.hp <= 0) {
+    return { player, log: null };
+  }
+  if (rng() >= PARTY_LEAVE_CHANCE) return { player, log: null };
+  const label = PARTY_LABELS[player.party];
+  return {
+    player: { ...player, party: null },
+    log: {
+      turn,
+      playerId: player.id,
+      message: `${player.name}は${label}を離党した`,
+      kind: "special",
+    },
+  };
+}
+
 export const PARTY_ACTIONS: Record<PartyId, readonly PartyAction[]> = {
   communist_party: [
     { name: "労働者の反撃", kind: "damage", amount: 3, weight: 60 },
@@ -114,7 +143,8 @@ export function resolvePartyActions(
         if (targets.length === 0) continue;
         const target = targets[Math.floor(rng() * targets.length)]!;
         const damaged = damagePlayer(target, action.amount);
-        players = players.map((player) => (player.id === target.id ? damaged : player));
+        const left = leavePartyOnDamage(damaged, action.amount, state.turn, rng);
+        players = players.map((player) => (player.id === target.id ? left.player : player));
         logs.push({
           turn: state.turn,
           playerId: actor.id,
@@ -122,6 +152,7 @@ export function resolvePartyActions(
           kind: "special",
           damage: action.amount,
         });
+        if (left.log) logs.push(left.log);
         break;
       }
       case "heal": {
