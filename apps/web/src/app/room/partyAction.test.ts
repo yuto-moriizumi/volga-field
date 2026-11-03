@@ -7,6 +7,8 @@ import {
   type PartyActionEvent,
 } from "./[roomId]/battleEvents";
 import {
+  PARTY_CARD_MS,
+  PARTY_EFFECT_MS,
   buildPartyPresentation,
   partyActionAnnouncement,
   partyEffectLabel,
@@ -232,4 +234,30 @@ test("presentation: every effect kind has a short label", () => {
   assert.equal(partyEffectLabel({ kind: "mp", amount: 2 }), "MP+2");
   assert.equal(partyEffectLabel({ kind: "money", amount: 3 }), "￥+3");
   assert.equal(partyEffectLabel({ kind: "steal", amount: 2 }), "奪￥2");
+});
+
+test("presentation: two beats share one key, card comes first", () => {
+  const events = partyEvents(state(), [
+    partyLog("無政府党が動いた！ 略奪: アリスから2円を奪った", "p2"),
+  ]);
+  const event = events[0]!;
+  const players = [
+    { id: "p1", name: "アリス" },
+    { id: "p2", name: "ボブ" },
+  ];
+
+  const card = buildPartyPresentation(event, players, "p1", 11);
+  const effect = buildPartyPresentation(event, players, "p1", 11, "effect");
+
+  assert.equal(card.stage, "card", "the card beat is the default");
+  assert.equal(effect.stage, "effect");
+  assert.equal(card.key, effect.key, "both beats reuse the same key");
+  assert.equal(effect.actionName, "略奪");
+  assert.deepEqual(effect.effect, card.effect);
+});
+
+test("timing: the two party beats add up to the presentation length", () => {
+  assert.equal(PARTY_CARD_MS, 900);
+  assert.equal(PARTY_EFFECT_MS, 900);
+  assert.equal(PARTY_CARD_MS + PARTY_EFFECT_MS, 1_800);
 });

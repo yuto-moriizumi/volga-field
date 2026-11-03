@@ -3246,13 +3246,86 @@ a {
   /* 行動名はカードの主役なので、属性カードの説明より一段大きく・太く。 */
   padding-left: 28px;
   color: #5c3f12;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.05;
   letter-spacing: 0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  border-radius: 4px;
+}
+
+/* 第二段階: 行動名を一度だけ強調する。背景と光彩だけで、位置は動かさない。 */
+.gf-party-action-card[data-stage="effect"] .gf-party-action-desc {
+  animation: gf-party-action-emphasis 0.9s ease-out both;
+}
+
+@keyframes gf-party-action-emphasis {
+  0% {
+    color: #5c3f12;
+    background: rgba(255, 208, 92, 0);
+    box-shadow: 0 0 0 0 rgba(216, 166, 74, 0);
+  }
+  16% {
+    color: #2f1f06;
+    background: rgba(255, 208, 92, 0.85);
+    box-shadow:
+      0 0 0 2px rgba(216, 166, 74, 0.9),
+      0 0 10px rgba(255, 196, 0, 0.4);
+  }
+  62% {
+    color: #35230a;
+    background: rgba(255, 208, 92, 0.62);
+    box-shadow:
+      0 0 0 2px rgba(216, 166, 74, 0.6),
+      0 0 8px rgba(255, 196, 0, 0.22);
+  }
+  100% {
+    color: #5c3f12;
+    background: rgba(255, 208, 92, 0);
+    box-shadow: 0 0 0 0 rgba(216, 166, 74, 0);
+  }
+}
+
+/* 第一段階: 右の場はまだ空。着地点だけを控えめに示す。 */
+.gf-party-pending {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+}
+
+.gf-party-pending span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d8a64a;
+  opacity: 0.22;
+  animation: gf-party-pending-pulse 0.9s ease-in-out both;
+}
+
+.gf-party-pending span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.gf-party-pending span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes gf-party-pending-pulse {
+  0% {
+    opacity: 0.22;
+    transform: scale(0.82);
+  }
+  42% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.22;
+    transform: scale(0.82);
+  }
 }
 
 .gf-party-impact {

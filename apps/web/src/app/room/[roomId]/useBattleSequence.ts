@@ -14,7 +14,8 @@ import {
   DUEL_STEP_MS,
   DUEL_TURN_HOLD_MS,
   DUEL_TURN_SETTLE_MS,
-  PARTY_ACTION_MS,
+  PARTY_CARD_MS,
+  PARTY_EFFECT_MS,
   absorbDraw,
   buildDuelPresentation,
   buildPartyPresentation,
@@ -155,12 +156,21 @@ export function useBattleSequence(
       );
       partyRef.current = presented;
       setParty(presented);
-      // Party actions are pure flavour: a fixed 1.2s beat, skippable, and no
-      // input is expected.
-      after(PARTY_ACTION_MS, epochRef.current, () => {
-        partyRef.current = null;
-        setParty(null);
-        pumpRef.current();
+      // Party actions are pure flavour: a fixed two-beat cadence (card, then
+      // impact), skippable, and no input is expected. Both beats reuse the same
+      // key, so the card is re-rendered in place rather than remounted.
+      const epoch = epochRef.current;
+      after(PARTY_CARD_MS, epoch, () => {
+        if (partyRef.current !== presented) return;
+        const impact: PartyPresentation = { ...presented, stage: "effect" };
+        partyRef.current = impact;
+        setParty(impact);
+        after(PARTY_EFFECT_MS, epoch, () => {
+          if (partyRef.current !== impact) return;
+          partyRef.current = null;
+          setParty(null);
+          pumpRef.current();
+        });
       });
       return;
     }

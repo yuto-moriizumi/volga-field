@@ -182,8 +182,20 @@ export function buildDuelPresentation(
   };
 }
 
-/** How long a party action stays on the field before the next queued step. */
-export const PARTY_ACTION_MS = 1_200;
+/**
+ * A party action is presented in two beats so the action name is readable
+ * before it disappears.
+ *
+ * Stage 1 (`card`): the action card alone on the left field, the right side
+ * still pending. Stage 2 (`effect`): the impact appears on the right and the
+ * action name on the card gets a short highlight. 900 + 900 = 1.8s total.
+ */
+export const PARTY_CARD_MS = 900;
+/** How long the impact + highlighted action name stay before the next step. */
+export const PARTY_EFFECT_MS = 900;
+
+/** Which beat of a party action is on screen. */
+export type PartyStage = "card" | "effect";
 
 /**
  * A party acting on its own turn: the owner's name on the left plate, the
@@ -192,6 +204,11 @@ export const PARTY_ACTION_MS = 1_200;
  */
 export interface PartyPresentation {
   key: number;
+  /**
+   * Beat of the presentation. Both beats share `key`, so React re-renders the
+   * card in place instead of remounting it.
+   */
+  stage: PartyStage;
   actorId: PlayerId;
   actorName: string;
   /** Party card id, used for the card face emoji. */
@@ -230,11 +247,13 @@ export function buildPartyPresentation(
   players: readonly { id: PlayerId; name: string }[],
   viewerId: PlayerId | null,
   key: number,
+  stage: PartyStage = "card",
 ): PartyPresentation {
   const nameOf = (id: PlayerId | null) =>
     id ? (players.find((player) => player.id === id)?.name ?? "?") : null;
   return {
     key,
+    stage,
     actorId: event.playerId,
     actorName: nameOf(event.playerId) ?? "?",
     cardId: event.cardId,

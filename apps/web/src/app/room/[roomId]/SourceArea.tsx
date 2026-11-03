@@ -50,9 +50,14 @@ export function SourceArea({
 }) {
   // A party acting on its own borrows the left field for a beat: the owner's
   // name on the plate and the action shown as a card. Nothing is selectable.
+  // The card arrives first and only then does the right field show the impact.
   if (party) {
     return (
-      <div className="gf-source-area" aria-label="政党の場" data-party-stage="card">
+      <div
+        className="gf-source-area"
+        aria-label="政党の場"
+        data-party-stage={party.stage}
+      >
         <div className="gf-status-stack">
           <NamePlate
             label="政党"
@@ -62,7 +67,11 @@ export function SourceArea({
             dataStep="party-owner"
           />
         </div>
-        <div className="gf-duel-slot is-filled" data-step="party-card">
+        <div
+          className="gf-duel-slot is-filled"
+          data-step="party-card"
+          data-party-stage={party.stage}
+        >
           <PartyActionCard party={party} />
         </div>
         <PartyAnnouncer party={party} />

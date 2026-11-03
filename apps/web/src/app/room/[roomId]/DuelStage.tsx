@@ -138,7 +138,11 @@ export function PartyActionCard({ party }: { party: PartyPresentation }) {
   const definition = party.cardId ? findCard(party.cardId) : null;
   const emoji = party.actionEmoji ?? definition?.emoji ?? "🚩";
   return (
-    <div className="gf-party-action-card" data-step="party-card">
+    <div
+      className="gf-party-action-card"
+      data-step="party-card"
+      data-stage={party.stage}
+    >
       <div className="gf-party-action-art" aria-hidden="true">
         {emoji}
       </div>
@@ -147,8 +151,25 @@ export function PartyActionCard({ party }: { party: PartyPresentation }) {
         <div className="gf-party-action-power">
           {partyEffectLabel(party.effect)}
         </div>
-        <div className="gf-party-action-desc">{party.actionName}</div>
+        <div className="gf-party-action-desc" data-stage={party.stage}>
+          {party.actionName}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The right field while the action card is still alone on the left. It only
+ * marks that something is about to land there; the effect itself belongs to
+ * the second beat.
+ */
+export function PartyPendingView() {
+  return (
+    <div className="gf-party-pending" aria-hidden="true">
+      <span />
+      <span />
+      <span />
     </div>
   );
 }
@@ -163,6 +184,7 @@ export function PartyImpactView({ party }: { party: PartyPresentation }) {
       className="gf-party-impact"
       data-kind={kind}
       data-step="party-effect"
+      data-stage={party.stage}
       aria-hidden="true"
     >
       <div className="gf-party-impact-value">

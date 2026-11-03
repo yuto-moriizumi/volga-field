@@ -13,6 +13,7 @@ import {
   DuelEffectView,
   DuelTurnView,
   PartyImpactView,
+  PartyPendingView,
 } from "./DuelStage";
 import type { PartyPresentation } from "./battleSequence";
 
@@ -49,11 +50,19 @@ export function TargetArea({
   onConfirmDefense: () => void;
 }) {
   // Party actions target someone too: the name plate and the effect sit on the
-  // right while the action card is on the left.
+  // right while the action card is on the left. On the first beat the right
+  // field only marks a pending target; the impact lands on the second beat.
   if (party) {
-    const hit = party.effect.kind === "damage" || party.effect.kind === "steal";
+    const settled = party.stage === "effect";
+    const hit =
+      settled &&
+      (party.effect.kind === "damage" || party.effect.kind === "steal");
     return (
-      <div className="gf-target-area" aria-label="政党行動の対象" data-party-stage="target">
+      <div
+        className="gf-target-area"
+        aria-label="政党行動の対象"
+        data-party-stage={party.stage}
+      >
         <NamePlate
           label="対象"
           name={party.targetName}
@@ -64,7 +73,11 @@ export function TargetArea({
         />
         <div className="gf-stage-wrap" data-hit={hit ? "true" : undefined}>
           <div className="gf-action-stage gf-duel-stage">
-            <PartyImpactView party={party} />
+            {settled ? (
+              <PartyImpactView party={party} />
+            ) : (
+              <PartyPendingView />
+            )}
           </div>
         </div>
       </div>
