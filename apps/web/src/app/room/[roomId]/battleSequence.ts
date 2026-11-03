@@ -14,13 +14,18 @@ import type {
  * A duel is one attack (and its defense/damage) presented step by step inside
  * the field instead of as a full-screen overlay.
  *
- * The whole presentation is a fixed 1s cadence: the data may arrive all at
- * once, but the steps are only advanced by the hook's timers. The only input
+ * The whole presentation is a fixed cadence of DUEL_STEP_MS per beat: the data
+ * may arrive all at once, but the steps are only advanced by the hook's timers. The only input
  * that can pause the cadence is the local defense decision (the defender has to
  * pick cards first) and a not-yet-arrived damage resolution.
  */
 
-export const DUEL_STEP_MS = 1_000;
+/**
+ * One beat of the duel (card arrives, target is called, defense is shown, the
+ * effect lands). Trimmed from 1s to 700ms: the presentation still reads as
+ * step-by-step, but a full exchange no longer costs five seconds.
+ */
+export const DUEL_STEP_MS = 700;
 /**
  * The field is cleared first so the played card arrives on an empty stage. That
  * empty beat is deliberately shorter than a normal step: it carries no
