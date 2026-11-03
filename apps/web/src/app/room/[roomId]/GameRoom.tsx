@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
+import { storePlayerName, useStoredPlayerName } from "@/lib/useStoredPlayerName";
 import {
   canDefendAttribute,
   findCard,
@@ -84,7 +84,7 @@ export function GameRoom({
   function submitName() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    localStorage.setItem("volga-player-name", trimmed);
+    storePlayerName(trimmed);
     autoJoinAttemptedRef.current = true;
     setError(null);
     setJoinRequested(true);

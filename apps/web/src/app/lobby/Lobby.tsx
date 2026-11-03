@@ -8,7 +8,7 @@ import type {
   TrainingPlayerCount,
 } from "@volga/shared";
 import { useGameSocket } from "@/lib/useGameSocket";
-import { useStoredPlayerName } from "@/lib/useStoredPlayerName";
+import { storePlayerName, useStoredPlayerName } from "@/lib/useStoredPlayerName";
 import { BottomBar } from "../_components/BottomBar";
 import { TopBar } from "../_components/TopBar";
 
@@ -75,18 +75,18 @@ export function Lobby() {
   useEffect(() => {
     const trimmed = name.trim();
     if (trimmed) {
-      localStorage.setItem("volga-player-name", trimmed);
+      storePlayerName(trimmed);
     }
   }, [name]);
 
   useEffect(() => {
     if (!lastMessage) return;
     if (lastMessage.type === "room_created") {
-      localStorage.setItem("volga-player-name", name.trim());
+      storePlayerName(name.trim());
       router.push(`/room/${lastMessage.roomId}`);
     }
     if (lastMessage.type === "room_joined") {
-      localStorage.setItem("volga-player-name", name.trim());
+      storePlayerName(name.trim());
       router.push(`/room/${lastMessage.gameState.roomId}`);
     }
   }, [lastMessage, router, name]);
@@ -112,7 +112,7 @@ export function Lobby() {
       return;
     }
     if (mode === "shinken") {
-      localStorage.setItem("volga-player-name", name.trim());
+      storePlayerName(name.trim());
       localStorage.removeItem("volga-room-password");
       send({
         type: "create_room",
@@ -131,7 +131,7 @@ export function Lobby() {
       setError("預言者の名前を入力してください");
       return;
     }
-    localStorage.setItem("volga-player-name", name.trim());
+    storePlayerName(name.trim());
     localStorage.removeItem("volga-room-password");
     send({
       type: "create_room",
@@ -149,7 +149,7 @@ export function Lobby() {
       setError("部屋の合言葉を入力してください");
       return;
     }
-    localStorage.setItem("volga-player-name", name.trim());
+    storePlayerName(name.trim());
     localStorage.setItem(
       "volga-room-password",
       JSON.stringify({ mode: hostMode, password: trimmedPassword }),
