@@ -15,6 +15,8 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    /* TypeScript 6 では types 未指定だと @types を自動で拾わない。 */
+    "types": ["node"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
