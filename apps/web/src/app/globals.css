@@ -1779,17 +1779,26 @@ a {
   min-height: 0;
 }
 
+/*
+ * 手札の2段目ぶんの高さを常に確保する。
+ * カード1枚 = 100px、段間 = 16px（選択カードの持ち上げ 12px + 枠線 4px が
+ * 上の段に重ならないための間隔）。
+ */
 .gf-hand-area .gf-hand-strip {
-  min-height: 100px;
+  min-height: 218px;
 }
 
 .gf-hand-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 2px;
+  /* 段は下揃え。1段でも2段でもカードの底辺は同じ位置に来る。 */
+  align-content: flex-end;
+  gap: 16px 2px;
   min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 1px;
+  /* 横スクロールはしない。折り返して2段目に並べる。持ち上げたカードも切らない。 */
+  overflow: visible;
+  padding-bottom: 2px;
 }
 
 .gf-hand-card {
